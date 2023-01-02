@@ -1,0 +1,65 @@
+sudo ip link set $interface down
+sudo iw dev $interface set type monitor
+sudo ip link set $interface up
+sudo iw dev $interface set freq 2467
+sudo iw dev $interface set channel 9
+
+
+dev             mac               driver    MI label
+wlx00e0332c993b 00:e0:33:2c:99:3b rtl8188fu Tx CHINA SM
+wlx00e0332c9962 00:e0:33:2c:99:62 rtl8188fu Tx CHINA SM
+wlx00e0430de2ba 00:e0:43:0d:e2:ba mt7601u   Tx CHINA SHOPEE
+wlx1c61b4e4555f 1c:61:b4:e4:55:5f 8192eu    xx TL-WN823N V3
+wlx1c61b4e46346 1c:61:b4:e4:63:46 8192eu    xx TL-WN823N V3
+wlx24ec998bee93 24:ec:99:8b:ee:93 ath9k_htc TS AR9271
+wlx24ec999b30f3 24:ec:99:9b:30:f3 ath9k_htc TS AR9271
+
+Bus 001 Device 046: ID 0bda:f179 Realtek Semiconductor Corp. RTL8188FTV 802.11b/g/n 1T1R 2.4G WLAN Adapter
+Bus 001 Device 052: ID 0bda:f179 Realtek Semiconductor Corp. RTL8188FTV 802.11b/g/n 1T1R 2.4G WLAN Adapter
+Bus 001 Device 044: ID 148f:7601 Ralink Technology, Corp. MT7601U Wireless Adapter
+Bus 001 Device 043: ID 2357:0109 TP-Link TL-WN823N v2/v3 [Realtek RTL8192EU]
+Bus 001 Device 042: ID 2357:0109 TP-Link TL-WN823N v2/v3 [Realtek RTL8192EU]
+Bus 003 Device 006: ID 0cf3:9271 Qualcomm Atheros Communications AR9271 802.11n
+Bus 003 Device 004: ID 0cf3:9271 Qualcomm Atheros Communications AR9271 802.11n
+
+sudo ./iw_set_type wlx00e0332c993b monitor
+sudo ./iw_set_type wlx00e0332c9962 monitor
+sudo ./iw_set_type wlx00e0430de2ba monitor
+sudo ./iw_set_type wlx1c61b4e4555f monitor
+sudo ./iw_set_type wlx1c61b4e46346 monitor
+sudo ./iw_set_type wlx24ec998bee93 monitor
+sudo ./iw_set_type wlx24ec999b30f3 monitor
+
+sudo iwconfig wlx00e0332c993b freq 2.412G
+sudo iwconfig wlx00e0332c9962 freq 2.412G
+sudo iwconfig wlx00e0430de2ba freq 2.412G
+sudo iwconfig wlx1c61b4e4555f freq 2.412G
+sudo iwconfig wlx1c61b4e46346 freq 2.412G
+sudo iwconfig wlx24ec998bee93 channel 11
+sudo iwconfig wlx24ec999b30f3 channel 11
+
+
+
+sudo iwlist wlx00e0332c993b freq
+sudo iwlist wlx00e0332c9962 freq
+sudo iwlist wlx00e0430de2ba freq
+sudo iwlist wlx1c61b4e4555f freq
+sudo iwlist wlx1c61b4e46346 freq
+
+sudo iwlist wlx00e0332c993b txpower
+sudo iwlist wlx00e0332c9962 txpower
+sudo iwlist wlx00e0430de2ba txpower
+sudo iwlist wlx1c61b4e4555f txpower
+sudo iwlist wlx1c61b4e46346 txpower
+
+sudo iw dev wlx00e0332c993b set freq 2412
+sudo iw dev wlx00e0332c9962 set freq 2412
+sudo iw dev wlx00e0430de2ba set freq 2412
+sudo iw dev wlx1c61b4e4555f set freq 2412
+sudo iw dev wlx1c61b4e46346 set freq 2412
+
+iwlist wlx00e0332c993b channel
+iwlist wlx00e0332c9962 channel
+iwlist wlx00e0430de2ba channel
+iwlist wlx1c61b4e4555f channel
+iwlist wlx1c61b4e46346 channel

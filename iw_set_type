@@ -1,0 +1,5 @@
+#!/bin/sh
+
+sudo ip link set $1 down
+sudo iw dev $1 set type $2
+sudo ip link set $1 up
