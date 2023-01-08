@@ -4,8 +4,6 @@
 
 #include <thread>
 
-
-
 void test_radio_tap()
 {
     alignas(8) uint8_t  radiotap_header_pre[] = {

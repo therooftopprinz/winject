@@ -113,6 +113,7 @@ struct address_t
 
 struct seq_ctl_t
 {
+    // @todo : not working in big endian
     uint16_t frag_sec;
 
     uint8_t get_fragment_num()

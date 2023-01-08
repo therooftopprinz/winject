@@ -2,6 +2,11 @@
 #define __WINJECT_RADIOTAP_HPP__
 
 #include <cstdint>
+#include <sstream>
+#include <iomanip>
+#include <bitset>
+
+#include <safeint.hpp>
 
 namespace winject
 {
@@ -12,13 +17,13 @@ struct header_t
 {
     u_int8_t  version;
     u_int8_t  pad;
-    u_int16_t length;
-    u_int32_t presence;
+    LEU16 length;
+    LEU32 presence;
 } __attribute__((__packed__));
 
 struct tsft_t              // size  8 align  8
 {
-    uint64_t mactime;
+    LEU64 mactime;
 };
 
 struct flags_t             // size  1 align  1
@@ -57,14 +62,14 @@ struct channel_t           // size  4 align  2
 	    E_FLAGS_HALF = 0x4000,
 	    E_FLAGS_QUARTER = 0x8000
     };
-    uint16_t frequency;
-    uint16_t flags;
+    LEU16 frequency;
+    LEU16 flags;
 };
 
 struct fhss_t              // size  2 align  2
 {
     // note : implement properly
-    uint16_t data;
+    LEU16 data;
 
     void set_hop_set(uint8_t value)
     {
@@ -108,17 +113,17 @@ struct antenna_noise_t     // size  1 align  1
 
 struct lock_quality_t      // size  2 align  2
 {
-    uint16_t value;
+    LEU16 value;
 };
 
 struct tx_attenuation_t    // size  2 align  2
 {
-    uint16_t value;
+    LEU16 value;
 };
 
 struct db_tx_attenuation_t // size  2 align  2
 {
-    uint16_t value;
+    LEU16 value;
 };
 
 struct dbm_tx_power_t      // size  1 align  1
@@ -149,7 +154,7 @@ struct rx_flags_t          // size  2 align  2
         BADPLCP = 0x0002,
     };
 
-    uint16_t value;
+    LEU16 value;
 };
 
 struct tx_flags_t          // size  2 align  2
@@ -164,7 +169,7 @@ struct tx_flags_t          // size  2 align  2
         E_FLAGS_NOREORDER = 0x0020
     };
 
-    uint16_t value;
+    LEU16 value;
 };
 
 struct rts_retries_t       // size  1 align  1
@@ -230,8 +235,8 @@ struct ampdu_status_t      // size  8 align  2
         E_FLAG_EOF_VALUE_KNOWN = 0x0080
     };
 
-    uint32_t ref_number;
-    uint16_t flags;
+    LEU32 ref_number;
+    LEU16 flags;
     uint8_t delimiter_crc;
     uint8_t reserved;
 };
@@ -298,13 +303,13 @@ struct vht_t               // size 12 align  2
         E_CODING_LDPC_USER3 = 0x08,
     };
 
-    uint16_t known;
+    LEU16 known;
     uint8_t flags;
     uint8_t bandwith;
     uint8_t mcs_nss[4];
     uint8_t coding;
     uint8_t group_id;
-    uint16_t partial_aid;
+    LEU16 partial_aid;
 
     uint8_t mcs_nss_to_mcs(uint8_t value){return value >> 4;}
     uint8_t mcs_nss_to_nss(uint8_t value){return value & 0xf;}
@@ -335,8 +340,8 @@ struct timestamp_t         // size 12 align  8
         E_FLAG_ACCURACY_KNOWN = 2
     };
 
-    uint64_t timestamp;
-    uint16_t accuracy;
+    LEU64 timestamp;
+    LEU16 accuracy;
     uint8_t unit_pos;
     uint8_t flags;
 };
@@ -492,6 +497,45 @@ public:
         }
     }
 };
+
+std::string to_string(const radiotap_t& rt)
+{
+    if (!rt.header)
+        return {};
+
+    std::stringstream ss;
+    ss <<   "radiotap:";
+    ss << "\n  header:";
+    ss << "\n    version: " << rt.header->version;
+    ss << "\n    length: " << rt.header->length;
+    ss << "\n    presence: " << std::bitset<16>(htole16(rt.header->length));
+    // header_t* header = nullptr;
+    // tsft_t* tsft = nullptr;
+    // flags_t* flags = nullptr;
+    // rate_t* rate = nullptr;
+    // channel_t* channel = nullptr;
+    // fhss_t* fhss = nullptr;
+    // antenna_signal_t* antenna_signal = nullptr;
+    // antenna_noise_t* antenna_noise = nullptr;
+    // lock_quality_t* lock_quality = nullptr;
+    // tx_attenuation_t* tx_attenuation = nullptr;
+    // db_tx_attenuation_t* db_tx_attenuation = nullptr;
+    // dbm_tx_power_t* dbm_tx_power = nullptr;
+    // antenna_t* antenna = nullptr;
+    // db_antenna_signal_t* db_antenna_signal = nullptr;
+    // db_antenna_noise_t* db_antenna_noise = nullptr;
+    // rx_flags_t* rx_flags = nullptr;
+    // tx_flags_t* tx_flags = nullptr;
+    // rts_retries_t* rts_retries = nullptr;
+    // data_retries_t* data_retries = nullptr;
+    // mcs_t* mcs = nullptr;
+    // ampdu_status_t* ampdu_status = nullptr;
+    // vht_t* vht = nullptr;
+    // timestamp_t* timestamp = nullptr;
+    if (rt.tsft)
+    ss << "\n  tsft:" << htole64(rt.tsft->mactime);
+    return ss.str();
+}
 
 } // namespace radiotap
 } // namespace winject
