@@ -71,6 +71,18 @@ private:
     };
 };
 
+template <typename T>
+inline int attach(int sd, T& filter)
+{
+    sock_fprog bpf =
+        {
+            .len    = filter.size(),
+            .filter = filter.data(),
+        };
+
+    return setsockopt(sd, SOL_SOCKET, SO_ATTACH_FILTER, &bpf, sizeof(bpf));
+}
+
 } // namespace filters
 } // namespace ieee_802_11
 } // namespace winject

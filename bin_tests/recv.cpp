@@ -16,21 +16,8 @@ int main(int argc, char *argv[])
     memset(buffer, 0, sizeof(buffer));
     int wdev_sd = wdev;
 
-    // winject::ieee_802_11::filters::data_addr3 bssid_filter(0x123456);
     winject::ieee_802_11::filters::data_addr3 bssid_filter(0x563412);
-
-    sock_fprog bpf =
-        {
-            .len    = bssid_filter.size(),
-            .filter = bssid_filter.data(),
-        };
-
-    int ret = setsockopt(wdev_sd, SOL_SOCKET, SO_ATTACH_FILTER, &bpf, sizeof(bpf));
-    if (ret < 0)
-    {
-        printf("SO_ATTACH_FILTER failed! %d=%s\n", errno, strerror(errno));
-        return 0;
-    }
+    winject::ieee_802_11::filters::attach(wdev_sd, bssid_filter);
 
     winject::radiotap::radiotap_t radiotap(buffer);
 
