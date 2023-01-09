@@ -1,6 +1,7 @@
       ldb  [3]              ;  rt_len = radiotap.length_high;
       lsh  #8               ;  rt_len <<= 8;
       tax                   ;  
+      ldb  [2]              ;
       or   x                ;  rt_len |= radiotap.length_low;
       tax                   ;  
       ldb  [x + 0]          ;  
@@ -18,5 +19,5 @@
       jne  #0xAF, die       ;  if (imm != fr80211.addr3[4]) goto die;
       ldb  [x + 21]         ;  
       jne  #0xFA, die       ;  if (imm != fr80211.addr3[5]) goto die;
-done: ret #-1               ;  return -1;
+      ret #-1               ;  return -1;
 die:  ret #0                ;  return 0;

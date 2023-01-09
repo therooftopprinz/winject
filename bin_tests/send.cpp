@@ -50,6 +50,9 @@ int main(int argc, char *argv[])
     radiotap.mcs->flags |= winject::radiotap::mcs_t::E_FLAG_BW_20;
     radiotap.mcs->flags |= winject::radiotap::mcs_t::E_FLAG_STBC_1;
 
+    auto radiotap_string = winject::radiotap::to_string(radiotap);
+    printf("--- radiotap header info ---\n%s\n\n", radiotap_string.c_str());
+
     struct llc_dummy_t
     {
         uint8_t dsap;
@@ -63,8 +66,9 @@ int main(int argc, char *argv[])
     winject::ieee_802_11::frame_t frame80211(radiotap.end());
     frame80211.frame_control->protocol_type = winject::ieee_802_11::frame_control_t::E_TYPE_DATA;
     frame80211.address1->set(0xffffffffffff); // IBSS Destination
-    frame80211.address2->set(0x5678); // IBSS Source
-    frame80211.address3->set(0x12345678); // IBSS BSSID
+    frame80211.address2->set(0x567890); // IBSS Source
+    // frame80211.address3->set(0x123456); // IBSS BSSID
+    frame80211.address3->set(0x563412); // IBSS BSSID
     frame80211.set_body_size(payload_size+sizeof(llc_dummy_t));
 
     auto llc = (llc_dummy_t*)(frame80211.frame_body);

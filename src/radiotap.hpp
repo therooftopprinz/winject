@@ -13,13 +13,13 @@ namespace winject
 namespace radiotap
 {
 
-struct header_t
+struct header_t            // size 8
 {
     u_int8_t  version;
     u_int8_t  pad;
     LEU16 length;
     LEU32 presence;
-} __attribute__((__packed__));
+};
 
 struct tsft_t              // size  8 align  8
 {
@@ -410,29 +410,36 @@ public:
     {
         scan_status = E_STATUS_PARTIAL;
         auto cp  = (uint8_t*)header + sizeof(header);
-        process_sequence(&radiotap_t::tsft, E_FIELD_PRESENCE_TSFT, cp);
-        process_sequence(&radiotap_t::flags, E_FIELD_PRESENCE_FLAGS, cp);
-        process_sequence(&radiotap_t::rate, E_FIELD_PRESENCE_RATE, cp);
-        process_sequence(&radiotap_t::channel, E_FIELD_PRESENCE_CHANNEL, cp);
-        process_sequence(&radiotap_t::fhss, E_FIELD_PRESENCE_FHSS, cp);
-        process_sequence(&radiotap_t::antenna_signal, E_FIELD_PRESENCE_DBM_ANTSIGNAL, cp);
-        process_sequence(&radiotap_t::antenna_noise, E_FIELD_PRESENCE_DBM_ANTNOISE, cp);
-        process_sequence(&radiotap_t::lock_quality, E_FIELD_PRESENCE_LOCK_QUALITY, cp);
-        process_sequence(&radiotap_t::tx_attenuation, E_FIELD_PRESENCE_TX_ATTENUATION, cp);
-        process_sequence(&radiotap_t::db_tx_attenuation, E_FIELD_PRESENCE_DB_TX_ATTENUATION, cp);
-        process_sequence(&radiotap_t::dbm_tx_power, E_FIELD_PRESENCE_DBM_TX_POWER, cp);
-        process_sequence(&radiotap_t::antenna, E_FIELD_PRESENCE_ANTENNA, cp);
-        process_sequence(&radiotap_t::db_antenna_signal, E_FIELD_PRESENCE_DB_ANTSIGNAL, cp);
-        process_sequence(&radiotap_t::db_antenna_noise, E_FIELD_PRESENCE_DB_ANTNOISE, cp);
-        process_sequence(&radiotap_t::rx_flags, E_FIELD_PRESENCE_RX_FLAGS, cp);
-        process_sequence(&radiotap_t::tx_flags, E_FIELD_PRESENCE_TX_FLAGS, cp);
-        process_sequence(&radiotap_t::rts_retries, E_FIELD_PRESENCE_RTS_RETRIES, cp);
-        process_sequence(&radiotap_t::data_retries, E_FIELD_PRESENCE_DATA_RETRIES, cp);
-        if ((1 << 18) & header->presence) return;
-        process_sequence(&radiotap_t::mcs, E_FIELD_PRESENCE_MCS, cp);
-        process_sequence(&radiotap_t::ampdu_status, E_FIELD_PRESENCE_AMPDU_STATUS, cp);
-        process_sequence(&radiotap_t::vht, E_FIELD_PRESENCE_VHT, cp);
-        process_sequence(&radiotap_t::timestamp, E_FIELD_PRESENCE_TIMESTAMP, cp);
+
+        if ((1 << 31) & (header->presence))
+        {
+            presence_ext = (uint32_t*) cp;
+            cp += 4;
+        }
+
+        process_sequence(header->presence, &radiotap_t::tsft, E_FIELD_PRESENCE_TSFT, cp);
+        process_sequence(header->presence, &radiotap_t::flags, E_FIELD_PRESENCE_FLAGS, cp);
+        process_sequence(header->presence, &radiotap_t::rate, E_FIELD_PRESENCE_RATE, cp);
+        process_sequence(header->presence, &radiotap_t::channel, E_FIELD_PRESENCE_CHANNEL, cp);
+        process_sequence(header->presence, &radiotap_t::fhss, E_FIELD_PRESENCE_FHSS, cp);
+        process_sequence(header->presence, &radiotap_t::antenna_signal, E_FIELD_PRESENCE_DBM_ANTSIGNAL, cp);
+        process_sequence(header->presence, &radiotap_t::antenna_noise, E_FIELD_PRESENCE_DBM_ANTNOISE, cp);
+        process_sequence(header->presence, &radiotap_t::lock_quality, E_FIELD_PRESENCE_LOCK_QUALITY, cp);
+        process_sequence(header->presence, &radiotap_t::tx_attenuation, E_FIELD_PRESENCE_TX_ATTENUATION, cp);
+        process_sequence(header->presence, &radiotap_t::db_tx_attenuation, E_FIELD_PRESENCE_DB_TX_ATTENUATION, cp);
+        process_sequence(header->presence, &radiotap_t::dbm_tx_power, E_FIELD_PRESENCE_DBM_TX_POWER, cp);
+        process_sequence(header->presence, &radiotap_t::antenna, E_FIELD_PRESENCE_ANTENNA, cp);
+        process_sequence(header->presence, &radiotap_t::db_antenna_signal, E_FIELD_PRESENCE_DB_ANTSIGNAL, cp);
+        process_sequence(header->presence, &radiotap_t::db_antenna_noise, E_FIELD_PRESENCE_DB_ANTNOISE, cp);
+        process_sequence(header->presence, &radiotap_t::rx_flags, E_FIELD_PRESENCE_RX_FLAGS, cp);
+        process_sequence(header->presence, &radiotap_t::tx_flags, E_FIELD_PRESENCE_TX_FLAGS, cp);
+        process_sequence(header->presence, &radiotap_t::rts_retries, E_FIELD_PRESENCE_RTS_RETRIES, cp);
+        process_sequence(header->presence, &radiotap_t::data_retries, E_FIELD_PRESENCE_DATA_RETRIES, cp);
+        if ((1 << 18) &  header->presence) return;
+        process_sequence(header->presence, &radiotap_t::mcs, E_FIELD_PRESENCE_MCS, cp);
+        process_sequence(header->presence, &radiotap_t::ampdu_status, E_FIELD_PRESENCE_AMPDU_STATUS, cp);
+        process_sequence(header->presence, &radiotap_t::vht, E_FIELD_PRESENCE_VHT, cp);
+        process_sequence(header->presence, &radiotap_t::timestamp, E_FIELD_PRESENCE_TIMESTAMP, cp);
         if ((1 << 23) & (header->presence)) return;
         if ((1 << 24) & (header->presence)) return;
         if ((1 << 25) & (header->presence)) return;
@@ -441,7 +448,41 @@ public:
         if ((1 << 28) & (header->presence)) return;
         if ((1 << 29) & (header->presence)) return;
         if ((1 << 30) & (header->presence)) return;
-        if ((1 << 31) & (header->presence)) return;
+
+        if (presence_ext)
+        {
+            process_sequence(*presence_ext, &radiotap_t::tsft, E_FIELD_PRESENCE_TSFT, cp);
+            process_sequence(*presence_ext, &radiotap_t::flags, E_FIELD_PRESENCE_FLAGS, cp);
+            process_sequence(*presence_ext, &radiotap_t::rate, E_FIELD_PRESENCE_RATE, cp);
+            process_sequence(*presence_ext, &radiotap_t::channel, E_FIELD_PRESENCE_CHANNEL, cp);
+            process_sequence(*presence_ext, &radiotap_t::fhss, E_FIELD_PRESENCE_FHSS, cp);
+            process_sequence(*presence_ext, &radiotap_t::antenna_signal, E_FIELD_PRESENCE_DBM_ANTSIGNAL, cp);
+            process_sequence(*presence_ext, &radiotap_t::antenna_noise, E_FIELD_PRESENCE_DBM_ANTNOISE, cp);
+            process_sequence(*presence_ext, &radiotap_t::lock_quality, E_FIELD_PRESENCE_LOCK_QUALITY, cp);
+            process_sequence(*presence_ext, &radiotap_t::tx_attenuation, E_FIELD_PRESENCE_TX_ATTENUATION, cp);
+            process_sequence(*presence_ext, &radiotap_t::db_tx_attenuation, E_FIELD_PRESENCE_DB_TX_ATTENUATION, cp);
+            process_sequence(*presence_ext, &radiotap_t::dbm_tx_power, E_FIELD_PRESENCE_DBM_TX_POWER, cp);
+            process_sequence(*presence_ext, &radiotap_t::antenna, E_FIELD_PRESENCE_ANTENNA, cp);
+            process_sequence(*presence_ext, &radiotap_t::db_antenna_signal, E_FIELD_PRESENCE_DB_ANTSIGNAL, cp);
+            process_sequence(*presence_ext, &radiotap_t::db_antenna_noise, E_FIELD_PRESENCE_DB_ANTNOISE, cp);
+            process_sequence(*presence_ext, &radiotap_t::rx_flags, E_FIELD_PRESENCE_RX_FLAGS, cp);
+            process_sequence(*presence_ext, &radiotap_t::tx_flags, E_FIELD_PRESENCE_TX_FLAGS, cp);
+            process_sequence(*presence_ext, &radiotap_t::rts_retries, E_FIELD_PRESENCE_RTS_RETRIES, cp);
+            process_sequence(*presence_ext, &radiotap_t::data_retries, E_FIELD_PRESENCE_DATA_RETRIES, cp);
+            if ((1 << 18) &  *presence_ext) return;
+            process_sequence(*presence_ext, &radiotap_t::mcs, E_FIELD_PRESENCE_MCS, cp);
+            process_sequence(*presence_ext, &radiotap_t::ampdu_status, E_FIELD_PRESENCE_AMPDU_STATUS, cp);
+            process_sequence(*presence_ext, &radiotap_t::vht, E_FIELD_PRESENCE_VHT, cp);
+            process_sequence(*presence_ext, &radiotap_t::timestamp, E_FIELD_PRESENCE_TIMESTAMP, cp);
+            if ((1 << 23) & (*presence_ext)) return;
+            if ((1 << 24) & (*presence_ext)) return;
+            if ((1 << 25) & (*presence_ext)) return;
+            if ((1 << 26) & (*presence_ext)) return;
+            if ((1 << 27) & (*presence_ext)) return;
+            if ((1 << 28) & (*presence_ext)) return;
+            if ((1 << 29) & (*presence_ext)) return;
+            if ((1 << 30) & (*presence_ext)) return;
+        }
 
         scan_length = cp - (uint8_t*)header;
 
@@ -462,6 +503,7 @@ public:
     uint16_t scan_length = 0;
 
     header_t* header = nullptr;
+    uint32_t* presence_ext = nullptr;
     tsft_t* tsft = nullptr;
     flags_t* flags = nullptr;
     rate_t* rate = nullptr;
@@ -486,10 +528,10 @@ public:
     timestamp_t* timestamp = nullptr;
 
     template <typename T>
-    void process_sequence(T radiotap_t::* m, int bitmask, uint8_t*& cp)
+    void process_sequence(uint32_t presence, T radiotap_t::* m, int bitmask, uint8_t*& cp)
     {
         using U = typename std::remove_pointer<T>::type;
-        if (bitmask & header->presence)
+        if (bitmask & presence)
         {
             auto field = (cp + (alignof(U) - uintptr_t(cp) % alignof(U)) % alignof(U));
             this->*m = (U*) field;
@@ -506,34 +548,87 @@ std::string to_string(const radiotap_t& rt)
     std::stringstream ss;
     ss <<   "radiotap:";
     ss << "\n  header:";
-    ss << "\n    version: " << rt.header->version;
-    ss << "\n    length: " << rt.header->length;
-    ss << "\n    presence: " << std::bitset<16>(htole16(rt.header->length));
-    // header_t* header = nullptr;
-    // tsft_t* tsft = nullptr;
-    // flags_t* flags = nullptr;
-    // rate_t* rate = nullptr;
-    // channel_t* channel = nullptr;
-    // fhss_t* fhss = nullptr;
-    // antenna_signal_t* antenna_signal = nullptr;
-    // antenna_noise_t* antenna_noise = nullptr;
-    // lock_quality_t* lock_quality = nullptr;
-    // tx_attenuation_t* tx_attenuation = nullptr;
-    // db_tx_attenuation_t* db_tx_attenuation = nullptr;
-    // dbm_tx_power_t* dbm_tx_power = nullptr;
-    // antenna_t* antenna = nullptr;
-    // db_antenna_signal_t* db_antenna_signal = nullptr;
-    // db_antenna_noise_t* db_antenna_noise = nullptr;
-    // rx_flags_t* rx_flags = nullptr;
-    // tx_flags_t* tx_flags = nullptr;
-    // rts_retries_t* rts_retries = nullptr;
-    // data_retries_t* data_retries = nullptr;
-    // mcs_t* mcs = nullptr;
-    // ampdu_status_t* ampdu_status = nullptr;
-    // vht_t* vht = nullptr;
-    // timestamp_t* timestamp = nullptr;
+    ss << "\n    version: " << std::dec << (unsigned) rt.header->version;
+    ss << "\n    length: " << std::dec << rt.header->length;
+    ss << "\n    presence: " << std::hex << rt.header->presence << " " << std::bitset<32>(rt.header->presence);
+
     if (rt.tsft)
-    ss << "\n  tsft:" << htole64(rt.tsft->mactime);
+        ss << "\n  tsft: " << std::dec << rt.tsft->mactime;
+    if (rt.flags)
+        ss << "\n  flags: " << std::hex << (unsigned) rt.flags->flags  << " " << std::bitset<8>(rt.flags->flags);
+    if (rt.rate)
+        ss << "\n  rate: " << std::dec << (unsigned) rt.rate->value;
+    if (rt.channel)
+    {
+        ss << "\n  channel:";
+        ss << "\n    flags: " << std::hex << rt.channel->flags  << " " << std::bitset<16>(rt.channel->flags);
+        ss << "\n    frequency: " <<  std::dec << rt.channel->frequency;
+    }
+    if (rt.fhss)
+    {
+        ss << "\n  fhss:";
+        ss << "\n    hop_pattern: " << std::dec << (unsigned) rt.fhss->get_hop_pattern();
+        ss << "\n    hop_set: " << std::dec << (unsigned) rt.fhss->get_hop_set();
+    }
+    if (rt.antenna_signal)
+        ss << "\n  antenna_signal: " << std::dec <<  (signed) rt.antenna_signal->dbm_value;
+    if(rt.antenna_noise)
+        ss << "\n  antenna_noise: " << std::dec <<  (signed) rt.antenna_noise->dbm_value;
+    if (rt.lock_quality)
+        ss << "\n  lock_quality: " << std::dec << rt.lock_quality->value;
+    if (rt.tx_attenuation)
+        ss << "\n  tx_attenuation: " << std::dec << rt.tx_attenuation->value;
+    if (rt.db_tx_attenuation)
+        ss << "\n  db_tx_attenuation: " << std::dec << rt.db_tx_attenuation->value;
+    if (rt.dbm_tx_power)
+        ss << "\n  dbm_tx_power: " << std::dec << (signed) rt.dbm_tx_power->value;
+    if (rt.antenna)
+        ss << "\n  antenna: " << std::dec << (unsigned) rt.antenna->index;
+    if (rt.db_antenna_signal)
+        ss << "\n  db_antenna_signal: " << std::dec << (unsigned) rt.db_antenna_signal->value;
+    if (rt.db_antenna_noise)
+        ss << "\n  db_antenna_noise: " << std::dec << (unsigned) rt.db_antenna_noise->value;
+    if (rt.rx_flags)
+        ss << "\n  rx_flags: " << std::dec << rt.rx_flags->value;
+    if (rt.tx_flags)
+        ss << "\n  tx_flags: " << std::dec << rt.tx_flags->value;
+    if (rt.rts_retries)
+        ss << "\n  rts_retries: " << std::dec << (unsigned) rt.rts_retries->value;
+    if (rt.data_retries)
+        ss << "\n  data_retries: " << std::dec << (unsigned) rt.data_retries->value;
+    if (rt.mcs)
+    {
+        ss << "\n  mcs:";
+        ss << "\n    flags: " << std::hex << (unsigned) rt.mcs->flags << " " << std::bitset<8>(rt.mcs->flags);
+        ss << "\n    known: " << std::hex << (unsigned) rt.mcs->known << " " << std::bitset<8>(rt.mcs->known);
+        ss << "\n    mcs_index: " << std::dec << (unsigned) rt.mcs->mcs_index;
+    }
+    if (rt.ampdu_status)
+    {
+        ss << "\n  ampdu_status:";
+        ss << "\n    flags: " << std::hex << rt.ampdu_status->flags << " " << std::bitset<16>(rt.ampdu_status->flags);
+        ss << "\n    ref_number: " << std::dec << rt.ampdu_status->ref_number;
+    }
+    if (rt.vht)
+    {
+        ss << "\n  vhts:";
+        ss << "\n    bandwith: " << std::hex << (unsigned) rt.vht->bandwith << " " << std::bitset<8>(rt.vht->bandwith);
+        ss << "\n    coding: " << std::hex << (unsigned) rt.vht->coding << " " << std::bitset<8>(rt.vht->coding);
+        ss << "\n    flags: " << std::hex << (unsigned) rt.vht->flags << " " << std::bitset<8>(rt.vht->flags);
+        ss << "\n    group_id: " << std::dec << rt.vht->group_id;
+        ss << "\n    known: " << std::hex << rt.vht->known << " " << std::bitset<16>(rt.vht->known);
+        // ss << "\n    mcs:" << rt.vht->mcs_nss;
+        // ss << "\n    nss:" << rt.vht->mcs_nss;
+        ss << "\n    partial_aid: " << std::dec << rt.vht->partial_aid;
+    }
+    if (rt.timestamp)
+    {
+        ss << "\n  timestamp:";
+        ss << "\n    flags: " << std::hex << (unsigned) rt.timestamp->flags << " " << std::bitset<8>(rt.timestamp->flags);
+        ss << "\n    timestamp: " << std::dec << rt.timestamp->timestamp;
+        ss << "\n    unit_pos: " << std::dec << rt.timestamp->unit_pos;
+    }
+ 
     return ss.str();
 }
 
