@@ -406,8 +406,37 @@ public:
         return (uint8_t*)header+size();
     }
 
+    void reset()
+    {
+        presence_ext = nullptr;
+        tsft = nullptr;
+        flags = nullptr;
+        rate = nullptr;
+        channel = nullptr;
+        fhss = nullptr;
+        antenna_signal = nullptr;
+        antenna_noise = nullptr;
+        lock_quality = nullptr;
+        tx_attenuation = nullptr;
+        db_tx_attenuation = nullptr;
+        dbm_tx_power = nullptr;
+        antenna = nullptr;
+        db_antenna_signal = nullptr;
+        db_antenna_noise = nullptr;
+        rx_flags = nullptr;
+        tx_flags = nullptr;
+        rts_retries = nullptr;
+        data_retries = nullptr;
+        mcs = nullptr;
+        ampdu_status = nullptr;
+        vht = nullptr;
+        timestamp = nullptr;
+    }
+
     void rescan(bool calculate_len = false)
     {
+        reset();
+
         scan_status = E_STATUS_PARTIAL;
         auto cp  = (uint8_t*)header + sizeof(header);
 
@@ -589,9 +618,9 @@ std::string to_string(const radiotap_t& rt)
     if (rt.db_antenna_noise)
         ss << "\n  db_antenna_noise: " << std::dec << (unsigned) rt.db_antenna_noise->value;
     if (rt.rx_flags)
-        ss << "\n  rx_flags: " << std::dec << rt.rx_flags->value;
+        ss << "\n  rx_flags: " << std::hex << rt.rx_flags->value << " " << std::bitset<16>(rt.rx_flags->value);
     if (rt.tx_flags)
-        ss << "\n  tx_flags: " << std::dec << rt.tx_flags->value;
+        ss << "\n  tx_flags: " << std::hex << rt.tx_flags->value << " " << std::bitset<16>(rt.tx_flags->value);
     if (rt.rts_retries)
         ss << "\n  rts_retries: " << std::dec << (unsigned) rt.rts_retries->value;
     if (rt.data_retries)

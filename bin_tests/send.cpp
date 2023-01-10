@@ -36,10 +36,12 @@ int main(int argc, char *argv[])
     int seq_num = 0;
 
     winject::radiotap::radiotap_t radiotap(buffer);
+    radiotap.header->presence |= winject::radiotap::E_FIELD_PRESENCE_FLAGS;
     radiotap.header->presence |= winject::radiotap::E_FIELD_PRESENCE_RATE;
     radiotap.header->presence |= winject::radiotap::E_FIELD_PRESENCE_TX_FLAGS;
     radiotap.header->presence |= winject::radiotap::E_FIELD_PRESENCE_MCS;
     radiotap.rescan(true);
+    radiotap.flags->flags |= winject::radiotap::flags_t::E_FLAGS_FCS;
     radiotap.rate->value = 65*2;
     radiotap.tx_flags->value |= winject::radiotap::tx_flags_t::E_FLAGS_NOACK;
     radiotap.tx_flags->value |= winject::radiotap::tx_flags_t::E_FLAGS_NOREORDER;
@@ -61,15 +63,16 @@ int main(int argc, char *argv[])
     } __attribute__((__packed__));
 
     uint8_t *payload;
-    size_t payload_size = 1400;
+    size_t payload_size = 1450;
 
     winject::ieee_802_11::frame_t frame80211(radiotap.end());
     frame80211.frame_control->protocol_type = winject::ieee_802_11::frame_control_t::E_TYPE_DATA;
+    frame80211.rescan();
     frame80211.address1->set(0xffffffffffff); // IBSS Destination
     frame80211.address2->set(0x567890); // IBSS Source
-    // frame80211.address3->set(0x123456); // IBSS BSSID
     frame80211.address3->set(0x563412); // IBSS BSSID
     frame80211.set_body_size(payload_size+sizeof(llc_dummy_t));
+    *frame80211.fcs = 0XFFFFFFFF;
 
     auto llc = (llc_dummy_t*)(frame80211.frame_body);
     llc->dsap = 0xFF;
@@ -77,7 +80,6 @@ int main(int argc, char *argv[])
     llc->ctl = 0;
 
     payload = frame80211.frame_body+sizeof(llc_dummy_t);
-
     for (int i=0; i<payload_size; i++)
     {
         payload[i] = i & 0xFF;   

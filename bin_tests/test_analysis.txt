@@ -1,0 +1,4 @@
+atheros9k_htc:
+* when sending data frame with addr1 != 0xFFFFFFFFFFFF rts is flooding
+* rts can be sent with data packet but always retransmitted
+* seems that the most reliable way is to send on broadcast address

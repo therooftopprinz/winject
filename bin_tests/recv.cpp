@@ -11,15 +11,11 @@ int main(int argc, char *argv[])
 
     winject::wifi wdev(device_str);
 
-
     uint8_t buffer[1024*4];
     memset(buffer, 0, sizeof(buffer));
-    int wdev_sd = wdev;
 
     winject::ieee_802_11::filters::data_addr3 bssid_filter(0x563412);
-    winject::ieee_802_11::filters::attach(wdev_sd, bssid_filter);
-
-    winject::radiotap::radiotap_t radiotap(buffer);
+    winject::ieee_802_11::filters::attach(wdev, bssid_filter);
 
     struct llc_dummy_t
     {
@@ -33,29 +29,23 @@ int main(int argc, char *argv[])
     auto tref = std::chrono::high_resolution_clock::now();
     while (true)
     {
-        ssize_t rv = recv(wdev_sd, buffer, sizeof(buffer), 0);
+        ssize_t rv = recv(wdev, buffer, sizeof(buffer), 0);
         if (rv < 0)
         {
             printf("Recv failed! errno=%d error=%s\n", errno, strerror(errno));
             return -1;
         }
 
-        radiotap.rescan();      
+        winject::radiotap::radiotap_t radiotap(buffer);
         winject::ieee_802_11::frame_t frame80211(radiotap.end());
-
         auto llc = (llc_dummy_t*)(frame80211.frame_body);
-        llc->dsap = 0xFF;
-        llc->ssap = 0;
-        llc->ctl = 0;
-
         payload = frame80211.frame_body+sizeof(llc_dummy_t);
 
         auto now = std::chrono::high_resolution_clock::now();
         auto tse_us = std::chrono::duration_cast<std::chrono::microseconds>(now-tref).count();
 
-        auto radiotap_string = winject::radiotap::to_string(radiotap);
         printf("time: %ld size: %lu\n",  tse_us, rv);
-        printf("--- radiotap header info ---\n%s\n", radiotap_string.c_str());
+        printf("--- radiotap header info ---\n%s\n", winject::radiotap::to_string(radiotap).c_str());
         printf("--- 802.11 info ---\n");
         printf("802.11:\n");
         printf("  frame_control:\n");
@@ -68,6 +58,11 @@ int main(int argc, char *argv[])
         printf("  seq_ctl:\n");
         printf("    seq:%d\n", frame80211.seq_ctl->get_seq_num());
         printf("    frag:%d\n", frame80211.seq_ctl->get_fragment_num());
+        printf("--- LLC info ---\n");
+        printf("LLC:\n");
+        printf("  dsap: %d\n", llc->dsap);
+        printf("  ssap: %d\n", llc->ssap);
+        printf("  ctl: %d\n", llc->ctl);
         printf("--------------------------------------------\n");
     }
 }

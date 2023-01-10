@@ -17,8 +17,8 @@ struct frame_control_t
 
         E_MTYPE_MASK                     = 0b00001100,
         E_MTYPE_MGNT                     = 0b00000000,
-        E_MTYPE_DATA                     = 0b00000100,
-        E_MTYPE_CTRL                     = 0b00001000,
+        E_MTYPE_CTRL                     = 0b00000100,
+        E_MTYPE_DATA                     = 0b00001000,
         E_MTYPE_EXTN                     = 0b00001100,
 
         E_TYPE_MASK                      = 0b11111100,
@@ -156,11 +156,25 @@ public:
         rescan();
     }
 
+    void reset()
+    {
+        address1 = nullptr;
+        address2 = nullptr;
+        address3 = nullptr;
+        seq_ctl = nullptr;
+        address4 = nullptr;
+        frame_body = nullptr;
+        fcs = nullptr;
+    }
+
     void rescan()
     {
+        reset();
+
         auto type = frame_control->protocol_type & frame_control_t::E_TYPE_MASK;
         auto mtype = type & frame_control_t::E_MTYPE_MASK;
-        if (mtype = frame_control_t::E_MTYPE_DATA)
+        auto stype = type & frame_control_t::E_TYPE_MASK;
+        if (mtype == frame_control_t::E_MTYPE_DATA)
         {
             address1 = (address_t*)((uint8_t*)duration + sizeof(uint16_t));
             address2 = (address_t*)((uint8_t*)address1 + sizeof(address_t));
@@ -181,11 +195,23 @@ public:
 
             fcs = (uint32_t*)frame_body;
         }
+        else if (stype == frame_control_t::E_TYPE_RTS)
+        {
+            address1 = (address_t*)((uint8_t*)duration + sizeof(uint16_t));
+            address2 = (address_t*)((uint8_t*)address1 + sizeof(address_t));
+            frame_body = (uint8_t*)address2 + sizeof(address_t);
+            fcs = (uint32_t*)frame_body;
+        }
+    }
+
+    uint8_t* end()
+    {
+        return (uint8_t*)fcs + sizeof(fcs);
     }
 
     size_t size()
     {
-        return (uint8_t*)fcs-(uint8_t*)frame_control + 4;
+        return end()-(uint8_t*)frame_control + 4;
     }
 
     void set_body_size(uint16_t size)
