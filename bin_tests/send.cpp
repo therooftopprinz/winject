@@ -11,7 +11,7 @@ void test_radio_tap()
         0x0d, 0x00, // <- radiotap header length
         0x04, 0x80, 0x00, 0x00, // <-- bitmap
         0x18,       // data rate (will be overwritten)
-        0x00, // align
+        0x00,       // align
         0x00, 0x00, // tx flags
         0x00
     };
@@ -68,16 +68,16 @@ int main(int argc, char *argv[])
     winject::ieee_802_11::frame_t frame80211(radiotap.end());
     frame80211.frame_control->protocol_type = winject::ieee_802_11::frame_control_t::E_TYPE_DATA;
     frame80211.rescan();
-    frame80211.address1->set(0xffffffffffff); // IBSS Destination
-    frame80211.address2->set(0x567890); // IBSS Source
-    frame80211.address3->set(0x563412); // IBSS BSSID
+    frame80211.address1->set(0xFFFFFFFFFFFF); // IBSS Destination
+    frame80211.address2->set(0xAABBCCDDEEFF); // IBSS Source
+    frame80211.address3->set(0xDEADBEEFCAFE); // IBSS BSSID
     frame80211.set_body_size(payload_size+sizeof(llc_dummy_t));
     *frame80211.fcs = 0XFFFFFFFF;
 
     auto llc = (llc_dummy_t*)(frame80211.frame_body);
-    llc->dsap = 0xFF;
-    llc->ssap = 0;
-    llc->ctl = 0;
+    llc->dsap = 0xFF; // NULL LSAP
+    llc->ssap = 0xFF; // NULL LSAP
+    llc->ctl =  0b00000011;
 
     payload = frame80211.frame_body+sizeof(llc_dummy_t);
     for (int i=0; i<payload_size; i++)
