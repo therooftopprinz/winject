@@ -118,24 +118,24 @@ struct seq_ctl_t
 
     uint8_t get_fragment_num()
     {
-        return frag_sec & 0xF;
+        return le16toh(frag_sec) & 0xF;
     }
 
     void set_fragment_num(uint8_t value)
     {
-        frag_sec &= 0xFFF0;
-        frag_sec |= value;
+        frag_sec = le16toh(frag_sec) & 0xFFF0;
+        frag_sec = le16toh(frag_sec) | value;
     }
 
     uint16_t get_seq_num()
     {
-        return frag_sec >> 4;
+        return le16toh(frag_sec) >> 4;
     }
 
     void set_seq_num(uint16_t value)
     {
-        frag_sec &= 0xF;
-        frag_sec |= (value << 4);
+        frag_sec = le16toh(frag_sec) & 0xF;
+        frag_sec = le16toh(frag_sec) | (value << 4);
     }
 
 } __attribute__((__packed__));
@@ -211,7 +211,7 @@ public:
 
     size_t size()
     {
-        return end()-(uint8_t*)frame_control + 4;
+        return end() - (uint8_t*)frame_control + (fcs ? 4 : 0);
     }
 
     void set_body_size(uint16_t size)
@@ -229,6 +229,40 @@ public:
     uint8_t* frame_body = nullptr;
     uint32_t* fcs = nullptr;
 };
+
+inline std::string to_string(frame_t& frame80211)
+{
+    char buffer[1024];
+    char *current = buffer;
+    auto rem = [buffer, &current]() {
+            return uintptr_t(buffer+sizeof(buffer)-current);
+        };
+
+    auto check = [&current](int result) mutable {
+            if (result<0)
+                return;
+            current += result;
+        };
+
+    check(snprintf(current, rem(), "802.11:\n"));
+    check(snprintf(current, rem(), "  frame_control:\n"));
+    check(snprintf(current, rem(), "    protocol_type: %p\n", (void*)(uintptr_t) frame80211.frame_control->protocol_type));
+    check(snprintf(current, rem(), "    flags: %p\n", (void*)(uintptr_t) frame80211.frame_control->flags));
+    check(snprintf(current, rem(), "  duration: %p\n", (void*)(uintptr_t) *frame80211.duration));
+    if (frame80211.address1)
+        check(snprintf(current, rem(), "  address1: %p\n", (void*) frame80211.address1->get()));
+    if (frame80211.address2)
+        check(snprintf(current, rem(), "  address2: %p\n", (void*) frame80211.address2->get()));
+    if (frame80211.address3)
+        check(snprintf(current, rem(), "  address3: %p\n", (void*) frame80211.address3->get()));
+    if (frame80211.address3)
+    {
+        check(snprintf(current, rem(), "  seq_ctl:\n"));
+        check(snprintf(current, rem(), "    seq: %d\n", frame80211.seq_ctl->get_seq_num()));
+        check(snprintf(current, rem(), "    frag: %d\n", frame80211.seq_ctl->get_fragment_num()));
+    }
+    return buffer;
+}
 
 } // namespace 802_11
 } // namespace winject

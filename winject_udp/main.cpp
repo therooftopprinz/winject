@@ -11,7 +11,7 @@ using options_t = std::map<std::string, std::string>;
 template<typename... Ts>
 void LOG(const char* msg, Ts&&... args)
 {
-    char buffer[1024];
+    char buffer[1024*64];
     snprintf(buffer,sizeof(buffer), msg, args...);
     uint64_t ts = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     printf("[%lu] %s\n", ts, buffer);
@@ -161,50 +161,30 @@ int main(int argc, char* argv[])
             }
 
             winject::radiotap::radiotap_t radiotap(wiffer);
-            auto radiotap_string = winject::radiotap::to_string(radiotap);
-            LOG("--- radiotap header info ---\n%s", radiotap_string.c_str());
             winject::ieee_802_11::frame_t frame80211(radiotap.end());
 
             auto frame80211end = wiffer+rv;
             size_t size =  frame80211end-frame80211.frame_body-4;
 
             LOG("buffer[%lu]:", rv);
-            char bufferstr[1024*4*3+1];
-            char *current=bufferstr;
+            std::stringstream bufferss;
             for (int i=0; i<rv; i++)
             {
                 int psz;
                 if (i%16 == 0)
                 {
-                    psz = sprintf(current,"\n%04X  - ", i);
-                    current+=psz;
+                    bufferss << "\n" << std::hex << std::setfill('0') << std::setw(4) << i << " - ";
                 }
-                psz = sprintf(current, "%02X ", wiffer[i]);
-                current+=psz;
+                bufferss << std::hex << std::setfill('0') << std::setw(2) << (int) wiffer[i] << " ";
             }
 
-            LOG("%s", bufferstr);
+            LOG("%s\n", bufferss.str().c_str());
 
             LOG("recv size %lu", rv);
-            LOG("--- radiotap header info ---\n%s", winject::radiotap::to_string(radiotap).c_str());
-            LOG("--- 802.11 info ---");
-            LOG("802.11:");
-            LOG("  frame_control:");
-            LOG("    protocol_type: %p", (void*)(uintptr_t) frame80211.frame_control->protocol_type);
-            LOG("    flags: %p", (void*)(uintptr_t) frame80211.frame_control->flags);
-            LOG("  duration: %p", (void*)(uintptr_t) *frame80211.duration);
-            LOG("  address1: %p", (void*) frame80211.address1->get());
-            LOG("  address2: %p", (void*) frame80211.address2->get());
-            LOG("  address3: %p", (void*) frame80211.address3->get());
-            LOG("  seq_ctl:");
-            LOG("    seq: %d", frame80211.seq_ctl->get_seq_num());
-            LOG("    frag: %d", frame80211.seq_ctl->get_fragment_num());
-            LOG("  size: %lu", size);
-            LOG("--------------------------------------------");
-            LOG("  offset-radiotap: %p", radiotap.header);
-            LOG("  offset-body    : %p", frame80211.frame_body);
-            LOG("  offset-end     : %p", frame80211end);
-            LOG("--------------------------------------------");
+            LOG("--- radiotap info ---\n%s", winject::radiotap::to_string(radiotap).c_str());
+            LOG("--- 802.11 info ---\n%s", winject::ieee_802_11::to_string(frame80211).c_str());
+            LOG("  frame body size: %lu", size);
+            LOG("-----------------------\n");
 
             if (!frame80211.frame_body)
             {
