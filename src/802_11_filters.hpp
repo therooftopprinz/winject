@@ -71,6 +71,65 @@ private:
     };
 };
 
+class winject_src
+{
+public:
+    winject_src() = delete;
+
+    winject_src(uint32_t src)
+    {
+        set_src(src);
+    }
+
+    void set_src(uint32_t src)
+    {
+        filter_code[10].k = 0xDEADBEEF;
+        filter_code[12].k = 0xCAFE; 
+        uint16_t src_ = (src>>8)&0xFFFF;
+        filter_code[18].k = src_;
+        filter_code[20].k = src&0xFF;
+    }
+
+    sock_filter* data()
+    {
+        return filter_code;
+    }
+
+    unsigned short size() const
+    {
+        return sizeof(filter_code)/sizeof(sock_filter);
+    }
+
+private:
+    static constexpr int LONGEST=13;
+    sock_filter filter_code[23] =
+    {
+        { 0x30, 0, 0, 0x00000003 },           // [00]      ldb  [3]              ;  rt_len = radiotap.length_high;
+        { 0x64, 0, 0, 0x00000008 },           // [01]      lsh  #8               ;  rt_len <<= 8;
+        { 0x7, 0, 0, 0x00000000 },            // [02]      tax                   ;  
+        { 0x30, 0, 0, 0x00000002 },           // [03]      ldb  [2]              ;
+        { 0x4c, 0, 0, 0x00000000 },           // [04]      or   x                ;  rt_len |= radiotap.length_low;
+        { 0x7, 0, 0, 0x00000000 },            // [05]      tax                   ;  
+        { 0x50, 0, 0, 0x00000000 },           // [06]      ldb  [x + 0]          ;  
+        { 0x54, 0, 0, 0x0000000f },           // [07]      and  #0x0F            ;  // TYPE=0b10 && PROTOCOL=0b00
+        { 0x15, 0, LONGEST, 0x00000008 },     // [08]      jne  #0x08, die       ;  if (0b1000 != fr80211.fc.proto_type) goto die;
+        { 0x40, 0, 0, 0x00000010 },           // [09]      ld   [x + 16]         ;  // FC(2) + DURATION(2) + ADDR1(6) + ADDR2(6)
+        { 0x15, 0, LONGEST-2, 0xdeadbeef },   // [10]      jne  #0xDEADBEEF, die ;      
+        { 0x48, 0, 0, 0x00000014 },           // [11]      ldh  [x + 20]         ;  
+        { 0x15, 0, LONGEST-4, 0x0000cafe },   // [12]      jne  #0xCAFE, die     ;  if (0xDEADBEEFCAFE != fr80211.addr3) goto die;
+        { 0x40, 0, 0, 0x00000004 },           // [13]      ld   [x + 4]          ;
+        { 0x15, 0, LONGEST-6, 0xffffffff },   // [14]      jne  #0xFFFFFFFF, die ;
+        { 0x48, 0, 0, 0x00000004 },           // [15]      ldh  [x + 4]          ;
+        { 0x15, 0, LONGEST-8, 0x0000ffff },   // [16]      jne  #0xFFFF, die     ;  if (0xFFFFFFFFFF != fr80211.addr1) goto die
+        { 0x48, 0, 0, 0x0000000a },           // [17]      ldh  [x + 10]         ;
+        { 0x15, 0, LONGEST-10, 0x0000ffaa },  // [18]      jne  #0xFFFF, die     ;
+        { 0x50, 0, 0, 0x0000000c },           // [19]      ldb  [x + 12]         ;
+        { 0x15, 0, LONGEST-12, 0x00000000 },  // [20]      jne  #0xFF, die       ;  if (0xFFFFFF != fr80211.addr2 >> 24)
+        { 0x6, 0, 0, 0xffffffff },            // [++]      ret #-1               ;  return -1;     
+        { 0x6, 0, 0, 0x00000000 },            // [22] die: ret #0                ;  return 0;
+    };
+};
+
 template <typename T>
 inline int attach(int sd, T& filter)
 {
