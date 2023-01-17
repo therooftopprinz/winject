@@ -143,7 +143,10 @@ struct seq_ctl_t
 class frame_t
 {
 public:
-    frame_t(uint8_t* buffer)
+    frame_t() = delete;
+    frame_t(uint8_t* buffer, uint8_t* last)
+        : last(last)
+        , is_enabled_fcs(true)
     {
         if (!buffer)
         {
@@ -164,7 +167,7 @@ public:
         seq_ctl = nullptr;
         address4 = nullptr;
         frame_body = nullptr;
-        fcs = nullptr;
+        fcs = (uint32_t*)last-sizeof(*fcs);
     }
 
     void rescan()
@@ -192,26 +195,40 @@ public:
                 address4 = nullptr;
                 frame_body = (uint8_t*)seq_ctl + sizeof(seq_ctl_t);
             }
-
-            fcs = (uint32_t*)frame_body;
         }
         else if (stype == frame_control_t::E_TYPE_RTS)
         {
             address1 = (address_t*)((uint8_t*)duration + sizeof(uint16_t));
             address2 = (address_t*)((uint8_t*)address1 + sizeof(address_t));
             frame_body = (uint8_t*)address2 + sizeof(address_t);
-            fcs = (uint32_t*)frame_body;
         }
     }
 
     uint8_t* end()
     {
-        return (uint8_t*)fcs + sizeof(fcs);
+        if (is_enabled_fcs)
+        {
+            return (uint8_t*)fcs + sizeof(*fcs);
+        }
+        else
+        {
+            return (uint8_t*)fcs;
+        }
     }
 
     size_t size()
     {
-        return end() - (uint8_t*)frame_control + (fcs ? 4 : 0);
+        return end() - (uint8_t*)frame_control;
+    }
+
+    size_t frame_body_size()
+    {
+        return end() - (uint8_t*)frame_body;
+    }
+
+    void set_enable_fcs(bool val)
+    {
+        is_enabled_fcs = val;
     }
 
     void set_body_size(uint16_t size)
@@ -228,6 +245,8 @@ public:
     address_t* address4 = nullptr;
     uint8_t* frame_body = nullptr;
     uint32_t* fcs = nullptr;
+    uint8_t* last = nullptr;
+    bool is_enabled_fcs = true;
 };
 
 inline std::string to_string(frame_t& frame80211)

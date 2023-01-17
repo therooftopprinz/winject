@@ -385,6 +385,7 @@ enum E_FIELD_PRESENCE
 class radiotap_t
 {
 public:
+    radiotap_t() = delete;
     radiotap_t(uint8_t* buffer)
     {
         if (!buffer)

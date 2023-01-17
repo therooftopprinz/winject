@@ -1,6 +1,9 @@
+# WInject 802.11
+```
 +-----------+-------------------+-----------------+-----+
 | Radio Tap | 802.11 Data Frame | WInject Payload | FCS |
 +-----------+-------------------+-----------------+-----+
+```
 
 802.11 Data Frame Special Meaning:
 * Address 1 should be: 0xFFFFFFFFFFFF
@@ -13,34 +16,32 @@
   * [1] DST_PORT destination port
 
   using the command utility:
-  ./winject -fec 5:1 -src 0001:01 -dst 0002:02
+  ./winject -fec 5:1 -src 000101 -dst 000202
 
-  # Winject Frames
-## Plain
-    * type=0
-    * payload
-## FEC Data
-    * type=1
-    * payload
-## FEC Parity
-    * type=2
-    * payload
+# WInject LLC
+```
+      8 7 6 5   4 3 2 1
+    +-------------------+
+ 0  |   nLC   |   FLAG  |
+    +---------+---------+  -----
+ 1  |   LCID  |         |    ^
+    +---------+         |    |  LC[0]..LC[nLC-1]
+ 2  |       LC sz       |    v
+    +-------------------+  -----
+```
 
-# Winject Frames Payloads
-## Stream
-    * type=0
-    * payload
-## Framed Chained
-    * type=1
-    * framenumber
-    * islastchunk
-    * offset
-    * size
-    * payload
-## Framed
-    * type=2
-    * framenumber
-    * islastchunk
-    * offset
-    * size
-    * payload
+# SimpleFEC LLC
+```
++--------+--------+--------+
+| HEADER | DATA N |  FEC M |
++--------+--------+--------+
+```
+## Properties
+* DATA and FEC size are preconfigured
+* A transmission consist of DATA N and FEC M
+* DATA matches with the same FEC number
+
+## Header
+- Data number
+- FEC number
+
