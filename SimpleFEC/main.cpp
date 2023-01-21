@@ -1,3 +1,11 @@
+#include <schifra/schifra_galois_field.hpp>
+#include <schifra/schifra_galois_field_polynomial.hpp>
+#include <schifra/schifra_sequential_root_generator_polynomial_creator.hpp>
+#include <schifra/schifra_reed_solomon_encoder.hpp>
+#include <schifra/schifra_reed_solomon_decoder.hpp>
+#include <schifra/schifra_reed_solomon_block.hpp>
+#include <schifra/schifra_error_processes.hpp>
+
 #include <winject/wifi.hpp>
 #include <winject/radiotap.hpp>
 #include <winject/802_11.hpp>
@@ -194,10 +202,23 @@ std::string buffer_str(uint8_t* buffer, size_t size)
 int main(int argc, char* argv[])
 {
 
-    constexpr size_t fecratio = 2;
-    constexpr size_t data_size = 30;
-    constexpr size_t fec_size = data_size/fecratio;
+
+    constexpr size_t fec_per_block = 3;
+    constexpr size_t data_size = 223 * fec_per_block;
+    constexpr size_t fec_size = 32 * fec_per_block;
     constexpr uint8_t nblockdelay = 0;
+
+    const schifra::galois::field field(8, schifra::galois::primitive_polynomial_size06, schifra::galois::primitive_polynomial06);
+    schifra::galois::field_polynomial generator_polynomial(field);
+    if (!schifra::make_sequential_root_generator_polynomial(field, 120, 32, generator_polynomial))
+    {
+        LOG("Error - Failed to create sequential root generator!");
+        return 1;
+    }
+
+   typedef schifra::reed_solomon::encoder<255,32> encoder_t;
+   typedef schifra::reed_solomon::decoder<255,32> decoder_t;
+   typedef schifra::reed_solomon::block<255,32> block_t;
 
     std::regex arger("^--(.+?)=(.+?)$");
     std::smatch match;
@@ -230,6 +251,7 @@ int main(int argc, char* argv[])
     int sd  = socket(AF_INET, SOCK_DGRAM, 0);
     if (options.at("mode")=="send")
     {
+        const encoder_t encoder(field, generator_polynomial);
         winject::wifi wdev(dev);
 
         sockaddr_in bindaddr;
@@ -355,12 +377,34 @@ int main(int argc, char* argv[])
                     si.frame80211->seq_ctl->set_seq_num(sn);
                     *(si.simple_fec->datanumber) = data_sn;
                     *(si.simple_fec->fecnumber) = data_sn-nblockdelay;
+
+                    auto& sifec = send_info[data_sn+nblockdelay];
+
+                    for (int h=0; h<fec_per_block; h++)
+                    {
+                        // @note: FEC Encode
+                        block_t block;
+                        for (int i=0; i<223; i++)
+                        {
+                            block[i] = si.simple_fec->data()[h*223+i];
+                        }
+                        if (!encoder.encode(block))
+                        {
+                            LOG("Error - Critical encoding failure! Msg: %s", block.error_as_string().c_str());
+                            return 1;
+                        }
+                        for (int i=0; i<32; i++)
+                        {
+                            sifec.simple_fec->fec()[h*32+i] = block.fec(i);
+                        }
+                    }
+
                     si.offset = 0;
                     data_sn = (data_sn+1) & 0x7F;
 
-                    // TODO: FEC ENCODE
-                    std::memset(si.simple_fec->fec(), 0xFF, fec_size);
                     to_send.emplace_back(&si);
+                    udp_rem -= data_rem;
+                    continue;
                 }
                 // @case : All UDP bytes can fit
                 else
@@ -373,20 +417,36 @@ int main(int argc, char* argv[])
                     {                        
                         *(si.simple_fec->datanumber) = data_sn;
                         *(si.simple_fec->fecnumber) = data_sn-nblockdelay;
+
+                        auto& sifec = send_info[data_sn+nblockdelay];
+
+                        for (int h=0; h<fec_per_block; h++)
+                        {
+                            // @note: FEC Encode
+                            block_t block;
+                            for (int i=0; i<223; i++)
+                            {
+                                block[i] = si.simple_fec->data()[h*223+i];
+                            }
+                            if (!encoder.encode(block))
+                            {
+                                LOG("Error - Critical encoding failure! Msg: %s", block.error_as_string().c_str());
+                                return 1;
+                            }
+                            for (int i=0; i<32; i++)
+                            {
+                                sifec.simple_fec->fec()[h*223+i] = block.fec(i);
+                            }
+                        }
+
                         si.offset = 0;
                         data_sn = (data_sn+1) & 0x7F;
-
-                        // TODO: FEC ENCODE
-                        std::memset(si.simple_fec->fec(), 0xFF, fec_size);
                         to_send.emplace_back(&si);
                         break;
                     }
                     si.offset += fragment.fragment_size();
                     break;
                 }
-
-                si.offset += fragment.fragment_size();
-                udp_rem -= data_rem;
             }
 
             udp_sn++;
@@ -414,6 +474,7 @@ int main(int argc, char* argv[])
     }
     else if (options.at("mode")=="recv")
     {
+        const decoder_t decoder(field, 120);
         winject::wifi wdev(dev);
 
         std::stringstream srcss;
@@ -445,7 +506,6 @@ int main(int argc, char* argv[])
             i.fec.resize(fec_size);
         }
 
-        size_t current_size = 0;
         while (true)
         {
             ssize_t rv = recv(wdev, wiffer, sizeof(wiffer), 0);
@@ -486,17 +546,36 @@ int main(int argc, char* argv[])
             std::memcpy(ri_data.data.data(), fec_llc.data(), data_size);
             std::memcpy(ri_fec.fec.data(), fec_llc.fec(), fec_size);
 
-            // TODO: FEC DECODE
             uint8_t current_data_idx = fec_idx - nblockdelay;
             auto& cri_data = recv_info[current_data_idx];
 
             std::vector<uint8_t> decoded_data(data_size);
 
-            LOG("Decoding data[%d] with fec", current_data_idx);
-            // TODO: TEMPORARY REPLACE WITH FROM DECODER
-            std::memcpy(decoded_data.data(), cri_data.data.data(), data_size);
+            // @note: FEC Decode
+            for (int h=0; h<fec_per_block; h++)
+            {
+                block_t block;
+                for (int i=0; i<223; i++)
+                {
+                    block[i] = cri_data.data[h*223+i];
+                }
+                for (int i=0; i<32; i++)
+                {
+                    block.fec(i) = ri_fec.fec.data()[h*32+i];
+                }
+                if (!decoder.decode(block))
+                {
+                    LOG("Error - Critical decoding failure! Msg: %s", block.error_as_string());
+                    continue;
+                }
 
-            // decoded_data.
+                LOG("Decoding data[%d] with fec", current_data_idx);
+                for (int i=0; i<223; i++)
+                {
+                    decoded_data[h*223+i] = block[i];
+                }
+            }
+
             uint8_t* current_fragment = decoded_data.data();
 
             LOG("fragments: ");
@@ -522,21 +601,22 @@ int main(int argc, char* argv[])
                 }
 
                 std::memcpy(buffer+fragment.get_offset(), fragment.data(), fragment.get_size());
-                current_size += fragment.get_size();
 
                 if (fragment.get_is_last())
                 {
-                    LOG("Sending to UDP: size=%d", current_size);
-                    LOG("%s", buffer_str(buffer, current_size).c_str());
-                    rv = sendto(sd, buffer, current_size, 0, (sockaddr*)&sendaddr, sizeof(sendaddr));
-                    current_size = 0;
-                    if (rv < 0)
+                    auto total_udp_size = fragment.get_offset()+fragment.get_size();
+                    if (total_udp_size>0)
                     {
-                        LOG("send failed! errno=%d error=%s", errno, strerror(errno));
-                        return -1;
+                        LOG("Sending to UDP: size=%d", total_udp_size);
+                        // LOG("\n%s", buffer_str(buffer, total_udp_size).c_str());
+                        rv = sendto(sd, buffer, total_udp_size, 0, (sockaddr*)&sendaddr, sizeof(sendaddr));
+                        if (rv < 0)
+                        {
+                            LOG("send failed! errno=%d error=%s", errno, strerror(errno));
+                            return -1;
+                        }
                     }
                 }
-
                 current_fragment += fragment.fragment_size();
             }
 
