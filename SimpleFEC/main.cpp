@@ -201,24 +201,25 @@ std::string buffer_str(uint8_t* buffer, size_t size)
 
 int main(int argc, char* argv[])
 {
-
-
-    constexpr size_t fec_per_block = 3;
-    constexpr size_t data_size = 223 * fec_per_block;
-    constexpr size_t fec_size = 32 * fec_per_block;
+    constexpr size_t unit_code_size = 255;
+    constexpr size_t unit_fec_size = 64;
+    constexpr size_t unit_data_size = unit_code_size-unit_fec_size;
+    constexpr size_t fec_per_block = 5;
+    constexpr size_t data_size = unit_data_size * fec_per_block;
+    constexpr size_t fec_size = unit_fec_size * fec_per_block;
     constexpr uint8_t nblockdelay = 0;
 
     const schifra::galois::field field(8, schifra::galois::primitive_polynomial_size06, schifra::galois::primitive_polynomial06);
     schifra::galois::field_polynomial generator_polynomial(field);
-    if (!schifra::make_sequential_root_generator_polynomial(field, 120, 32, generator_polynomial))
+    if (!schifra::make_sequential_root_generator_polynomial(field, 120, unit_fec_size, generator_polynomial))
     {
         LOG("Error - Failed to create sequential root generator!");
         return 1;
     }
 
-   typedef schifra::reed_solomon::encoder<255,32> encoder_t;
-   typedef schifra::reed_solomon::decoder<255,32> decoder_t;
-   typedef schifra::reed_solomon::block<255,32> block_t;
+   typedef schifra::reed_solomon::encoder<unit_code_size,unit_fec_size> encoder_t;
+   typedef schifra::reed_solomon::decoder<unit_code_size,unit_fec_size> decoder_t;
+   typedef schifra::reed_solomon::block<unit_code_size,unit_fec_size> block_t;
 
     std::regex arger("^--(.+?)=(.+?)$");
     std::smatch match;
@@ -384,18 +385,18 @@ int main(int argc, char* argv[])
                     {
                         // @note: FEC Encode
                         block_t block;
-                        for (int i=0; i<223; i++)
+                        for (int i=0; i<unit_data_size; i++)
                         {
-                            block[i] = si.simple_fec->data()[h*223+i];
+                            block[i] = si.simple_fec->data()[h*unit_data_size+i];
                         }
                         if (!encoder.encode(block))
                         {
                             LOG("Error - Critical encoding failure! Msg: %s", block.error_as_string().c_str());
                             return 1;
                         }
-                        for (int i=0; i<32; i++)
+                        for (int i=0; i<unit_fec_size; i++)
                         {
-                            sifec.simple_fec->fec()[h*32+i] = block.fec(i);
+                            sifec.simple_fec->fec()[h*unit_fec_size+i] = block.fec(i);
                         }
                     }
 
@@ -424,18 +425,18 @@ int main(int argc, char* argv[])
                         {
                             // @note: FEC Encode
                             block_t block;
-                            for (int i=0; i<223; i++)
+                            for (int i=0; i<unit_data_size; i++)
                             {
-                                block[i] = si.simple_fec->data()[h*223+i];
+                                block[i] = si.simple_fec->data()[h*unit_data_size+i];
                             }
                             if (!encoder.encode(block))
                             {
                                 LOG("Error - Critical encoding failure! Msg: %s", block.error_as_string().c_str());
                                 return 1;
                             }
-                            for (int i=0; i<32; i++)
+                            for (int i=0; i<unit_fec_size; i++)
                             {
-                                sifec.simple_fec->fec()[h*223+i] = block.fec(i);
+                                sifec.simple_fec->fec()[h*unit_fec_size+i] = block.fec(i);
                             }
                         }
 
@@ -460,6 +461,9 @@ int main(int argc, char* argv[])
             {
                 auto& si = *i;
                 size_t size = si.radiotap->size()+si.frame80211->size(); 
+
+                LOG("Sending to frame[%d]: size=%d", *(si.simple_fec->fecnumber), size);
+                LOG("\n%s", buffer_str(si.buffer.data(), size).c_str());
 
                 rv = sendto(wdev, si.buffer.data(), size, 0, (sockaddr *) &wdev.address(), sizeof(struct sockaddr_ll));
                 if (rv < 0)
@@ -552,27 +556,28 @@ int main(int argc, char* argv[])
             std::vector<uint8_t> decoded_data(data_size);
 
             // @note: FEC Decode
+            std::vector<size_t> erasure_lists;
             for (int h=0; h<fec_per_block; h++)
             {
                 block_t block;
-                for (int i=0; i<223; i++)
+                for (int i=0; i<unit_data_size; i++)
                 {
-                    block[i] = cri_data.data[h*223+i];
+                    block[i] = cri_data.data[h*unit_data_size+i];
                 }
-                for (int i=0; i<32; i++)
+                for (int i=0; i<unit_fec_size; i++)
                 {
-                    block.fec(i) = ri_fec.fec.data()[h*32+i];
+                    block.fec(i) = ri_fec.fec.data()[h*unit_fec_size+i];
                 }
+                LOG("Decoding data[%d] with fec", current_data_idx);
                 if (!decoder.decode(block))
                 {
-                    LOG("Error - Critical decoding failure! Msg: %s", block.error_as_string());
-                    continue;
+                    LOG("Error: fec_number:%d - Critical decoding failure! Msg: %s",
+                        fec_idx,
+                        block.error_as_string());
                 }
-
-                LOG("Decoding data[%d] with fec", current_data_idx);
-                for (int i=0; i<223; i++)
+                for (int i=0; i<unit_data_size; i++)
                 {
-                    decoded_data[h*223+i] = block[i];
+                    decoded_data[h*unit_data_size+i] = block[i];
                 }
             }
 
@@ -608,7 +613,7 @@ int main(int argc, char* argv[])
                     if (total_udp_size>0)
                     {
                         LOG("Sending to UDP: size=%d", total_udp_size);
-                        // LOG("\n%s", buffer_str(buffer, total_udp_size).c_str());
+                        LOG("\n%s", buffer_str(buffer, total_udp_size).c_str());
                         rv = sendto(sd, buffer, total_udp_size, 0, (sockaddr*)&sendaddr, sizeof(sendaddr));
                         if (rv < 0)
                         {
