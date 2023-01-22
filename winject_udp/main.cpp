@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
         auto radiotap_string = winject::radiotap::to_string(radiotap);
         LOG("--- radiotap header info ---\n%s", radiotap_string.c_str());
 
-        winject::ieee_802_11::frame_t frame80211(radiotap.end());
+        winject::ieee_802_11::frame_t frame80211(radiotap.end(), wiffer+sizeof(wiffer));
         frame80211.frame_control->protocol_type = winject::ieee_802_11::frame_control_t::E_TYPE_DATA;
         frame80211.rescan();
         frame80211.address1->set(0xFFFFFFFFFFFF); // IBSS Destination
@@ -161,7 +161,7 @@ int main(int argc, char* argv[])
             }
 
             winject::radiotap::radiotap_t radiotap(wiffer);
-            winject::ieee_802_11::frame_t frame80211(radiotap.end());
+            winject::ieee_802_11::frame_t frame80211(radiotap.end(), wiffer+sizeof(wiffer));
 
             auto frame80211end = wiffer+rv;
             size_t size =  frame80211end-frame80211.frame_body-4;
