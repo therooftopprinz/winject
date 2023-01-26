@@ -17,6 +17,52 @@ void LOG(const char* msg, Ts&&... args)
     printf("[%lu] %s\n", ts, buffer);
 }
 
+
+std::string buffer_str(uint8_t* buffer, size_t size)
+{
+    std::stringstream bufferss;
+    for (int i=0; i<size; i++)
+    {
+        if ((i%16) == 0)
+        {
+            bufferss << std::hex << std::setfill('0') << std::setw(4) << i << " - ";
+
+            for (int ii=0; ii<16 && (buffer+i+ii) < (buffer+size); ii++)
+            {
+                char c = buffer[i+ii];
+                c = (c>=36 && c<=126) ? c : '.';
+                bufferss << std::dec << c;
+            }
+
+            if ((size-i) < 16)
+            {
+                int rem = 16-size%16;
+                for (int ii=0; ii <= rem; ii++)
+                {
+                    bufferss << " ";
+                }
+            }
+            else
+            {
+                bufferss << " ";
+            }
+        }
+
+        if (i%16 == 8)
+        {
+            bufferss << " ";
+        }
+
+        bufferss << std::hex << std::setfill('0') << std::setw(2) << (int) buffer[i] << " ";
+        
+        if (i%16 == 15)
+        {
+            bufferss << "\n";
+        }
+    }
+    return bufferss.str();
+}
+
 int main(int argc, char* argv[])
 {
     std::regex arger("^--(.+?)=(.+?)$");
@@ -118,11 +164,13 @@ int main(int argc, char* argv[])
             {
                 continue;
             }
+
             frame80211.set_body_size(rv);
             frame80211.seq_ctl->set_seq_num(sn++);
             size_t size = radiotap.size() + frame80211.size() - 4;
             std::memcpy(frame80211.frame_body, buffer, rv);
 
+            LOG ("Sending buffer[size=%d]=\n%s", size, buffer_str(wiffer, size).c_str());
             rv = sendto(wdev, wiffer, size, 0, (sockaddr *) &wdev.address(), sizeof(struct sockaddr_ll));
             if (rv < 0)
             {
@@ -134,7 +182,6 @@ int main(int argc, char* argv[])
     else if (options.at("mode")=="recv")
     {
         winject::wifi wdev(dev);
-
 
         std::stringstream srcss;
         uint32_t srcraw;
@@ -166,19 +213,8 @@ int main(int argc, char* argv[])
             auto frame80211end = wiffer+rv;
             size_t size =  frame80211end-frame80211.frame_body-4;
 
-            LOG("buffer[%lu]:", rv);
-            std::stringstream bufferss;
-            for (int i=0; i<rv; i++)
-            {
-                int psz;
-                if (i%16 == 0)
-                {
-                    bufferss << "\n" << std::hex << std::setfill('0') << std::setw(4) << i << " - ";
-                }
-                bufferss << std::hex << std::setfill('0') << std::setw(2) << (int) wiffer[i] << " ";
-            }
 
-            LOG("%s\n", bufferss.str().c_str());
+            LOG("buffer[%lu]:\n%s", buffer_str(buffer, rv).c_str());
 
             LOG("recv size %lu", rv);
             LOG("--- radiotap info ---\n%s", winject::radiotap::to_string(radiotap).c_str());

@@ -198,9 +198,9 @@ public:
         }
         else if (stype == frame_control_t::E_TYPE_RTS)
         {
-            address1 = (address_t*)((uint8_t*)duration + sizeof(uint16_t));
-            address2 = (address_t*)((uint8_t*)address1 + sizeof(address_t));
-            frame_body = (uint8_t*)address2 + sizeof(address_t);
+            address1 = (address_t*)((uint8_t*)duration + sizeof(*duration));
+            address2 = (address_t*)((uint8_t*)address1 + sizeof(*address1));
+            fcs = (uint32_t*)((uint8_t*)address2 + sizeof(*address2));
         }
     }
 

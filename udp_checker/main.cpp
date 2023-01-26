@@ -16,6 +16,7 @@ void LOG(const char* msg, Ts&&... args)
     snprintf(buffer,sizeof(buffer), msg, args...);
     uint64_t ts = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     printf("[%lu] %s\n", ts, buffer);
+    fflush(stdout);
 }
 
 
@@ -128,6 +129,7 @@ int main(int argc, char* argv[])
 
     if (options.at("mode")=="recv")
     {
+        int stats_int = std::stol(options.at("stats"));
         sockaddr_in bindaddr;
         std::memset(&bindaddr, 0, sizeof(bindaddr));
         bindaddr.sin_family = AF_INET;
@@ -167,14 +169,14 @@ int main(int argc, char* argv[])
             stats_pkt_rcv++;
             stats_byt_rcv += rv;
             uint64_t this_time = std::chrono::high_resolution_clock::now().time_since_epoch().count()/(1000*1000*1000);
-            if (this_time != stats_time)
+            if (this_time > (stats_time+stats_int-1))
             {
                 stats_time = this_time;
-                LOG("STATS: rcvd_packets:%4d tp_Mbits:%3.3lf, missd_packets:%4d err_Kbits:%3.3lf",
-                    stats_pkt_rcv,
-                    double(stats_byt_rcv)*8/(1000*1000),
-                    stats_pkt_mis,
-                    double(stats_ebt_rcv)*8/(1000));
+                LOG("STATS: rcvd_packets:%4lf tp_Mbits:%3.3lf, missd_packets:%.3lf err_Kbits:%3.3lf",
+                    double(stats_pkt_rcv)/stats_int,
+                    double(stats_byt_rcv)*8/(1000*1000*stats_int),
+                    double(stats_pkt_mis)/stats_int,
+                    double(stats_ebt_rcv)*8/(1000*stats_int));
                 stats_pkt_rcv = 0;
                 stats_byt_rcv = 0;
                 stats_pkt_mis = 0;
@@ -189,8 +191,7 @@ int main(int argc, char* argv[])
                 errors += (checker.data[i] != (i&0xFF)) ? 1 : 0;
             }
             bool has_skipped = ((last_id+1)&0xFF) != *(checker.id);
-            // LOG("TEST LAST+1=%d", (last_id+1)&0xFF);
-            // LOG("TEST CURR=%d", *(checker.id));
+
             if (has_skipped || errors)
             {
                 auto diff =  *(checker.id) - last_id;
@@ -198,17 +199,9 @@ int main(int argc, char* argv[])
                 stats_pkt_mis += diff;
                 stats_ebt_rcv += errors;
                 // LOG("ERROR: prev=%3d curr=%3d has_skipped=%d errors=%3d", last_id, *(checker.id), has_skipped, errors);
-                // if (errors)
-                // {
-                //     LOG("udp_packe5 (size=%d):\n%s", rv, buffer_str(buffer, rv).c_str());
-                // }
-            }
-            else
-            {
-                // LOG("R_OK : prev=%3d curr=%3d has_skipped=%d errors=%3d", last_id, *(checker.id), has_skipped, errors);
             }
 
-            last_id = *(checker.id);
+            last_id = *(checker.id);   
         }
     }
     else if (options.at("mode")=="send")
@@ -222,7 +215,7 @@ int main(int argc, char* argv[])
         double send_period = 1/send_rate;
         uint64_t send_period_us = send_period*1000*1000;
 
-        LOG("bitrate=%8.3lf Kbps send_rate=%lf Hz", rate*1000, send_rate);
+        LOG("bitrate=%8.3lf Kbps send_rate=%.3lf Hz", rate*1000, send_rate);
 
         sockaddr_in bindaddr;
         sockaddr_in sendaddr;

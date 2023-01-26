@@ -71,6 +71,59 @@ private:
     };
 };
 
+class winject_rts_src
+{
+public:
+    winject_rts_src() = delete;
+
+    winject_rts_src(uint64_t src)
+    {
+        set_src(src);
+    }
+    void set_src(uint64_t src)
+    {
+        // filter_code[10].k = 0xDEADBEEF;
+        // filter_code[12].k = 0xCAFE; 
+        uint16_t src_ = (src>>8)&0xFFFF;
+        filter_code[14].k = src_;
+        filter_code[16].k = src&0xFF;
+    }
+
+    sock_filter* data()
+    {
+        return filter_code;
+    }
+
+    unsigned short size() const
+    {
+        return sizeof(filter_code)/sizeof(sock_filter);
+    }
+
+private:
+    sock_filter filter_code[19] =
+    {
+        { 0x30, 0, 0, 0x00000003 },           // [00]       ldb  [3]              ;  rt_len = radiotap.length_high;
+        { 0x64, 0, 0, 0x00000008 },           // [01]       lsh  #8               ;  rt_len <<= 8;
+        { 0x7, 0, 0, 0x00000000 },            // [02]       tax                   ;  
+        { 0x30, 0, 0, 0x00000002 },           // [03]       ldb  [2]              ;
+        { 0x4c, 0, 0, 0x00000000 },           // [04]       or   x                ;  rt_len |= radiotap.length_low;
+        { 0x7, 0, 0, 0x00000000 },            // [05]       tax                   ;  
+        { 0x50, 0, 0, 0x00000000 },           // [06]       ldb  [x + 0]          ;  
+        { 0x54, 0, 0, 0x000000ff },           // [07]       and  #0xFF            ;  // PROTOCOL=0b00 && TYPE=0b01 && SUBTYPE=0b1011
+        { 0x15, 0, 9, 0x000000b4 },           // [08]       jne  #0xb4, die       ;  if (1 != fr80211.fc.type && 0xb!= fr80211.fc.subtype) goto die;
+        { 0x40, 0, 0, 0x0000000a },           // [09]       ld   [x + 10]         ;  // FC(2) + DURATION(2) + ADDR1(6)
+        { 0x15, 0, 7, 0xdeadbeef },           // [10]       jne  #0xDEADBEEF, die ;      
+        { 0x48, 0, 0, 0x00000014 },           // [11]       ldh  [x + 20]         ;  
+        { 0x15, 0, 5, 0x0000cafe },           // [12]       jne  #0xCAFE, die     ;  if (0xDEADBEEFCAFE != fr80211.addr2) goto die;
+        { 0x48, 0, 0, 0x00000004 },           // [13]       ldh  [x + 4]          ;
+        { 0x15, 0, 3, 0x0000ffff },           // [14]       jne  #0xFFFF, die     ;
+        { 0x50, 0, 0, 0x00000006 },           // [15]       ldb  [x + 6]          ;
+        { 0x15, 0, 1, 0x000000ff },           // [16]       jne  #0xFF, die       ;  if (0xFFFFFF != fr80211.addr1 >> 24)
+        { 0x6, 0, 0, 0xffffffff },            // [17]       ret #-1               ;  return -1;     
+        { 0x6, 0, 0, 0x00000000 },            // [18] die:  ret #0                ;  return 0;
+    };
+};
+
 class winject_src
 {
 public:
@@ -83,8 +136,8 @@ public:
 
     void set_src(uint32_t src)
     {
-        filter_code[10].k = 0xDEADBEEF;
-        filter_code[12].k = 0xCAFE; 
+        // filter_code[10].k = 0xDEADBEEF;
+        // filter_code[12].k = 0xCAFE; 
         uint16_t src_ = (src>>8)&0xFFFF;
         filter_code[18].k = src_;
         filter_code[20].k = src&0xFF;
