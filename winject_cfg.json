@@ -1,0 +1,87 @@
+{
+  "winject_rrc_config" :{
+    "frame80211_config" : {
+      "slot_intvl_us" : 1000,
+      "fec_config" : [
+        {
+          "fec_type" : "RS(255,239)",
+          "threshold" : 10
+        },
+        {
+          "fec_type" : "RS(255,223)",
+          "threshold" : 20
+        },
+        {
+          "fec_type" : "RS(255,191)",
+          "threshold" : 40
+        },
+        {
+          "fec_type" : "RS(255,127)",
+          "threshold" : 80
+        }
+      ]
+    },
+    "llc_configs": [
+      {
+        "lcid" : 0,
+        "tx_mode" : "transparent",
+        "tx_config" : {
+          "guaranteed_pdu_size" : -1,
+          "scheduling_quanta" : 0
+        }
+      },
+      {
+        "lcid" : 1,
+        "tx_mode" : "transparent",
+        "tx_config" : {
+          "guaranteed_pdu_size" : -1,
+          "scheduling_quanta" : 0
+        }
+      },
+      {
+        "lcid" : 2,
+        "tx_mode" : "transparent",
+        "tx_config" : {
+          "guaranteed_pdu_size" : 0,
+          "scheduling_quanta" : 255
+        }
+      },
+      {
+        "lcid" : 3,
+        "tx_mode" : "acknowledged",
+        "tx_config" : {
+          "guaranteed_pdu_size" : 5,
+          "scheduling_quanta" : 64,
+          "retx_slot_count" : 10,
+          "max_retx_count" : 3
+        }
+      }
+    ],
+    "pdcp_configs": [
+      {
+        "description" : "RRC",
+        "lcid" : 0
+      },
+      {
+        "description" : "UART Link",
+        "lcid" : 1,
+        "transport" : "udp",
+        "portin" : 1000,
+        "portout" : 1001
+      },
+      {
+        "description" : "Realtime Video",
+        "lcid" : 2,
+        "transport" : "udp",
+        "portin" : 1010,
+        "portout" : 1011
+      },
+      {
+        "description" : "IP Tunnel",
+        "lcid" : 3,
+        "transport" : "tcp",
+        "port" : 1020
+      }
+    ]
+  }
+}

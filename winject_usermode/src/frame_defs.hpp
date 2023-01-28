@@ -24,14 +24,14 @@ struct llc_t
     static constexpr uint8_t mask_R     = 0b01000000;
     static constexpr uint8_t mask_SN    = 0b00111111;
     static constexpr uint8_t mask_LCID  = 0b11110000;
-    static constexpr uint8_t mask_C     = 0b00001000;
+    static constexpr uint8_t mask_A     = 0b00001000;
     static constexpr uint8_t mask_SIZEH = 0b00000111;
     static constexpr uint8_t mask_SIZEL = 0b11111111;
     static constexpr uint8_t shift_D     = 7;
     static constexpr uint8_t shift_R     = 6;
     static constexpr uint8_t shift_SN    = 0;
     static constexpr uint8_t shift_LCID  = 4;
-    static constexpr uint8_t shift_C     = 3;
+    static constexpr uint8_t shift_A     = 3;
     static constexpr uint8_t shift_SIZEH = 0;
     static constexpr uint8_t shift_SIZEL = 0;
 
@@ -44,6 +44,7 @@ struct llc_t
     {
         uint8_t mv = base[index] & ~mask;
         mv |= ((val<<shift) & mask);
+        base[index] = mv;
     }
 
     void set_D(bool val)
@@ -86,14 +87,14 @@ struct llc_t
         return get(1, mask_LCID, shift_LCID);
     }
 
-    void set_C(bool val)
+    void set_A(bool val)
     {
-        set(1, mask_C, shift_C, val);
+        set(1, mask_A, shift_A, val);
     }
 
-    bool get_C()
+    bool get_A()
     {
-        return get(1, mask_C, shift_C);
+        return get(1, mask_A, shift_A);
     }
 
     void set_SIZE(uint16_t size)
@@ -108,7 +109,7 @@ struct llc_t
                (get(2, mask_SIZEL, shift_SIZEL));
     }
 
-    size_t get_header_size()
+    static size_t get_header_size()
     {
         return 3;
     }
@@ -127,6 +128,12 @@ struct llc_t
     {
         return get_SIZE()-get_header_size();
     }
+
+    void set_payload_size(size_t size)
+    {
+        set_SIZE(size+get_header_size());
+    }
+
 
     uint8_t* base = nullptr;
     size_t max_size = 0;

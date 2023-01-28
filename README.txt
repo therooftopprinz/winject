@@ -57,7 +57,7 @@ ppWiFi LLC:
    +---+---+-----------------------+
 00 | D | R | LLC SN                |
    +---+---+-------+---+-----------+
-01 | LCID          | C | SIZEH     |
+01 | LCID          | A | SIZEH     |
    +---------------+---+-----------+
 02 | SIZEL                         |
    +-------------------------------+
@@ -70,17 +70,15 @@ LLC SN: 6-bit LLC sequence number
 LCID: 5-bit Logical Channel Identifier
 SIZEH: Upper 3-bit of the LLC size
 SIZEL: Lower 8-bit of the LLC size
-C: LLC-CTL Type Indicator
-  0: ACK
-  1: PARITY
+A: Reserved
 
-LLC-CTL-ACK Payload:
+LLC-DATA-ACK Payload:
    +---+---+-----------------------+
 00 | # | # | LLC SN                |
    +---+---+-----------------------+
 01 | # | # | COUNT                 |
    +---+---+-----------------------+
-   
+
 ppWiFi PDCP
    +-------------------------------+
 00 | PDCP SN                       |

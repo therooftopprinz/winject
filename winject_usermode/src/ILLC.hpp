@@ -2,14 +2,15 @@
 #define __ILLC_HPP__
 
 #include "pdu.hpp"
+#include "frame_defs.hpp"
+#include "info_defs.hpp"
 
 struct ILLC
 {
     virtual ~ILLC(){} 
 
-    virtual void get_pdu(pdu_t& pdu, size_t slot) = 0;
-    virtual void get_prio_pdu(pdu_t& pdu, size_t slot) = 0;
-    virtual void on_pdu(const pdu_t& pdu, size_t slot) = 0;
+    virtual void on_tx(tx_info_t&) = 0;
+    virtual void on_rx(const rx_info_t&) = 0;
 };
 
-#endif // __ILLC_HPP__
+#endif // __ILLC_HPP__w
