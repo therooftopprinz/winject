@@ -12,7 +12,7 @@
 // 03 | Payload                       |
 //    +-------------------------------+
 
-TEST(LLC_Frame_tests, should_set_CDR)
+TEST(Test_llc_t, should_set_ADR)
 {
     uint8_t buffer[1024];
     {
@@ -41,19 +41,19 @@ TEST(LLC_Frame_tests, should_set_CDR)
     }
     {
         llc_t encode(buffer, sizeof(buffer));
-        encode.set_C(true);
+        encode.set_A(true);
         llc_t decode(buffer, sizeof(buffer));
-        EXPECT_EQ(true, decode.get_C());
+        EXPECT_EQ(true, decode.get_A());
     }
     {
         llc_t encode(buffer, sizeof(buffer));
-        encode.set_C(false);
+        encode.set_A(false);
         llc_t decode(buffer, sizeof(buffer));
-        EXPECT_EQ(false, decode.get_C());
+        EXPECT_EQ(false, decode.get_A());
     }
 }
 
-TEST(LLC_Frame_tests, should_set_LCID)
+TEST(Test_llc_t, should_set_LCID)
 {
     uint8_t buffer[1024];
     llc_t encode(buffer, sizeof(buffer));
@@ -62,7 +62,7 @@ TEST(LLC_Frame_tests, should_set_LCID)
     EXPECT_EQ(0xA, decode.get_LCID());
 }
 
-TEST(LLC_Frame_tests, should_set_SIZE)
+TEST(Test_llc_t, should_set_SIZE)
 {
     uint8_t buffer[1024];
     llc_t encode(buffer, sizeof(buffer));

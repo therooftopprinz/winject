@@ -1,8 +1,12 @@
-#ifndef __FRAME_DEFS_HPP__
-#define __FRAME_DEFS_HPP__
+#ifndef __WINJECTUM_FRAME_DEFS_HPP__
+#define __WINJECTUM_FRAME_DEFS_HPP__
 
 #include <cstdint>
 #include <cstddef>
+
+using sn_t = uint8_t;
+using lcid_t = uint8_t;
+using llc_sz_t = uint16_t;
 
 //    +---+---+-----------------------+
 // 00 | D | R | LLC SN                |
@@ -67,22 +71,22 @@ struct llc_t
         return get(0, mask_R, shift_R);
     }
 
-    void set_SN(uint8_t sn)
+    void set_SN(sn_t sn)
     {
         set(0, mask_SN, shift_SN, sn);
     }
 
-    uint8_t get_SN()
+    sn_t get_SN()
     {
         return get(0, mask_SN, shift_SN);
     }
 
-    void set_LCID(uint8_t lcid)
+    void set_LCID(lcid_t lcid)
     {
         set(1, mask_LCID, shift_LCID, lcid);
     }
 
-    uint8_t get_LCID()
+    lcid_t get_LCID()
     {
         return get(1, mask_LCID, shift_LCID);
     }
@@ -97,19 +101,19 @@ struct llc_t
         return get(1, mask_A, shift_A);
     }
 
-    void set_SIZE(uint16_t size)
+    void set_SIZE(llc_sz_t size)
     {
         set(1, mask_SIZEH, shift_SIZEH, size >> 8);
         set(2, mask_SIZEL, shift_SIZEL, size);
     }
 
-    uint16_t get_SIZE()
+    llc_sz_t get_SIZE()
     {
         return (get(1, mask_SIZEH, shift_SIZEH) << 8) |
                (get(2, mask_SIZEL, shift_SIZEL));
     }
 
-    static size_t get_header_size()
+    static llc_sz_t get_header_size()
     {
         return 3;
     }
@@ -119,24 +123,24 @@ struct llc_t
         return base+get_header_size();
     }
 
-    size_t get_max_payload_size()
+    llc_sz_t get_max_payload_size()
     {
         return max_size-get_header_size();
     }
 
-    size_t get_payload_size()
+    llc_sz_t get_payload_size()
     {
         return get_SIZE()-get_header_size();
     }
 
-    void set_payload_size(size_t size)
+    void set_payload_size(llc_sz_t size)
     {
         set_SIZE(size+get_header_size());
     }
 
 
     uint8_t* base = nullptr;
-    size_t max_size = 0;
+    llc_sz_t max_size = 0;
 };
 
 // LLC-CTL-ACK Payload:
@@ -147,9 +151,9 @@ struct llc_t
 //    +---+---+-----------------------+
 struct llc_payload_ack_t
 {
-    uint8_t sn;
-    uint8_t count;
+    sn_t sn;
+    sn_t count;
 } __attribute((packed));
 
 
-#endif // __FRAME_DEFS_HPP__
+#endif // __WINJECTUM_FRAME_DEFS_HPP__

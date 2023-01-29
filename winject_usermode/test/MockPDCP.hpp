@@ -1,12 +1,13 @@
-#ifndef __MOCKPDCP_HPP__
-#define __MOCKPDCP_HPP__
+#ifndef __WINJECTUMTST_MOCKPDCP_HPP__
+#define __WINJECTUMTST_MOCKPDCP_HPP__
 
+#include <gmock/gmock.h>
 #include "IPDCP.hpp"
 
 struct MockPDCP : public IPDCP
 {
-    virtual void on_tx(tx_info_t&) = 0;
-    virtual void on_rx(const rx_info_t&) = 0;
+    MOCK_METHOD1(on_tx, void(tx_info_t&));
+    MOCK_METHOD1(on_rx, void(rx_info_t&));
 };
 
-#endif // __MOCKPDCP_HPP__
+#endif // __WINJECTUMTST_MOCKPDCP_HPP__

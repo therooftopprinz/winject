@@ -47,4 +47,4 @@ file(GLOB_RECURSE test_src test/*.cpp)
 add_executable(test ${test_src})
 target_include_directories(test PRIVATE src test ..)
 
-target_link_libraries(test PRIVATE pthread gtest gtest_main)
+target_link_libraries(test PRIVATE pthread gtest gtest_main gmock gmock_main)

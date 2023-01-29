@@ -1,5 +1,5 @@
-#ifndef __IPDCP_HPP__
-#define __IPDCP_HPP__
+#ifndef __WINJECTUM_IPDCP_HPP__
+#define __WINJECTUM_IPDCP_HPP__
 
 #include "pdu.hpp"
 #include "info_defs.hpp"
@@ -12,4 +12,4 @@ struct IPDCP
     virtual void on_rx(rx_info_t&) = 0;
 };
 
-#endif // __IPDCP_HPP__
+#endif // __WINJECTUM_IPDCP_HPP__

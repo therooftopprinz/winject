@@ -1,5 +1,5 @@
-#ifndef __LLC_HPP__
-#define __LLC_HPP__
+#ifndef __WINJECTUM_LLC_HPP__
+#define __WINJECTUM_LLC_HPP__
 
 #include "ILLC.hpp"
 #include "IPDCP.hpp"
@@ -13,19 +13,35 @@
 class LLC : public ILLC
 {
 public:
-    LLC(std::shared_ptr<IPDCP> pdcp)
+    LLC(
+        std::shared_ptr<IPDCP> pdcp,
+        uint8_t lcid,
+        size_t retx_slot_count,
+        size_t retx_max_count)
         : pdcp(pdcp)
-        , retx_slot_count(5)
-        , retx_max_count(4)
-    {}
+        , lcid(lcid)
+        , retx_slot_count(retx_slot_count)
+        , retx_max_count(retx_max_count)
+        , tx_ring(64)
+    {
+        for (auto& tx_ring_elem : tx_ring)
+        {
+            tx_ring_elem.acknowledged = true;
+            tx_ring_elem.to_check = -1;
+            tx_ring_elem.pdcp_pdu = allocate_buffer();
+        }
+    }
 
     void on_tx(tx_info_t& info)
     {
-        check_retransmit(info.in_frame_info->slot_number);
+        check_retransmit(info.in_frame_info.slot_number);
 
         // @note tx_info for slot synchronization only
         if (info.out_pdu.size <= llc_t::get_header_size())
         {
+            info.out_pdu.size = 0;
+            // @note No allocation just inform PDCP for slot update;
+            pdcp->on_tx(info);
             return;
         }
 
@@ -42,10 +58,11 @@ public:
             if (to_ack_list.size())
             {
                 int n_acks = 0;
+                lg.unlock();
                 while (info.out_pdu.size >= sizeof(llc_payload_ack_t))
                 {
                     lg.lock();
-                    if (to_ack_list.size())
+                    if (!to_ack_list.size())
                     {
                         break;
                     }
@@ -74,9 +91,13 @@ public:
         // @note Allocate PDCP
         if (info.out_pdu.size < llc_t::get_header_size())
         {
+            info.out_pdu.size = 0;
+            // @note No allocation just inform PDCP for slot update;
+            pdcp->on_tx(info);
             return;
         }
 
+        llc.set_LCID(lcid);
         llc.set_D(true);
         llc.set_R(false);
         llc.set_A(false);
@@ -89,8 +110,13 @@ public:
         {
             has_retransmit = true;
             auto& retx_pdu = to_retx_list.front();
+            // @note Allocation not enught for retransmit
             if (retx_pdu.first > info.out_pdu.size)
             {
+                info.out_pdu.size = 0;
+                // @note No allocation just inform PDCP for slot update;
+                pdcp->on_tx(info);
+                info.tx_available = true;
                 return;
             }
         }
@@ -100,6 +126,8 @@ public:
         if (!has_retransmit)
         {
             pdcp->on_tx(info);
+            size_t pdcp_allocation_size = info.out_allocated - init_alloc;
+            llc.set_payload_size(pdcp_allocation_size);
         }
         // @note Get PDCP from retransmit
         else
@@ -110,10 +138,14 @@ public:
             llc.set_payload_size(retx_pdu.first);
             info.out_allocated += retx_pdu.first;
             to_retx_list.pop_front();
+
+            info.out_pdu.size = 0;
+            // @note No allocation just inform PDCP for slot update;S
+            pdcp->on_tx(info);
         }
 
         // @note No PDCP allocated
-        if (info.out_allocated == info.out_allocated)
+        if (init_alloc == info.out_allocated)
         {
             return;
         }
@@ -124,14 +156,13 @@ public:
         increment_sn();
 
         // @note Setup tx_ring element for retransmit check
-        auto slot_number = info.in_frame_info->slot_number;
+        auto slot_number = info.in_frame_info.slot_number;
         auto ack_ck_idx = tx_ring_index(slot_number + retx_slot_count);
         auto tx_idx = tx_ring_index(slot_number);
         auto& ack_elem = tx_ring[ack_ck_idx];
         auto& tx_elem = tx_ring[tx_idx];
 
         tx_elem.acknowledged = false;
-        tx_elem.ref_check = ack_ck_idx;
         ack_elem.to_check = tx_idx;
 
         // @note copy PDCP to tx_ring elem needed when retransmitting
@@ -145,15 +176,11 @@ public:
         // @note Handle ack
         if (llc.get_D() && llc.get_A())
         {
-            auto idx = tx_ring_index(info.in_frame_info->slot_number);
-            auto& sent = tx_ring[idx];
-            sent.acknowledged = true;
-
-            // @note Reset sent tx_ring_elem
-            auto& to_check_slot = tx_ring[*(sent.to_check)];
-            // @note Reset to_check tx_ring_elem
-            to_check_slot.ref_check.reset();
-            sent.to_check.reset();
+            auto idx = tx_ring_index(info.in_frame_info.slot_number);
+            auto& current_slot = tx_ring[idx];
+            auto sent_idx = tx_ring_index(current_slot.to_check);
+            auto& sent_slot = tx_ring[sent_idx];
+            sent_slot.acknowledged = true;
         }
         // @note Handle data
         else if (llc.get_D())
@@ -168,15 +195,28 @@ public:
 private:
     void check_retransmit(size_t slot_number)
     {
-
+        auto& this_slot = tx_ring[tx_ring_index(slot_number)];
+        auto& sent_slot = tx_ring[tx_ring_index(this_slot.to_check)];
+        if (sent_slot.acknowledged)
+        {
+            return;
+        }
+        // @note Reset state to default
+        sent_slot.acknowledged = true;
+        // @note Queue back retx PDCP
+        to_retx_list.emplace_back();
+        auto& to_retx = to_retx_list.back();
+        to_retx.first = sent_slot.pdcp_pdu_size;
+        to_retx.second = allocate_buffer();
+        sent_slot.pdcp_pdu.swap(to_retx.second);
     }
 
-    void to_acknowledge(size_t sn)
+    void to_acknowledge(sn_t sn)
     {
         std::unique_lock<std::mutex> lg(to_ack_list_mutex);
         if (!to_ack_list.size())
         {
-            to_ack_list.emplace_front(sn, 1);
+            to_ack_list.emplace_back(sn, 1);
         }
         else
         {
@@ -187,7 +227,7 @@ private:
             }
             else
             {
-                to_ack_list.emplace_front(sn, 1);
+                to_ack_list.emplace_back(sn, 1);
             }
         }
     }
@@ -204,11 +244,10 @@ private:
 
     struct tx_ring_elem_t
     {
-        std::optional<int> to_check;
-        bool acknowledged;
-        std::optional<int> ref_check;
-        buffer_t pdcp_pdu;
+        size_t to_check;
         size_t pdcp_pdu_size;
+        buffer_t pdcp_pdu;
+        bool acknowledged;
     };
 
     buffer_t allocate_buffer()
@@ -232,7 +271,7 @@ private:
     // @brief Used for pdpc cache and retx cache
     std::list<buffer_t> buffer_pool;
     // @brief Logical Channel Identifier
-    uint8_t lcid;
+    lcid_t lcid;
     // @brief Number of slot before retransmit
     size_t retx_slot_count;
     // @brief Max retransmit before reporting radio link failure to PDCP
@@ -244,8 +283,8 @@ private:
     // @brief PDCP frames that needs retransmission (multithreaded)
     std::list<std::pair<size_t,buffer_t>> to_retx_list;
     std::mutex to_ack_list_mutex;
-    uint8_t  sn_counter;
+    sn_t  sn_counter = 0;
     const size_t llc_max_size = 1500;
 };
 
-#endif // __LLC_HPP__
+#endif // __WINJECTUM_LLC_HPP__

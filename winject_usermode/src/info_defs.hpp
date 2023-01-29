@@ -1,5 +1,5 @@
-#ifndef __INFO_DEPS_HPP__
-#define __INFO_DEPS_HPP__
+#ifndef __WINJECTUM_INFO_DEPS_HPP__
+#define __WINJECTUM_INFO_DEPS_HPP__
 
 #include <cstddef>
 #include <cstdint>
@@ -23,15 +23,16 @@ class pdu_t;
 
 struct tx_info_t
 {
-    const frame_info_t const* in_frame_info; 
+    const frame_info_t& in_frame_info;
+    bool tx_available;
     pdu_t out_pdu;
     size_t out_allocated;
 };
 
 struct rx_info_t
 {
-    const frame_info_t const* in_frame_info; 
+    const frame_info_t& in_frame_info;
     pdu_t in_pdu;
 };
 
-#endif // __INFO_DEPS_HPP__
+#endif // __WINJECTUM_INFO_DEPS_HPP__

@@ -1,5 +1,5 @@
-#ifndef __PDU_HPP__
-#define __PDU_HPP__
+#ifndef __WINJECTUM_PDU_HPP__
+#define __WINJECTUM_PDU_HPP__
 
 #include <vector>
 #include <cstdint>
@@ -13,4 +13,4 @@ struct pdu_t
     size_t size = 0;
 };
 
-#endif // __PDU_HPP__
+#endif // __WINJECTUM_PDU_HPP__
