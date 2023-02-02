@@ -24,17 +24,49 @@ public:
         , retx_max_count(retx_max_count)
         , tx_ring(64)
     {
-        for (auto& tx_ring_elem : tx_ring)
-        {
-            tx_ring_elem.acknowledged = true;
-            tx_ring_elem.to_check = -1;
-            tx_ring_elem.pdcp_pdu = allocate_buffer();
-        }
+        reset_tx();
     }
 
+    void reset_tx()
+    {
+
+        for (auto& tx_ring_elem : tx_ring)
+        {
+            if(tx_ring_elem.pdcp_pdu.empty())
+            {
+                tx_ring_elem.pdcp_pdu = allocate_buffer();
+            }
+            tx_ring_elem.acknowledged = true;
+            tx_ring_elem.to_check = -1;
+        }
+
+        for (auto& i : to_retx_list)
+        {
+            if (i.pdcp_pdu.size())
+            {
+                free_buffer(std::move(i.pdcp_pdu));
+            }
+        }
+
+        to_retx_list.clear();
+    }
+
+    /**
+     * @brief on_tx
+     *   Called by scheduler to fillup buffer with LLC PDUs
+     *   Should not be called again once tx_info_t::has_data_loaded
+     *   is set.
+    */
     void on_tx(tx_info_t& info)
     {
         check_retransmit(info.in_frame_info.slot_number);
+
+        // @note Setup tx_ring element for retransmit check
+        auto slot_number = info.in_frame_info.slot_number;
+        auto ack_ck_idx = tx_ring_index(slot_number + retx_slot_count);
+        auto tx_idx = tx_ring_index(slot_number);
+        auto& ack_elem = tx_ring[ack_ck_idx];
+        auto& tx_elem = tx_ring[tx_idx];
 
         // @note tx_info for slot synchronization only
         if (info.out_pdu.size <= llc_t::get_header_size())
@@ -50,7 +82,7 @@ public:
         info.out_pdu.base = llc.payload();
         info.out_pdu.size -= llc.get_header_size();
 
-        // @note Allocate ACKs first
+        // @note Allocate LLC-DATA-ACKs first
         {
             std::unique_lock<std::mutex> lg(to_ack_list_mutex);
             llc_payload_ack_t* acks = (llc_payload_ack_t*) llc.payload();
@@ -110,8 +142,8 @@ public:
         {
             has_retransmit = true;
             auto& retx_pdu = to_retx_list.front();
-            // @note Allocation not enught for retransmit
-            if (retx_pdu.first > info.out_pdu.size)
+            // @note Allocation not enough for retransmit
+            if (retx_pdu.pdcp_pdu_size > info.out_pdu.size)
             {
                 info.out_pdu.size = 0;
                 // @note No allocation just inform PDCP for slot update;
@@ -121,27 +153,43 @@ public:
             }
         }
 
-        size_t init_alloc = info.out_allocated; 
+        size_t init_alloc = info.out_allocated;
+        size_t retx_count = 0;
         // @note Get PDCP from PDCP layer
         if (!has_retransmit)
         {
             pdcp->on_tx(info);
             size_t pdcp_allocation_size = info.out_allocated - init_alloc;
             llc.set_payload_size(pdcp_allocation_size);
+            info.has_data_loaded = true;
         }
         // @note Get PDCP from retransmit
         else
         {
             auto& retx_pdu = to_retx_list.front();
-            std::memcpy(llc.payload(), retx_pdu.second.data(), retx_pdu.first);
-            free_buffer(std::move(retx_pdu.second));
-            llc.set_payload_size(retx_pdu.first);
-            info.out_allocated += retx_pdu.first;
-            to_retx_list.pop_front();
+            retx_count = retx_pdu.retry_count + 1;
+            if (retx_count >= retx_max_count)
+            {
+                info.out_pdu.size = 0;
+                // @note No allocation just inform PDCP for slot update;S
+                pdcp->on_tx(info);
+                pdcp->on_tx_rlf();
+                info.out_allocated = 0;
+                on_tx_rlf();
+                return;
+            }
+            else
+            {
+                std::memcpy(llc.payload(), retx_pdu.pdcp_pdu.data(), retx_pdu.pdcp_pdu_size);
+                free_buffer(std::move(retx_pdu.pdcp_pdu));
+                llc.set_payload_size(retx_pdu.pdcp_pdu_size);
+                info.out_allocated += retx_pdu.pdcp_pdu_size;
+                to_retx_list.pop_front();
 
-            info.out_pdu.size = 0;
-            // @note No allocation just inform PDCP for slot update;S
-            pdcp->on_tx(info);
+                info.out_pdu.size = 0;
+                pdcp->on_tx(info);
+                info.has_data_loaded = true;
+            }
         }
 
         // @note No PDCP allocated
@@ -155,13 +203,7 @@ public:
         llc.set_SN(sn_counter);
         increment_sn();
 
-        // @note Setup tx_ring element for retransmit check
-        auto slot_number = info.in_frame_info.slot_number;
-        auto ack_ck_idx = tx_ring_index(slot_number + retx_slot_count);
-        auto tx_idx = tx_ring_index(slot_number);
-        auto& ack_elem = tx_ring[ack_ck_idx];
-        auto& tx_elem = tx_ring[tx_idx];
-
+        tx_elem.retry_count = retx_count;
         tx_elem.acknowledged = false;
         ack_elem.to_check = tx_idx;
 
@@ -192,7 +234,22 @@ public:
         }
     }
 
+    void on_rx_rlf()
+    {
+        {
+            std::unique_lock<std::mutex> lg(to_ack_list_mutex);
+            to_ack_list.clear();
+        }
+
+        pdcp->on_rx_rlf();
+    }
+
 private:
+    void on_tx_rlf()
+    {
+        reset_tx();
+    }
+
     void check_retransmit(size_t slot_number)
     {
         auto& this_slot = tx_ring[tx_ring_index(slot_number)];
@@ -206,12 +263,13 @@ private:
         // @note Queue back retx PDCP
         to_retx_list.emplace_back();
         auto& to_retx = to_retx_list.back();
-        to_retx.first = sent_slot.pdcp_pdu_size;
-        to_retx.second = allocate_buffer();
-        sent_slot.pdcp_pdu.swap(to_retx.second);
+        to_retx.retry_count = sent_slot.retry_count;
+        to_retx.pdcp_pdu_size = sent_slot.pdcp_pdu_size;
+        to_retx.pdcp_pdu = allocate_buffer();
+        sent_slot.pdcp_pdu.swap(to_retx.pdcp_pdu);
     }
 
-    void to_acknowledge(sn_t sn)
+    void to_acknowledge(llc_sn_t sn)
     {
         std::unique_lock<std::mutex> lg(to_ack_list_mutex);
         if (!to_ack_list.size())
@@ -242,14 +300,6 @@ private:
         return slot % tx_ring.size();
     }
 
-    struct tx_ring_elem_t
-    {
-        size_t to_check;
-        size_t pdcp_pdu_size;
-        buffer_t pdcp_pdu;
-        bool acknowledged;
-    };
-
     buffer_t allocate_buffer()
     {
         if (buffer_pool.size())
@@ -267,6 +317,22 @@ private:
         buffer_pool.emplace_back(std::move(buffer));
     }
 
+    struct tx_ring_elem_t
+    {
+        size_t to_check;
+        size_t retry_count;
+        size_t pdcp_pdu_size;
+        buffer_t pdcp_pdu;
+        bool acknowledged;
+    };
+
+    struct retx_elem_t
+    {
+        size_t retry_count;
+        size_t pdcp_pdu_size;
+        buffer_t pdcp_pdu;
+    };
+
     std::shared_ptr<IPDCP> pdcp;
     // @brief Used for pdpc cache and retx cache
     std::list<buffer_t> buffer_pool;
@@ -281,9 +347,9 @@ private:
     // @brief LLC sequence number list pending for acknowledgement
     std::list<std::pair<size_t,size_t>> to_ack_list;
     // @brief PDCP frames that needs retransmission (multithreaded)
-    std::list<std::pair<size_t,buffer_t>> to_retx_list;
+    std::list<retx_elem_t> to_retx_list;
     std::mutex to_ack_list_mutex;
-    sn_t  sn_counter = 0;
+    llc_sn_t  sn_counter = 0;
     const size_t llc_max_size = 1500;
 };
 

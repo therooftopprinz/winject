@@ -24,9 +24,12 @@ class pdu_t;
 struct tx_info_t
 {
     const frame_info_t& in_frame_info;
-    bool tx_available;
+    // used to inform scheduler that data is available
+    bool tx_available = false;
+    // used to inform scheduler data has already allocated in this slot
+    bool has_data_loaded = false;
     pdu_t out_pdu;
-    size_t out_allocated;
+    size_t out_allocated = 0;
 };
 
 struct rx_info_t

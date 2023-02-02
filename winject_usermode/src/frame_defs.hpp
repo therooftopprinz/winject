@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstddef>
 
-using sn_t = uint8_t;
+using llc_sn_t = uint8_t;
 using lcid_t = uint8_t;
 using llc_sz_t = uint16_t;
 
@@ -155,5 +155,27 @@ struct llc_payload_ack_t
     sn_t count;
 } __attribute((packed));
 
+//     +-------------------------------+
+//  00 | PDCP SN                       |
+//     +-------------------------------+
+//  01 | OFFSET (OPTIONAL)             |
+//     +-------------------------------|
+//  04 | PAYLOAD                       |
+//     +-------------------------------+
+//  SZ | MAC                           | EOP
+//     +-------------------------------+
+
+struct pdcp_t
+{
+    sn_t 
+    uint8_t* base = nullptr;
+    llc_sz_t max_size = 0;
+};
+
+struct pdcp_uf_t
+{
+    uint8_t* base = nullptr;
+    llc_sz_t max_size = 0;
+};
 
 #endif // __WINJECTUM_FRAME_DEFS_HPP__

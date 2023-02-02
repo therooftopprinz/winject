@@ -11,6 +11,7 @@ struct ILLC
 
     virtual void on_tx(tx_info_t&) = 0;
     virtual void on_rx(rx_info_t&) = 0;
+    virtual void on_rx_rlf() = 0;
 };
 
 #endif // __WINJECTUM_ILLC_HPP__

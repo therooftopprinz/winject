@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <bitset>
 
-#include <winject/safeint.hpp>
+#include "safeint.hpp"
 
 namespace winject
 {

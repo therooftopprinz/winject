@@ -2,6 +2,7 @@
 #define __WINJECT_802_11_hpp__
 
 #include <cstdint>
+#include "safeint.hpp"
 
 namespace winject
 {
@@ -154,7 +155,7 @@ public:
         }
 
         frame_control = (frame_control_t*) buffer;
-        duration = (uint16_t*)(buffer + sizeof(frame_control_t));
+        duration = (LEU16UA*)(buffer + sizeof(frame_control_t));
 
         rescan();
     }
@@ -167,7 +168,7 @@ public:
         seq_ctl = nullptr;
         address4 = nullptr;
         frame_body = nullptr;
-        fcs = (uint32_t*)last-sizeof(*fcs);
+        fcs = (LEU32UA*)last-sizeof(*fcs);
     }
 
     void rescan()
@@ -200,7 +201,7 @@ public:
         {
             address1 = (address_t*)((uint8_t*)duration + sizeof(*duration));
             address2 = (address_t*)((uint8_t*)address1 + sizeof(*address1));
-            fcs = (uint32_t*)((uint8_t*)address2 + sizeof(*address2));
+            fcs = (LEU32UA*)((uint8_t*)address2 + sizeof(*address2));
         }
     }
 
@@ -233,18 +234,18 @@ public:
 
     void set_body_size(uint16_t size)
     {
-        fcs = (uint32_t*)(frame_body+size);
+        fcs = (LEU32UA*)(frame_body+size);
     }
 
     frame_control_t* frame_control = nullptr;
-    uint16_t* duration = nullptr;
+    LEU16UA* duration = nullptr;
     address_t* address1 = nullptr;
     address_t* address2 = nullptr;
     address_t* address3 = nullptr;
     seq_ctl_t* seq_ctl = nullptr;
     address_t* address4 = nullptr;
     uint8_t* frame_body = nullptr;
-    uint32_t* fcs = nullptr;
+    LEU32UA* fcs = nullptr;
     uint8_t* last = nullptr;
     bool is_enabled_fcs = true;
 };
