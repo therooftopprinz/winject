@@ -21,6 +21,7 @@ using pdcp_segment_offset_t = uint16_t;
 //    +-------------------------------+
 // 03 | Payload                       |
 //    +-------------------------------+
+
 struct llc_t
 {
     llc_t(uint8_t* base, size_t size)
@@ -158,6 +159,7 @@ struct llc_t
 //    +---+---+-----------------------+
 // 01 | # | # | COUNT                 |
 //    +---+---+-----------------------+
+
 struct llc_payload_ack_t
 {
     llc_sn_t sn;
@@ -180,7 +182,7 @@ struct pdcp_t
     {
     }
 
-    void initialize()
+    void rescan()
     {
         uint8_t *ptr = base;
 
@@ -203,6 +205,8 @@ struct pdcp_t
         {
             hmac = nullptr;
         }
+
+        payload = ptr;
     }
 
     size_t get_header_size()
@@ -215,6 +219,8 @@ struct pdcp_t
 
     uint8_t* iv_ext = nullptr;
     uint8_t* hmac = nullptr;
+
+    uint8_t* payload = nullptr;
 
     uint8_t* base = nullptr;
     llc_sz_t pdu_size = 0;
@@ -229,6 +235,7 @@ struct pdcp_t
 //     +-------------------------------+
 //     | PAYLOAD                       | EOS
 //     +-------------------------------+
+
 struct pdcp_segment_t
 {
     pdcp_segment_t(uint8_t* base, size_t size)
@@ -255,10 +262,61 @@ struct pdcp_segment_t
         payload = ptr;
     }
 
-    void set_SN(pdcp_sn_t value);
-    pdcp_sn_t get_SN();
-    void set_OFFSET(std::optional<pdcp_segment_offset_t> offset);
-    std::optional<pdcp_segment_offset_t> get_OFFSET();
+    void set_SN(pdcp_sn_t value)
+    {
+        *sn = value;
+    }
+
+    pdcp_sn_t get_SN()
+    {
+        return *sn;
+    }
+
+    void set_OFFSET(std::optional<pdcp_segment_offset_t> value)
+    {
+        if (!value)
+        {
+            has_offset = false;
+        }
+
+        *offset = *value;
+    }
+
+    std::optional<pdcp_segment_offset_t> get_OFFSET()
+    {
+        if (!has_offset)
+        {
+            return {};
+        }
+        return *offset;
+    }
+
+    void set_SIZE(pdcp_segment_offset_t value)
+    {
+        *size = value;
+    }
+
+    pdcp_segment_offset_t get_SIZE()
+    {
+        return *size;
+    }
+
+    size_t get_header_size()
+    {
+        return sizeof(*sn) + (has_offset ? sizeof(*offset) : 0) +
+            sizeof(*size); 
+    }
+
+    pdcp_segment_offset_t get_payload_size()
+    {
+        return get_SIZE()-get_header_size();
+    }
+
+    void set_payload_size(pdcp_segment_offset_t size)
+    {
+        set_SIZE(size+get_header_size());
+    }
+    
 
     uint8_t *base = nullptr;
     size_t max_size = 0;
@@ -268,6 +326,5 @@ struct pdcp_segment_t
     winject::BEU16UA *size = nullptr;
     uint8_t *payload = nullptr;
 };
-
 
 #endif // __WINJECTUM_FRAME_DEFS_HPP__

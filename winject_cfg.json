@@ -72,26 +72,30 @@
       {
         "description" : "RRC",
         "lcid" : 0,
-        "type" : "internal"
+        "type" : "internal",
+        "allow_segmentation" : false
       },
       {
         "description" : "UART",
         "lcid" : 1,
         "type" : "uart",
-        "device" : "/dev/ttyS0"
+        "device" : "/dev/ttyS0",
+        "allow_segmentation" : false
       },
       {
         "description" : "video",
         "lcid" : 2,
         "type" : "udp",
         "portin" : 1010,
-        "portout" : 1011
+        "portout" : 1011,
+        "allow_segmentation" : true
       },
       {
         "description" : "Tunnel",
         "lcid" : 3,
         "type" : "tun",
-        "device" : "/dev/tun0"
+        "device" : "/dev/tun0",
+        "allow_segmentation" : true
       }
     ]
   }

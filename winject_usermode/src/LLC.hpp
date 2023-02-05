@@ -423,7 +423,7 @@ private:
     std::list<retx_elem_t> to_retx_list;
     std::mutex to_ack_list_mutex;
     llc_sn_t  sn_counter = 0;
-    const size_t llc_max_size = 1500;
+    static constexpr size_t llc_max_size = 1500;
 
     bool is_tx_enabled = false;
     bool is_rx_enabled = false;
