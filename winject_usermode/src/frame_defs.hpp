@@ -186,14 +186,14 @@ struct pdcp_t
     {
         uint8_t *ptr = base;
 
-        if (iv_ext_size)
+        if (iv_size)
         {
-            iv_ext = ptr;
-            ptr += iv_ext_size;
+            iv = ptr;
+            ptr += iv_size;
         }
         else
         {
-            iv_ext = nullptr;
+            iv = nullptr;
         }
 
         if (hmac_size)
@@ -211,13 +211,13 @@ struct pdcp_t
 
     size_t get_header_size()
     {
-        return (hmac_size + iv_ext_size);
+        return (hmac_size + iv_size);
     }
 
-    size_t iv_ext_size = 0;
+    size_t iv_size = 0;
     size_t hmac_size = 0;
 
-    uint8_t* iv_ext = nullptr;
+    uint8_t* iv = nullptr;
     uint8_t* hmac = nullptr;
 
     uint8_t* payload = nullptr;

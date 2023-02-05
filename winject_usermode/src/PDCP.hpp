@@ -78,10 +78,13 @@ public:
             return;
         }
 
-        info.tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
+        {
+            std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
+            info.tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
+        }
 
         pdcp_t pdcp(info.out_pdu.base, info.out_pdu.size);
-        pdcp.iv_ext_size = tx_cipher_iv_size;
+        pdcp.iv_size = tx_cipher_iv_size;
         pdcp.hmac_size = tx_hmac_size;
         pdcp.rescan();
 
@@ -111,13 +114,25 @@ public:
             pdcp_segment_t segment(payload, available_for_data);
             segment.has_offset = tx_config.allow_segmentation;
             segment.rescan();
+
+            if (segment.get_header_size() > available_for_data)
+            {
+                break;
+            }
+
             available_for_data -= segment.get_header_size();
 
-            segment.set_SN(tx_sn++);
+            segment.set_SN(tx_sn);
 
             if (!segment.has_offset)
             {
                 std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
+
+                if (!to_tx_queue.size())
+                {
+                    break;
+                }
+
                 buffer_t pdu = std::move(to_tx_queue.front());
                 if (pdu.size() > available_for_data)
                 {
@@ -160,9 +175,10 @@ public:
             }
 
             payload += segment.get_SIZE();
-            available_for_data -= segment.get_SIZE();
+            available_for_data -= segment.get_payload_size();
             info.out_allocated += segment.get_SIZE();
             allocated_segments++;
+            tx_sn++;
 
             // @todo: Implement PDCP encryption
             // @todo: Implement PDCP integrity
@@ -172,6 +188,8 @@ public:
         {
             info.out_allocated += pdcp.get_header_size();
         }
+
+        info.tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
     }
 
     void on_rx(rx_info_t& info)
@@ -183,7 +201,7 @@ public:
         }
 
         pdcp_t pdcp(info.in_pdu.base, info.in_pdu.size);
-        pdcp.iv_ext_size = rx_cipher_iv_size;
+        pdcp.iv_size = rx_cipher_iv_size;
         pdcp.hmac_size = rx_hmac_size;
         pdcp.rescan();
 
@@ -196,8 +214,6 @@ public:
             segment.has_offset = rx_config.allow_segmentation;
             segment.rescan();
             available_data -= segment.get_header_size();
-
-            segment.set_SN(tx_sn++);
 
             if (!segment.has_offset)
             {
