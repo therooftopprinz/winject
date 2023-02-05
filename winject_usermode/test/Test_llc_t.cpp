@@ -12,21 +12,21 @@
 // 03 | Payload                       |
 //    +-------------------------------+
 
-TEST(Test_llc_t, should_set_ADR)
+TEST(Test_llc_t, should_set_AR)
 {
     uint8_t buffer[1024];
-    {
-        llc_t encode(buffer, sizeof(buffer));
-        encode.set_D(true);
-        llc_t decode(buffer, sizeof(buffer));
-        EXPECT_EQ(true, decode.get_D());
-    }
-    {
-        llc_t encode(buffer, sizeof(buffer));
-        encode.set_D(false);
-        llc_t decode(buffer, sizeof(buffer));
-        EXPECT_EQ(false, decode.get_D());
-    }
+    // {
+    //     llc_t encode(buffer, sizeof(buffer));
+    //     encode.set_D(true);
+    //     llc_t decode(buffer, sizeof(buffer));
+    //     EXPECT_EQ(true, decode.get_D());
+    // }
+    // {
+    //     llc_t encode(buffer, sizeof(buffer));
+    //     encode.set_D(false);
+    //     llc_t decode(buffer, sizeof(buffer));
+    //     EXPECT_EQ(false, decode.get_D());
+    // }
     {
         llc_t encode(buffer, sizeof(buffer));
         encode.set_R(true);

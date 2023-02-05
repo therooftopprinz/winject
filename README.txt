@@ -10,6 +10,7 @@ channel. It supports the acknowledged transmission mode, as well as
 forward error correction codes. It supports packet disassembly and 
 reassembly. And it supports message authentication and encryption.
 
+
 Problem
 -----------------------------
     SDR devices are expensive; if the application is just to be able to 
@@ -54,7 +55,6 @@ ppWIFI RRC:
 Implementation
 -----------------------------
 
-
 ppWiFi 802.11 Frame structure:
 
       +----------------------+----------------------+
@@ -83,22 +83,24 @@ ppWiFi 802.11 Frame structure:
 
 ppWiFi LLC:
       +---+---+-----------------------+
-   00 | D | R | LLC SN                |
+   00 | # | R | LLC SN                |
       +---+---+-------+---+-----------+
    01 | LCID          | A | SIZEH     |
       +---------------+---+-----------+
    02 | SIZEL                         |
       +-------------------------------+
-   03 | Payload                       | EOP
+   03 | CRC                           | CRCSZ
+      +-------------------------------+
+      | Payload                       | EOP
       +-------------------------------+
 
-      D: LLC-DATA Indicator (LLC-CTL if unset)
       R: Retransmit Indicator 
       LLC SN: 6-bit LLC sequence number
       LCID: 5-bit Logical Channel Identifier
+      A: Acknowledgement
       SIZEH: Upper 3-bit of the LLC size
       SIZEL: Lower 8-bit of the LLC size
-      A: Acknowledgement
+      CRC: Cyclic Redundancy Check
 
 LLC-ACK Payload:
       +---+---+-----------------------+
@@ -110,30 +112,33 @@ LLC-ACK Payload:
       LLC SN: Start LLC SN
       COUNT: Number of LLC PDU acknowledged
 
-LLC-ACK Payload:
-   Not Available. For future use.
-
 LLC-DATA Payload:
       +-------------------------------+
    00 | PDCP PDU                      | EOS
       +-------------------------------+
 
-ppWiFi PDCP
+ppWiFi PDCP:
       +-------------------------------+
-   00 | PDCP SN (IV)                  |
-      +-------------------------------+
-   01 | IV-EXT (OPTIONAL)             | IVSZ
-      +-------------------------------+
-      | OFFSET (OPTIONAL)             | 02
+   00 | IV (OPTIONAL)                 | IVSZ
       +-------------------------------|
-      | PAYLOAD                       | SZ
+      | HMAC (OPTIONAL)               |
       +-------------------------------+
-      | HMAC (OPTIONAL)               | EOP
+      | PDCP-SEGMENTs                 | EOP
       +-------------------------------+
 
-      PDCP SN: PDCP sequence number
-      OFFSET: Data offset (for framing PDCP only)
+      IV: Initialization Vector
       MAC: Message Authentication Code
+
+PDCP-SEGMENT Payload;
+      +-------------------------------+
+   00 | PACKET SN                     |
+      +-------------------------------|
+   01 | OFFSET (OPTIONAL)             | 02
+      +-------------------------------+
+      | SIZE                          | 02
+      +-------------------------------+
+      | PAYLOAD                       | EOS
+      +-------------------------------+
 
 Architecture:
                +--------------+

@@ -25,15 +25,23 @@
       {
         "lcid" : 0,
         "tx_mode" : "transparent",
-        "tx_config" : {
+        "scheduling_config" : {
           "guaranteed_pdu_size" : -1,
           "scheduling_quanta" : 0
+        },
+        "rx_config" :
+        {
+          "crc" : "CRC32(04C11DB7)"
+        },
+        "tx_config" :
+        {
+          "crc" : "CRC32(04C11DB7)"
         }
       },
       {
         "lcid" : 1,
         "tx_mode" : "transparent",
-        "tx_config" : {
+        "scheduling_config" : {
           "guaranteed_pdu_size" : -1,
           "scheduling_quanta" : 0
         }
@@ -41,7 +49,7 @@
       {
         "lcid" : 2,
         "tx_mode" : "transparent",
-        "tx_config" : {
+        "scheduling_config" : {
           "guaranteed_pdu_size" : 0,
           "scheduling_quanta" : 255
         }
@@ -49,38 +57,41 @@
       {
         "lcid" : 3,
         "tx_mode" : "acknowledged",
-        "tx_config" : {
+        "scheduling_config" : {
           "guaranteed_pdu_size" : 5,
-          "scheduling_quanta" : 64,
+          "scheduling_quanta" : 64
+        },
+        "tx_config" : {
           "retx_slot_count" : 10,
-          "max_retx_count" : 3
+          "max_retx_count" : 3,
+          "crc" : "CRC32(04C11DB7)"
         }
       }
     ],
     "pdcp_configs": [
       {
         "description" : "RRC",
-        "lcid" : 0
+        "lcid" : 0,
+        "type" : "internal"
       },
       {
-        "description" : "UART Link",
+        "description" : "UART",
         "lcid" : 1,
-        "transport" : "udp",
-        "portin" : 1000,
-        "portout" : 1001
+        "type" : "uart",
+        "device" : "/dev/ttyS0"
       },
       {
-        "description" : "Realtime Video",
+        "description" : "video",
         "lcid" : 2,
-        "transport" : "udp",
+        "type" : "udp",
         "portin" : 1010,
         "portout" : 1011
       },
       {
-        "description" : "IP Tunnel",
+        "description" : "Tunnel",
         "lcid" : 3,
-        "transport" : "tcp",
-        "port" : 1020
+        "type" : "tun",
+        "device" : "/dev/tun0"
       }
     ]
   }

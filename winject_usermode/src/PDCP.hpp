@@ -15,10 +15,36 @@ public:
 
     void on_tx(tx_info_t& info)
     {
-        if (info.out_pdu.size == 0)
+        info.tx_available = to_tx_queue.size() || current_tx_buffer.size();
+
+        pdcp_t pdcp(info.out_pdu.base, info.out_pdu.size);
+        pdcp.iv_ext_size = tx_cipher_iv_size;
+        pdcp.hmac_size = tx_cipher_iv_size;
+
+        if (!info.tx_available ||
+            info.out_pdu.size == 0 ||
+            pdcp.get_header_size() >= info.out_pdu.size)
         {
-            
+            return;
         }
+
+        bool below_min_commit_size = min_commit_size > info.out_pdu.size;
+        // @todo include LLC header and frame header in this calculation
+        bool commit_above_current_mtu = min_commit_size > info.in_frame_info.max_frame_payload;
+
+        // @note Wait for the allocation to increase
+        if (below_min_commit_size && !commit_above_current_mtu)
+        {
+            return;
+        }
+
+        size_t available_for_data = pdcp.pdu_size - pdcp.get_header_size();
+        pdcp.initialize();
+        *(pdcp.sn) = tx_sn++;
+        // @todo: Implement PDCP compression
+        // @todo: Implement PDCP encryption
+        // @todo: Implement PDCP integrity
+        
     }
 
     void on_rx(rx_info_t&)
@@ -71,11 +97,6 @@ public:
 
 
 private:
-    void on_slot_update(size_t slot)
-    {
-
-    }
-
     bool is_framing = true;
     size_t min_commit_size = 1000;
     bool commit_small_pdu = true;
@@ -93,6 +114,12 @@ private:
             E_COMPRESSION_ALG_LZ77_HUFFMAN
         };
 
+    pdcp_sn_t tx_sn = 0;
+    pdcp_sn_t rx_sn = 0;
+    size_t tx_cipher_iv_size = 0;
+    size_t rx_cipher_iv_size = 0;
+    size_t tx_hmac_size = 0;
+    size_t rx_hmac_size = 0;
     std::vector<uint8_t> tx_cipher_key;
     std::vector<uint8_t> rx_cipher_key;
     std::vector<uint8_t> tx_integrity_key;
@@ -107,10 +134,10 @@ private:
     uint8_t rx_compression_level;
 
     buffer_t current_tx_buffer;
-    size_t current_tx_offset;
     buffer_t current_rx_buffer;
-    size_t current_rx_offset;
-    size_t current_rx_max;
+    size_t   current_tx_offset;
+    size_t   current_rx_offset;
+    size_t   current_rx_max;
 
     std::deque<buffer_t> to_tx_queue;
     std::deque<buffer_t> to_rx_queue;

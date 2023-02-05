@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "LLC.hpp"
 #include "MockPDCP.hpp"
+#include "MockRRC.hpp"
 #include "info_defs_matcher.hpp"
 #include "buffer_utils.hpp"
 
@@ -8,12 +9,22 @@ struct Test_LLC : public testing::Test
 {
     Test_LLC()
         : mock_pdcp(std::make_shared<MockPDCP>())
-    {}
+        , mock_rrc(std::make_shared<MockRRC>())
+    {
+        tx_config.arq_window_size = 3;
+        tx_config.max_retx_count = 3;
+        tx_config.mode = ILLC::E_TX_MODE_AM;
+        tx_config.crc_type = ILLC::E_CRC_TYPE_NONE;
+        rx_config.crc_type = ILLC::E_CRC_TYPE_NONE;
+
+        sut = std::make_shared<LLC>(mock_pdcp, mock_rrc, 0, tx_config, rx_config);
+        sut->set_tx_enabled(true);
+        sut->set_rx_enabled(true);
+    }
 
     llc_t prepare_data_pdu(uint8_t* buffer, lcid_t lcid, llc_sn_t sn, llc_sz_t payload_size=5)
     {
         llc_t pdu(buffer, sizeof(buffer));
-        pdu.set_D(true);
         pdu.set_A(false);
         pdu.set_SN(sn);
         pdu.set_LCID(lcid);
@@ -49,15 +60,17 @@ struct Test_LLC : public testing::Test
     }
 
     std::shared_ptr<MockPDCP> mock_pdcp;
+    std::shared_ptr<MockRRC> mock_rrc;
     std::shared_ptr<LLC> sut;
     frame_info_t tx_frame_info{};
     frame_info_t rx_frame_info{};
+    ILLC::tx_config_t tx_config;
+    ILLC::rx_config_t rx_config;
     uint8_t buffer[1024];
 };
 
 TEST_F(Test_LLC, should_not_allocate_llc_when_pdu_size_is_zero)
 {
-    sut = std::make_shared<LLC>(mock_pdcp, 0, 3, 3);
     EXPECT_CALL(*mock_pdcp, on_tx(testing::_)).Times(1);
     auto tx_info = trigger_tx(0, nullptr, 0);
     EXPECT_EQ(0, tx_info.out_allocated);
@@ -65,18 +78,15 @@ TEST_F(Test_LLC, should_not_allocate_llc_when_pdu_size_is_zero)
 
 TEST_F(Test_LLC, should_allocate_ACK_first)
 {
-    sut = std::make_shared<LLC>(mock_pdcp, 0, 3, 3);
-
     EXPECT_CALL(*mock_pdcp, on_rx(testing::_)).Times(1);
     trigger_data_rx(0, 0, 0x3A, "AABBCCDDEE");
     
-    size_t expected_pdu_size = llc_t::get_header_size() + sizeof(llc_payload_ack_t);
+    size_t expected_pdu_size = 3 + sizeof(llc_payload_ack_t);
     EXPECT_CALL(*mock_pdcp, on_tx(testing::_)).Times(1);
     auto tx_info = trigger_tx(0, buffer, expected_pdu_size);
     ASSERT_EQ(tx_info.out_allocated, expected_pdu_size);
 
     llc_t send_pdu(buffer, expected_pdu_size);
-    EXPECT_EQ(send_pdu.get_D(), true);
     EXPECT_EQ(send_pdu.get_A(), true);
     EXPECT_EQ(send_pdu.get_SN(), 0);
     EXPECT_EQ(send_pdu.get_LCID(), 0);
@@ -88,20 +98,17 @@ TEST_F(Test_LLC, should_allocate_ACK_first)
 
 TEST_F(Test_LLC, should_combine_ACKs)
 {
-    sut = std::make_shared<LLC>(mock_pdcp, 0, 3, 3);
-
     EXPECT_CALL(*mock_pdcp, on_rx(testing::_)).Times(2);
     trigger_data_rx(0, 0, 0x01, "AABBCCDDEE");
     trigger_data_rx(0, 1, 0x02, "FF00112233");
 
-    size_t expected_pdu_size = llc_t::get_header_size() + sizeof(llc_payload_ack_t);
+    size_t expected_pdu_size = 3 + sizeof(llc_payload_ack_t);
     EXPECT_CALL(*mock_pdcp, on_tx(testing::_)).Times(1);
     auto tx_info = trigger_tx(0, buffer, expected_pdu_size);
 
     ASSERT_EQ(tx_info.out_allocated, expected_pdu_size);
 
     llc_t send_pdu(buffer, expected_pdu_size);
-    EXPECT_EQ(send_pdu.get_D(), true);
     EXPECT_EQ(send_pdu.get_A(), true);
     EXPECT_EQ(send_pdu.get_SN(), 0);
     EXPECT_EQ(send_pdu.get_LCID(), 0);
@@ -113,8 +120,6 @@ TEST_F(Test_LLC, should_combine_ACKs)
 
 TEST_F(Test_LLC, should_allocate_ACKs_when_possible)
 {
-    sut = std::make_shared<LLC>(mock_pdcp, 0, 3, 3);
-
     EXPECT_CALL(*mock_pdcp, on_rx(testing::_)).Times(3);
     EXPECT_CALL(*mock_pdcp, on_tx(testing::_)).Times(3);
 
@@ -124,13 +129,12 @@ TEST_F(Test_LLC, should_allocate_ACKs_when_possible)
     trigger_tx(0, buffer, 0);
     trigger_data_rx(0, 2, 0x05, "FF00112233");
 
-    size_t expected_pdu_size = llc_t::get_header_size() + 3*sizeof(llc_payload_ack_t);
+    size_t expected_pdu_size = 3 + 3*sizeof(llc_payload_ack_t);
     auto tx_info = trigger_tx(0, buffer, expected_pdu_size);
 
     ASSERT_EQ(tx_info.out_allocated, expected_pdu_size);
 
     llc_t send_pdu(buffer, expected_pdu_size);
-    EXPECT_EQ(send_pdu.get_D(), true);
     EXPECT_EQ(send_pdu.get_A(), true);
     EXPECT_EQ(send_pdu.get_SN(), 0);
     EXPECT_EQ(send_pdu.get_LCID(), 0);
@@ -146,8 +150,6 @@ TEST_F(Test_LLC, should_allocate_ACKs_when_possible)
 
 TEST_F(Test_LLC, should_allocate_PDCP)
 {
-    sut = std::make_shared<LLC>(mock_pdcp, 0, 3, 3);
-
     auto str_data = "TEST";
     auto pdcp_writer = [&str_data](tx_info_t& tx_info) {
             if (tx_info.out_pdu.size >= 5)
@@ -161,19 +163,16 @@ TEST_F(Test_LLC, should_allocate_PDCP)
         .Times(1)
         .WillOnce(testing::Invoke(pdcp_writer));
     auto tx_info = trigger_tx(0, buffer, sizeof(buffer));
-    EXPECT_EQ(llc_t::get_header_size() + strlen(str_data)+1, tx_info.out_allocated);
     llc_t llc(buffer, tx_info.out_allocated);
+    EXPECT_EQ(llc.get_header_size() + strlen(str_data)+1, tx_info.out_allocated);
     EXPECT_EQ(0, llc.get_SN());
     EXPECT_EQ(0, llc.get_LCID());
-    EXPECT_EQ(true, llc.get_D());
     ASSERT_EQ(strlen(str_data)+1, llc.get_payload_size());
     EXPECT_EQ(0, strcmp(str_data, (char*)llc.payload()));
 }
 
 TEST_F(Test_LLC, should_allocate_retx_PDCP)
 {
-    sut = std::make_shared<LLC>(mock_pdcp, 0, 3, 3);
-
     auto str_data = "TEST";
     auto pdcp_writer = [&str_data](tx_info_t& tx_info) {
             if (tx_info.out_pdu.size >= 5)
@@ -195,15 +194,12 @@ TEST_F(Test_LLC, should_allocate_retx_PDCP)
     llc_t llc(buffer, retx_info.out_allocated);
     EXPECT_EQ(1, llc.get_SN());
     EXPECT_EQ(0, llc.get_LCID());
-    EXPECT_EQ(true, llc.get_D());
     ASSERT_EQ(strlen(str_data)+1, llc.get_payload_size());
     EXPECT_EQ(0, strcmp(str_data, (char*)llc.payload()));
 }
 
 TEST_F(Test_LLC, should_allocate_PDCP_and_ACKs)
 {
-    sut = std::make_shared<LLC>(mock_pdcp, 0, 3, 3);
-
     auto str_data = "TEST";
     auto pdcp_writer = [&str_data](tx_info_t& tx_info) {
             if (tx_info.out_pdu.size >= 5)
@@ -229,11 +225,10 @@ TEST_F(Test_LLC, should_allocate_PDCP_and_ACKs)
 
     auto tx_info = trigger_tx(0, buffer, sizeof(buffer));
     llc_t ack_pdu(buffer, tx_info.out_allocated);
-    EXPECT_EQ(ack_pdu.get_D(), true);
     EXPECT_EQ(ack_pdu.get_A(), true);
     EXPECT_EQ(ack_pdu.get_SN(), 0);
     EXPECT_EQ(ack_pdu.get_LCID(), 0);
-    EXPECT_EQ(ack_pdu.get_SIZE(), llc_t::get_header_size()+sizeof(llc_payload_ack_t)*3);
+    EXPECT_EQ(ack_pdu.get_SIZE(), ack_pdu.get_header_size()+sizeof(llc_payload_ack_t)*3);
     auto acks = (llc_payload_ack_t*) ack_pdu.payload();
     EXPECT_EQ(acks[0].sn, 0x01);
     EXPECT_EQ(acks[0].count, 1);
@@ -246,17 +241,14 @@ TEST_F(Test_LLC, should_allocate_PDCP_and_ACKs)
     size_t next_size = tx_info.out_allocated - ack_pdu.get_SIZE();
     llc_t data_pdu(next_pdu, next_size);
     EXPECT_EQ(0, data_pdu.get_SN());
-    EXPECT_EQ(true, data_pdu.get_D());
     EXPECT_EQ(0, data_pdu.get_LCID());
-    EXPECT_EQ(llc_t::get_header_size() + strlen(str_data)+1, next_size);
+    EXPECT_EQ(data_pdu.get_header_size() + strlen(str_data)+1, next_size);
     ASSERT_EQ(strlen(str_data)+1, data_pdu.get_payload_size());
     EXPECT_EQ(0, strcmp(str_data, (char*)data_pdu.payload()));
 }
 
 TEST_F(Test_LLC, should_RLF_on_max_retry)
 {
-    sut = std::make_shared<LLC>(mock_pdcp, 0, 3, 3);
-
     auto str_data = "TEST";
     auto pdcp_writer = [&str_data](tx_info_t& tx_info) {
             if (tx_info.out_pdu.size >= 5)
@@ -268,10 +260,10 @@ TEST_F(Test_LLC, should_RLF_on_max_retry)
         };
 
     EXPECT_CALL(*mock_pdcp, on_tx(testing::_))
-        .Times(10)
+        .Times(9)
         .WillOnce(testing::Invoke(pdcp_writer))
         .WillRepeatedly(testing::Return());
-    EXPECT_CALL(*mock_pdcp, on_rlf())
+    EXPECT_CALL(*mock_rrc, on_rlf(0))
         .Times(1);
 
     trigger_tx(0, buffer, sizeof(buffer));
