@@ -8,16 +8,9 @@ Type RRC_U8
     type(unsigned) width(8)
 };
 
-
 Type RRC_U8A
 {
     type(u8) dynamic_array(256)
-};
-
-
-Type RRC_U8O
-{
-    type(u8) optional()
 };
 
 Type RRC_U16
@@ -34,6 +27,8 @@ Type RRC_U64
 {
     type(unsigned) width(64)
 };
+
+
 
 Type RRC_STR
 {
@@ -82,49 +77,70 @@ Enumeration RRC_LLCCRCType
 Sequence RRC_LLCTxConfig
 {
     RRC_LLCTxMode mode,
-    RRC_U16 gpduSize,
-    RRC_U16 quanta,
     RRC_U16 arqWindowSize,
     RRC_LLCCRCType crcType
+};
+
+Sequence RRC_SchedulingConfig
+{
+    RRC_U16 nd_gpdu_max_size,
+    RRC_U16 quanta
 };
 
 Sequence RRC_LLCConfig
 {
     RRC_U8 llcid,
-    RRC_LLCTxConfig txConfig
+    RRC_LLCTxConfig txConfig,
+    RRC_SchedulingConfig scheduling_config
+};
+
+Enumeration RRC_EPType
+{
+    E_RRC_EPType_INTERNAL
+    E_RRC_EPType_UDP,
+    E_RRC_EPType_UART,
+    E_RRC_EPType_TUN
+};
+
+Enumeration RRC_CipherAlgorithm
+{
+    E_RRC_CipherAlgorithm_NONE,
+    E_RRC_CipherAlgorithm_AES128_CBC
+};
+
+Enumeration RRC_IntegrityAlgorithm
+{
+    E_RRC_CipherAlgorithm_NONE,
+    E_RRC_CipherAlgorithm_HMAC_SHA1
+};
+
+Enumeration RRC_CompressionAlgorithm
+{
+    RRC_CompressionAlgorithm_NONE,
+    RRC_CompressionAlgorithm_ZLIB
 };
 
 Sequence RRC_PDCPConfig
 {
-    RRC_U8 pdcpid
+    RRC_U8 pdcpid,
+    RRC_U8 linkedLcid,
+    RRC_BOOL allow_segmentation,
+    RRC_U16 min_commit_size,
+    RRC_U8A cipher_key,
+    RRC_U8A integrity_key,
+    RRC_CipherAlgorithm cipherAlgorithm,
+    RRC_IntegrityAlgorithm integrityAlgorithm,
+    RRC_CompressionAlgorithm compressionAlgorithm,
+    U8 compressionLevel,
+    RRC_EPType type,
+    RRC_STR address
 };
 
-Sequence RRC_EndPointConfig
-{
-    RRC_U8 epid
-};
-
-
-Type RRC_LLCConfigList
-{
-    Type(RRC_LLCConfig) dynamic_array(256)
-};
-
-Type RRC_PDCPConfigList
-{
-    Type(RRC_PDCPConfig) dynamic_array(256)
-};
-
-Type RRC_EndPointConfigList
-{
-    Type(RRC_EndPointConfig) dynamic_array(256)
-};
-
-Sequence RRC_ConfigRequest
+Sequence RRC_PullRequest
 {
     RRC_BOOL includeFrameConfig,
+    RRC_BOOL includeLLCConfig,
     RRC_BOOL includePDCPConfig,
-    RRC_BOOL includeEndpointConfig,
     RRC_U8A lcids
 };
 
@@ -133,47 +149,55 @@ Type RRC_FrameConfigOptional
     type(RRC_FrameConfig) optional()
 };
 
-Sequence RRC_ConfigResponse
+Type RRC_LLCConfigOptional
 {
-    RRC_FrameConfigOptional frameConfig,
-    RRC_LLCConfigList llcConfigs,
-    RRC_PDCPConfigList pdcpConfigs,
-    RRC_EndPointConfigList epConfigs
+    type(RRC_LLCConfig) optional()
 };
 
-Sequence RRC_ConfigUpdateRequest
+Type RRC_PDCPConfigOptional
 {
-    RRC_FrameConfigOptional frameConfig,
-    RRC_LLCConfigList llcConfigs,
-    RRC_PDCPConfigList pdcpConfigs,
-    RRC_EndPointConfigList epConfigs
+    type(RRC_PDCPConfig) optional()
 };
 
-Sequence RRC_ConfigUpdateResponse
+Sequence RRC_PullResponse
+{
+    RRC_FrameConfigOptional frameConfig,
+    RRC_LLCConfigOptional llcConfig,
+    RRC_PDCPConfigOptional pdcpConfig
+};
+
+Sequence RRC_PushRequest
+{
+    RRC_FrameConfigOptional frameConfig,
+    RRC_LLCConfigOptional llcConfig,
+    RRC_PDCPConfigOptional pdcpConfig
+};
+
+Sequence RRC_PushResponse
 {
     RRC_U8 spare
 };
 
-
-Sequence RRC_LLCStateUpdate
+Sequence RRC_ActivateRequest
 {
     RRC_U8 llcid,
-    RRC_BOOL isActive
+    RRC_BOOL isTxActive
+    RRC_BOOL isRxActive
 };
 
-Sequence RRC_ActivateLLCResponse
+Sequence RRC_ActivateResponse
 {
     RRC_U8 spare
 };
 
 Choice RRC_Message
 {
-    RRC_ConfigRequest,
-    RRC_ConfigResponse,
-    RRC_ConfigUpdateRequest,
-    RRC_ConfigUpdateResponse,
-    RRC_ActivateLLCRequest,
-    RRC_ActivateLLCResponse,
+    RRC_PullRequest,
+    RRC_PullResponse,
+    RRC_PushRequest,
+    RRC_PushResponse,
+    RRC_ActivateRequest,
+    RRC_ActivateResponse,
 };
 
 Sequence RRC
