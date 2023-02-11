@@ -1,0 +1,183 @@
+Type RRC_BOOL
+{
+    type(unsigned) width(8)
+};
+
+Type RRC_U8
+{
+    type(unsigned) width(8)
+};
+
+
+Type RRC_U8A
+{
+    type(u8) dynamic_array(256)
+};
+
+
+Type RRC_U8O
+{
+    type(u8) optional()
+};
+
+Type RRC_U16
+{
+    type(unsigned) width(16)
+};
+
+Type RRC_U32
+{
+    type(unsigned) width(64)
+};
+
+Type RRC_U64
+{
+    type(unsigned) width(64)
+};
+
+Type RRC_STR
+{
+    type(asciiz)
+};
+
+Enumeration RRC_FECType
+{
+    E_RRC_FECType_RS_NONE,
+    E_RRC_FECType_RS_255_247,
+    E_RRC_FECType_RS_255_239,
+    E_RRC_FECType_RS_255_223,
+    E_RRC_FECType_RS_255_191,
+    E_RRC_FECType_RS_255_127
+};
+
+Sequence RRC_FECConfig
+{
+    RRC_FECType type,
+    RRC_U32 threshold
+};
+
+Type RRC_FECConfigList
+{
+    type(RRC_FECConfig) dynamic_array(256)
+};
+
+Sequence RRC_FrameConfig
+{
+    RRC_U64 slotInterval,
+    RRC_FECConfigList fecConfig
+};
+
+Enumeration RRC_LLCTxMode
+{
+    E_RRC_LLCTxMode_TM,
+    E_RRC_LLCTxMode_AM
+}
+
+Enumeration RRC_LLCCRCType
+{
+    E_RRC_LLCCRCType_NONE,
+    E_RRC_LLCCRCType_CRC32_04C11DB7
+};
+
+Sequence RRC_LLCTxConfig
+{
+    RRC_LLCTxMode mode,
+    RRC_U16 gpduSize,
+    RRC_U16 quanta,
+    RRC_U16 arqWindowSize,
+    RRC_LLCCRCType crcType
+};
+
+Sequence RRC_LLCConfig
+{
+    RRC_U8 llcid,
+    RRC_LLCTxConfig txConfig
+};
+
+Sequence RRC_PDCPConfig
+{
+    RRC_U8 pdcpid
+};
+
+Sequence RRC_EndPointConfig
+{
+    RRC_U8 epid
+};
+
+
+Type RRC_LLCConfigList
+{
+    Type(RRC_LLCConfig) dynamic_array(256)
+};
+
+Type RRC_PDCPConfigList
+{
+    Type(RRC_PDCPConfig) dynamic_array(256)
+};
+
+Type RRC_EndPointConfigList
+{
+    Type(RRC_EndPointConfig) dynamic_array(256)
+};
+
+Sequence RRC_ConfigRequest
+{
+    RRC_BOOL includeFrameConfig,
+    RRC_BOOL includePDCPConfig,
+    RRC_BOOL includeEndpointConfig,
+    RRC_U8A lcids
+};
+
+Type RRC_FrameConfigOptional
+{
+    type(RRC_FrameConfig) optional()
+};
+
+Sequence RRC_ConfigResponse
+{
+    RRC_FrameConfigOptional frameConfig,
+    RRC_LLCConfigList llcConfigs,
+    RRC_PDCPConfigList pdcpConfigs,
+    RRC_EndPointConfigList epConfigs
+};
+
+Sequence RRC_ConfigUpdateRequest
+{
+    RRC_FrameConfigOptional frameConfig,
+    RRC_LLCConfigList llcConfigs,
+    RRC_PDCPConfigList pdcpConfigs,
+    RRC_EndPointConfigList epConfigs
+};
+
+Sequence RRC_ConfigUpdateResponse
+{
+    RRC_U8 spare
+};
+
+
+Sequence RRC_LLCStateUpdate
+{
+    RRC_U8 llcid,
+    RRC_BOOL isActive
+};
+
+Sequence RRC_ActivateLLCResponse
+{
+    RRC_U8 spare
+};
+
+Choice RRC_Message
+{
+    RRC_ConfigRequest,
+    RRC_ConfigResponse,
+    RRC_ConfigUpdateRequest,
+    RRC_ConfigUpdateResponse,
+    RRC_ActivateLLCRequest,
+    RRC_ActivateLLCResponse,
+};
+
+Sequence RRC
+{
+    U8 requestID,
+    RRC_Message message
+}

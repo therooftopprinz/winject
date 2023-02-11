@@ -36,7 +36,6 @@ struct IPDCP
 
         bool allow_segmentation = false;
         size_t min_commit_size = 1000;
-        bool commit_small_pdu = true;
     };
 
     struct rx_config_t

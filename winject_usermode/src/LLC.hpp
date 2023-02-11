@@ -116,7 +116,7 @@ public:
     /**
      * @brief on_tx
      *   Called by scheduler to fillup buffer with LLC PDUs
-     *   Should not be called again once tx_info_t::has_data_loaded
+     *   Should not be called again once tx_info_t::out_has_data_loaded
      *   is set.
     */
     void on_tx(tx_info_t& info)
@@ -193,7 +193,7 @@ public:
         }
 
         // @note Allocate PDCP
-        if (info.out_pdu.size < llc.get_header_size())
+        if (info.out_pdu.size < llc.get_header_size() || !info.in_allow_data)
         {
             info.out_pdu.size = 0;
             // @note No allocation just inform PDCP for slot update;
@@ -219,7 +219,7 @@ public:
                 info.out_pdu.size = 0;
                 // @note No allocation just inform PDCP for slot update;
                 pdcp->on_tx(info);
-                info.tx_available = true;
+                info.out_tx_available = true;
                 return;
             }
         }
@@ -232,7 +232,7 @@ public:
             pdcp->on_tx(info);
             size_t pdcp_allocation_size = info.out_allocated - init_alloc;
             llc.set_payload_size(pdcp_allocation_size);
-            info.has_data_loaded = true;
+            info.out_has_data_loaded = true;
         }
         // @note Get PDCP from retransmit
         else
@@ -255,7 +255,7 @@ public:
 
                 info.out_pdu.size = 0;
                 pdcp->on_tx(info);
-                info.has_data_loaded = true;
+                info.out_has_data_loaded = true;
             }
         }
 

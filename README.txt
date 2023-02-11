@@ -179,3 +179,107 @@ Architecture:
                  +------+
                  | APP  |
                  +------+
+
+RRC Procedures
+-----------------------------
+
+Unidirectional RX LLC Establishment
+AL3                AL0                    BL0                BL3
+ |                  |                      |                  |
+ |                  | PullReq(LC3)         |                  |
+ |                  +--------------------->|                  |
+ |                  |                      |                  |
+ | reconfig_rx      | PullResp(LC3)        |                  |
+ |<- - - - - - - - -+<---------------------+                  |
+ | enable_rx        |                      |                  |
+ |                  | ActivateReq(RX,LC3)  | enable_tx        |
+ |                  +--------------------->+- - - - - - - - ->|
+ |                  |                      |                  |
+ | enable_rx        | ActivateResp         |                  |
+ |<- - - - - - - - -|<---------------------+                  |
+ |                  |                      |                  |
+ |                    << LLC ACTIVATED <<                     |
+ |< - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+ Unidirectional TX LLC Establishment
+AL3                AL0                    BL0                BL3
+ |                  |                      |                  |
+ |                  | PushReq(LC3)         | reconfig_rx      |
+ |                  +--------------------->+- - - - - - - - ->|
+ |                  |                      | enable_rx        |
+ |                  | PushResp(LC3)        |                  |
+ |                  |<---------------------+                  |
+ |                  |                      |                  |
+ |                  | ActivateReq(TX,LC3)  |                  |
+ |                  +--------------------->+ - - - - - - - - >|
+ |                  |                      | enable_rx        |
+ | enable_tx        | ActivateResp         |                  |
+ |<- - - - - - - - -+<---------------------+                  |
+ |                  |                      |                  |
+ |                     >> LLC ACTIVATED >>                    |
+ +- - - - - - - - - - - - - - - - - - - - - - - - - - - - - ->|
+
+Bidirectional LLC Establishment
+AL3                AL0                    BL0                BL3
+ |                  |                      |                  |
+ |                  | PullReq(LC3)         |                  |
+ |                  +--------------------->|                  |
+ |                  |                      |                  |
+ | reconfig_rx      | PullResp(LC3)        |                  |
+ |<- - - - - - - - -+<---------------------+                  |
+ | enable_rx        |                      |                  |
+ |                  |                      |                  |
+ |                  | PushReq(LC3)         | reconfig_rx      |
+ |                  +--------------------->+- - - - - - - - ->|
+ |                  |                      | enable_rx        |
+ |                  | PushResp(LC3)        |                  |
+ |                  |<---------------------+                  |
+ |                  |                      |                  |
+ |                  | ActivateReq(AB,LC3)  | enable_tx        |
+ |                  +--------------------->+- - - - - - - - ->|
+ |                  |                      |                  |
+ |                    << LLC ACTIVATED  <<                    |
+ |< - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
+ |                  |                      |                  |
+ | enable_tx        | ActivateResp         |                  |
+ |<- - - - - - - - -+<---------------------+                  |
+ |                  |                      |                  |
+ |                    >> LLC ACTIVATED  >>                    |
+ +- - - - - - - - - - - - - - - - - - - - - - - - - - - - - ->|
+
+
+LLC Reconfiguration
+ AL3                AL0             BL0                BL3
+ |                  |               |                  |
+ |                   << LLC ACTIVE <<                  |
+ |< - - - - - - - - - - - - - - - - - - - - - - - - - >|
+ |                  |               |                  |
+ |                  | PushReq(LC3)  | reconfig_rx      |
+ |                  +-------------->+- - - - - - - - ->|
+ |                  |               | enable_rx        |
+ |                  | PushResp(LC3) |                  |
+ |                  |<--------------+                  |
+ |                  |               |                  |
+
+LLC Fault
+ AL3                AL0             BL0                BL3
+ |                  |               |                  |
+ | DATA 0           |               |                  |
+ +-------------------------> X      |                  |
+ | DATA 0 RTX0      |               |                  |
+ +-------------------------> X      |                  |
+ |                  |               |                  |
+                          . . .
+ |                  |               |                  |
+ | DATA 0 MAXRTX    |               |                  |
+ +-------------------------> X      |                  |
+ |                  |               |                  |
+ | on_rlf           | FaultRequest  | disable_rx       |
+ + - - - - - - - -->+---------------+- - - - - - - - ->|
+ | disable_tx       |               | reset_pdcp       |
+ | reset_pdcp       | FaultResponse |                  |
+ |                  |<--------------+                  |
+ |                  |               |                  |
+ |                   >> LLC FAULT >>                   |
+ +- - - - - - - - - - - - - - -> X  |                  |
+ 

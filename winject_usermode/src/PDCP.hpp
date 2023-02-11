@@ -80,7 +80,7 @@ public:
 
         {
             std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
-            info.tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
+            info.out_tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
         }
 
         pdcp_t pdcp(info.out_pdu.base, info.out_pdu.size);
@@ -88,19 +88,16 @@ public:
         pdcp.hmac_size = tx_hmac_size;
         pdcp.rescan();
 
-        if (!info.tx_available ||
+        if (!info.out_tx_available ||
             info.out_pdu.size == 0 ||
             pdcp.get_header_size() >= info.out_pdu.size)
         {
             return;
         }
 
-        bool below_min_commit_size = tx_config.min_commit_size > info.out_pdu.size;
-        // @todo : include LLC header and frame header in this calculation
-        bool commit_above_current_mtu = tx_config.min_commit_size > info.in_frame_info.max_frame_payload;
-
-        // @note Wait for the allocation to increase
-        if (below_min_commit_size && !commit_above_current_mtu)
+        // @note : wait for the allocation to increase
+        // current_tx_buffer.size()
+        if (tx_config.min_commit_size > info.out_pdu.size)
         {
             return;
         }
@@ -134,6 +131,8 @@ public:
                 }
 
                 buffer_t pdu = std::move(to_tx_queue.front());
+
+                // @note : wait for the allocation to increase 
                 if (pdu.size() > available_for_data)
                 {
                     break;
@@ -189,7 +188,7 @@ public:
             info.out_allocated += pdcp.get_header_size();
         }
 
-        info.tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
+        info.out_tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
     }
 
     void on_rx(rx_info_t& info)

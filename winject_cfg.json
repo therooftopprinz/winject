@@ -29,10 +29,6 @@
           "guaranteed_pdu_size" : -1,
           "scheduling_quanta" : 0
         },
-        "rx_config" :
-        {
-          "crc" : "CRC32(04C11DB7)"
-        },
         "tx_config" :
         {
           "crc" : "CRC32(04C11DB7)"

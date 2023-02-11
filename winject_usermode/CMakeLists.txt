@@ -7,6 +7,7 @@ set(CMAKE_VERBOSE_MAKEFILE on)
 include(ExternalProject)
 include(FetchContent)
 
+set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_STANDARD 17)
 
 ExternalProject_Add(googletest
@@ -44,7 +45,19 @@ set_target_properties(gmock_main PROPERTIES
 add_dependencies(gmock_main gtest)
 
 file(GLOB_RECURSE test_src test/*.cpp)
+
 add_executable(test ${test_src})
 target_include_directories(test PRIVATE src test ..)
 
 target_link_libraries(test PRIVATE pthread gtest gtest_main gmock gmock_main)
+
+if(BUILD_COVERAGE)
+    set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CMakeModules)
+    include(CodeCoverage)
+    append_coverage_compiler_flags_to_target(test)
+    setup_target_for_coverage_gcovr_html(
+        NAME test_coverage
+        EXECUTABLE ./test
+        DEPENDENCIES test
+    )
+endif()

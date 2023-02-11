@@ -277,3 +277,5 @@ TEST_F(Test_LLC, should_RLF_on_max_retry)
     trigger_tx(8, buffer, 0);
     trigger_tx(9, buffer, sizeof(buffer));
 }
+
+// @todo : should report tx_available when there's to ack
