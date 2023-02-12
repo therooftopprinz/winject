@@ -87,7 +87,7 @@ public:
         auto cmdfnIt = mCmds.find(cmd);
         if (mCmds.end() == cmdfnIt)
         {
-            return "command not found: \""s+cmd+"\"";
+            return "command not found: \""s+cmd+"\"\n";
         }
         return cmdfnIt->second(std::move(argsMap));
     }

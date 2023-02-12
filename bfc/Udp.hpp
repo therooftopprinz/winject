@@ -1,9 +1,11 @@
 #ifndef __UDP_HPP__
 #define __UDP_HPP__
 
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
 #include <memory>
 #include <cstring>
 #include <string>
@@ -133,7 +135,7 @@ inline Ip4Port toIp4Port(std::string host, int port)
 {
     sockaddr_in sa;
     inet_pton(AF_INET, host.c_str(), &(sa.sin_addr));
-    return Ip4Port(htonl(sa.sin_addr.s_addr), htons(port));
+    return Ip4Port(htonl(sa.sin_addr.s_addr), port);
 }
 
 

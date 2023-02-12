@@ -1,11 +1,14 @@
 #ifndef __WINJECTUM_APPRRC_HPP__
 #define __WINJECTUM_APPRRC_HPP__
 
-#include "WIFI.hpp"
-#include "IRRC.hpp"
 #include <bfc/CommandManager.hpp>
 #include <bfc/Udp.hpp>
 #include <bfc/EpollReactor.hpp>
+#include <bfc/Timer.hpp>
+
+#include "WIFI.hpp"
+#include "IRRC.hpp"
+#include "TxScheduler.hpp"
 
 class AppRRC : public IRRC
 {
@@ -13,15 +16,16 @@ public:
     AppRRC(const config_t& config)
         : config(config)
         , wifi(config.app_config.wifi_device)
+        , tx_scheduler(timer, wifi)
     {
         console_sock.bind(bfc::toIp4Port(
             config.app_config.udp_console_host, config.app_config.udp_console_port));
 
-        cmdman.addCommand("push", nullptr);
-        cmdman.addCommand("pull", nullptr);
-        cmdman.addCommand("reset", nullptr);
-        cmdman.addCommand("activate", nullptr);
-        cmdman.addCommand("deactivate", nullptr);
+        cmdman.addCommand("push", [this](bfc::ArgsMap&& args){return on_cmd_push(std::move(args));});
+        cmdman.addCommand("pull", [this](bfc::ArgsMap&& args){return on_cmd_pull(std::move(args));});
+        cmdman.addCommand("reset", [this](bfc::ArgsMap&& args){return on_cmd_reset(std::move(args));});
+        cmdman.addCommand("activate", [this](bfc::ArgsMap&& args){return on_cmd_activate(std::move(args));});
+        cmdman.addCommand("deactivate", [this](bfc::ArgsMap&& args){return on_cmd_deactivate(std::move(args));});
 
         reactor.addHandler(console_sock.handle(), [this](){on_console_read();});
     }
@@ -33,29 +37,36 @@ public:
         auto rv = console_sock.recvfrom(bv, sender_addr);
         if (rv>0)
         {
+            console_buff[rv] = 0;
             std::string result = cmdman.executeCommand(std::string_view((char*)console_buff, rv));
-            console_sock.sendto(bfc::BufferView(result.data(), result.size()), sender_addr);
+            console_sock.sendto(bfc::BufferView((uint8_t*)result.data(), result.size()), sender_addr);
         }
     }
 
-    void on_cmd_push(bfc::ArgsMap&& args)
+    std::string on_cmd_push(bfc::ArgsMap&& args)
     {
-        
+        return "push:\n";
     }
 
-    void on_cmd_pull(bfc::ArgsMap&& args)
+    std::string on_cmd_pull(bfc::ArgsMap&& args)
     {
-
+        return "pull:\n";
     }
 
-    void on_cmd_reset(bfc::ArgsMap&& args)
-    {}
+    std::string on_cmd_reset(bfc::ArgsMap&& args)
+    {
+        return "reset:\n";
+    }
 
-    void on_cmd_activate(bfc::ArgsMap&& args)
-    {}
+    std::string on_cmd_activate(bfc::ArgsMap&& args)
+    {
+        return "activate:\n";
+    }
 
-    void on_cmd_deactivate(bfc::ArgsMap&& args)
-    {}
+    std::string on_cmd_deactivate(bfc::ArgsMap&& args)
+    {
+        return "deactivate:\n";
+    }
 
     void run()
     {
@@ -69,7 +80,10 @@ public:
 
 private:
     config_t config;
+    bfc::Timer<> timer;
     WIFI wifi;
+    TxScheduler tx_scheduler;
+
     uint8_t console_buff[1024];
     bfc::UdpSocket console_sock;
     bfc::EpollReactor reactor;

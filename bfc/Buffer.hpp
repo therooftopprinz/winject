@@ -80,7 +80,7 @@ private:
 
     size_t mSize = 0;
     T* mData = nullptr;
-    LightFn<void(T*)>  mDeleter;
+    std::function<void(T*)>  mDeleter;
 };
 
 using Buffer = BufferImpl<uint8_t>;

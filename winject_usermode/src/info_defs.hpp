@@ -17,9 +17,8 @@ struct frame_info_t
 {
     size_t slot_number = 0;
     fec_type_e fec_type = E_FEC_TYPE_NONE;
-    uint64_t slot_interval_us;
-    fec_type_e fec_type;
-    size_t frame_size;
+    uint64_t slot_interval_us = 0;
+    size_t frame_size = 0;
 };
 
 class pdu_t;

@@ -52,7 +52,7 @@ struct Test_LLC : public testing::Test
     {
         tx_frame_info.slot_number = slot_number;
         tx_info_t tx_info{tx_frame_info};
-        tx_info.tx_available = false;
+        tx_info.out_tx_available = false;
         tx_info.out_pdu.base = buffer;
         tx_info.out_pdu.size = size;
         sut->on_tx(tx_info);
@@ -278,4 +278,4 @@ TEST_F(Test_LLC, should_RLF_on_max_retry)
     trigger_tx(9, buffer, sizeof(buffer));
 }
 
-// @todo : should report tx_available when there's to ack
+// @todo : should report out_tx_available when there's to ack

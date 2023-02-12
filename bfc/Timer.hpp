@@ -47,7 +47,7 @@ public:
     {
         std::unique_lock<std::mutex> lg(mSchedulesMutex);
 
-        if (mToRunId == pID)
+        if (mToRunId == pId)
         {
             mCancelCurrent = true;
             mSchedulesCv.notify_one();

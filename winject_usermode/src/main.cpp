@@ -3,6 +3,10 @@
 #include <json/json.hpp>
 #include "AppRRC.hpp"
 
+#include "Logger.hpp"
+const char* Logger::LoggerRef = "LoggerRefXD";
+std::unique_ptr<Logger> main_logger;
+
 fec_type_e to_fec_type_e(std::string s)
 {
     if (s == "RS(255,239)") return fec_type_e::E_FEC_TYPE_RS_255_239;
@@ -15,8 +19,8 @@ fec_type_e to_fec_type_e(std::string s)
 
 ILLC::tx_mode_e to_tx_mode(std::string s)
 {
-    if (s == "RS(255,239)") return ILLC::tx_mode_e::E_TX_MODE_AM;
-    if (s == "RS(255,239)") return ILLC::tx_mode_e::E_TX_MODE_UM;
+    if (s == "AM") return ILLC::tx_mode_e::E_TX_MODE_AM;
+    if (s == "TM") return ILLC::tx_mode_e::E_TX_MODE_TM;
     throw std::runtime_error("to_tx_mode: invalid");
 }
 
@@ -29,6 +33,11 @@ ILLC::crc_type_e to_crc_type(std::string s)
 
 int main()
 {
+    main_logger = std::make_unique<Logger>("main.log");
+    main_logger->logful();
+
+    Logless(*main_logger, Logger::TRACE, "DBG | main | Reading from config.json");
+
     std::ifstream f("config.json");
     auto croot = nlohmann::json::parse(f);
     IRRC::config_t rrc_config;
@@ -38,21 +47,31 @@ int main()
     auto& pdcps =  rrc.at("pdcp_configs");
     auto& app =  rrc.at("app_config");
 
+    Logless(*main_logger, Logger::TRACE, "DBG | main | --- FEC ---");
     for (auto& fec : frame["fec_configs"])
     {
-        rrc_config.fec_configs.emplace_back(IRRC::fec_config_t{
+        auto fec_config = IRRC::fec_config_t{
             to_fec_type_e(fec.at("fec_type")),
-            fec.at("threshold")
-        });
+            fec.at("threshold")};
+        rrc_config.fec_configs.emplace_back(fec_config);
+        Logless(*main_logger, Logger::TRACE, "DBG | main | fec_config(#,#)",
+            (int) fec_config.threshold,
+            (int) fec_config.type);
     }
 
     rrc_config.frame_info.frame_size = frame.at("frame_size");
     rrc_config.frame_info.slot_interval_us = frame.at("slot_interval_us");
 
-    for (auto& llc : frame["llc_configs"])
+    Logless(*main_logger, Logger::TRACE, "DBG | main | --- FRAME ---");
+    Logless(*main_logger, Logger::TRACE, "DBG | main | frame_info.frame_size=#", rrc_config.frame_info.frame_size);
+    Logless(*main_logger, Logger::TRACE, "DBG | main | frame_info.slot_interval_us=#", rrc_config.frame_info.slot_interval_us);
+
+    Logless(*main_logger, Logger::TRACE, "DBG | main | --- LLCs ---");
+    for (auto& llc : llcs)
     {
-        auto& llc_config = rrc_config.llc_configs[llc.at("lcid")];
-        auto& scheduling_config = rrc_config.scheduling_configs[llc.at("lcid")];
+        uint8_t lcid = llc.at("lcid");
+        auto& llc_config = rrc_config.llc_configs[lcid];
+        auto& scheduling_config = rrc_config.scheduling_configs[lcid];
 
         llc_config.mode = to_tx_mode(llc.at("tx_mode"));
         auto& scheduling_config_j = llc.at("scheduling_config");
@@ -69,27 +88,44 @@ int main()
             auto& tx_config = llc.at("tx_config");
             llc_config.crc_type = to_crc_type(tx_config.at("crc_type"));
         }
+
+        Logless(*main_logger, Logger::TRACE, "DBG | main | lcid: #", (int) lcid);
+        Logless(*main_logger, Logger::TRACE, "DBG | main |   mode: #", (int) llc_config.mode);
+        Logless(*main_logger, Logger::TRACE, "DBG | main |   arq_window_size: #", llc_config.arq_window_size);
+        Logless(*main_logger, Logger::TRACE, "DBG | main |   max_retx_count: #", llc_config.max_retx_count);
+        Logless(*main_logger, Logger::TRACE, "DBG | main |   crc_type: #", (int) llc_config.crc_type);
     }
 
-
-    for (auto& pdcp : frame["pdcp_configs"])
+    Logless(*main_logger, Logger::TRACE, "DBG | main | --- PDCPs ---");
+    for (auto& pdcp : pdcps)
     {
-        auto& pdcp_config = rrc_config.pdcp_configs[pdcp.at("lcid")];
+        uint8_t lcid = pdcp.at("lcid");
+        auto& pdcp_config = rrc_config.pdcp_configs[lcid];
         pdcp_config.allow_segmentation = pdcp.at("allow_segmentation");
         pdcp_config.min_commit_size = pdcp.at("min_commit_size");
+
         // pdcp_config.tx_cipher_key;
         // pdcp_config.tx_integrity_key;
         // pdcp_config.tx_cipher_algorigthm;
         // pdcp_config.tx_integrity_algorigthm;
         // pdcp_config.tx_compression_algorigthm;
         // pdcp_config.rx_compression_level;
+
+        Logless(*main_logger, Logger::TRACE, "DBG | main | lcid: #", (int) lcid);
+        Logless(*main_logger, Logger::TRACE, "DBG | main |   allow_segmentation: #", (int) pdcp_config.allow_segmentation);
+        Logless(*main_logger, Logger::TRACE, "DBG | main |   min_commit_size: #", pdcp_config.min_commit_size);
     }
 
     rrc_config.app_config.wifi_device = app.at("wifi_device");
     rrc_config.app_config.udp_console_host = app.at("udp_console_host");
-    rrc_config.app_config.udp_console_port = app.at("udp_console_port");
+    rrc_config.app_config.udp_console_port = app.at("udp_console_port").get<int>();
+
+    Logless(*main_logger, Logger::TRACE, "DBG | main | --- APP ---");
+    Logless(*main_logger, Logger::TRACE, "DBG | main | wifi_device: #", rrc_config.app_config.wifi_device.c_str());
+    Logless(*main_logger, Logger::TRACE, "DBG | main | udp_console_host: #", rrc_config.app_config.udp_console_host.c_str());
+    Logless(*main_logger, Logger::TRACE, "DBG | main | udp_console_port: #", rrc_config.app_config.udp_console_port);
 
     AppRRC app_rrc{rrc_config};
     app_rrc.run();
-    return;
+    return 0;
 }

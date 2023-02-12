@@ -70,14 +70,16 @@
         "description" : "RRC",
         "lcid" : 0,
         "type" : "internal",
-        "allow_segmentation" : false
+        "allow_segmentation" : false,
+        "min_commit_size" : 0
       },
       {
         "description" : "UART",
         "lcid" : 1,
         "type" : "uart",
         "device" : "/dev/ttyS0",
-        "allow_segmentation" : false
+        "allow_segmentation" : false,
+        "min_commit_size" : 0
       },
       {
         "description" : "video",
@@ -85,21 +87,23 @@
         "type" : "udp",
         "portin" : 1010,
         "portout" : 1011,
-        "allow_segmentation" : true
+        "allow_segmentation" : true,
+        "min_commit_size" : 0
       },
       {
         "description" : "Tunnel",
         "lcid" : 3,
         "type" : "tun",
         "device" : "/dev/tun0",
-        "allow_segmentation" : true
+        "allow_segmentation" : true,
+        "min_commit_size" : 0
       }
     ],
     "app_config" :
     {
       "wifi_device" : "/dev/wlan0",
-      "udp_console_host" : "localhost",
-      "udp_console_port" : "9999"
+      "udp_console_host" : "127.0.0.1",
+      "udp_console_port" : 9999
     }
   }
 }

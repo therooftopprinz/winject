@@ -39,7 +39,7 @@ struct Test_PDCP : public testing::Test
     {
         tx_frame_info.slot_number = slot_number;
         tx_info_t tx_info{tx_frame_info};
-        tx_info.tx_available = false;
+        tx_info.out_tx_available = false;
         tx_info.out_pdu.base = buffer;
         tx_info.out_pdu.size = size;
         sut->on_tx(tx_info);
@@ -66,7 +66,7 @@ TEST_F(Test_PDCP, should_report_tx_available)
     configure_sut_basic();
     sut->to_tx(to_buffer("ABCD1122"));
     auto tx_info = trigger_tx(42, nullptr, 0);
-    EXPECT_TRUE(tx_info.tx_available);
+    EXPECT_TRUE(tx_info.out_tx_available);
     EXPECT_EQ(0, tx_info.out_allocated);
 }
 
@@ -89,13 +89,13 @@ TEST_F(Test_PDCP, should_allocate_basic)
     EXPECT_EQ(0, segment.get_SN());
     EXPECT_EQ(5, segment.get_payload_size());
     EXPECT_EQ(pdcp.get_header_size() + segment.get_SIZE(), tx_info.out_allocated);
-    EXPECT_FALSE(tx_info.tx_available);
+    EXPECT_FALSE(tx_info.out_tx_available);
 }
 
 TEST_F(Test_PDCP, should_allocate_segmented_halving)
 {
     configure_sut_segmented();
-    tx_frame_info.max_frame_payload = 1000;
+    tx_frame_info.frame_size = 1000;
     sut->to_tx(to_buffer("ABCD112233EFAA445566"));
     {
         auto tx_info = trigger_tx(1, buffer, 10);
@@ -114,7 +114,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
 
         EXPECT_EQ(0, segment.get_SN());
         EXPECT_EQ(pdcp.get_header_size() + segment.get_SIZE(), tx_info.out_allocated);
-        EXPECT_TRUE(tx_info.tx_available);
+        EXPECT_TRUE(tx_info.out_tx_available);
 
         ASSERT_EQ(5, segment.get_payload_size());
 
@@ -138,7 +138,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
 
         EXPECT_EQ(1, segment.get_SN());
         EXPECT_EQ(pdcp.get_header_size() + segment.get_SIZE(), tx_info.out_allocated);
-        EXPECT_FALSE(tx_info.tx_available);
+        EXPECT_FALSE(tx_info.out_tx_available);
 
         ASSERT_EQ(5, segment.get_payload_size());
 
@@ -151,7 +151,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
 TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
 {
     configure_sut_segmented();
-    tx_frame_info.max_frame_payload = 1000;
+    tx_frame_info.frame_size = 1000;
     sut->to_tx(to_buffer("ABCD112233EFAA445566"));
     sut->to_tx(to_buffer("001122"));
     {
@@ -171,7 +171,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
 
         EXPECT_EQ(0, segment.get_SN());
         EXPECT_EQ(pdcp.get_header_size() + segment.get_SIZE(), tx_info.out_allocated);
-        EXPECT_TRUE(tx_info.tx_available);
+        EXPECT_TRUE(tx_info.out_tx_available);
 
         ASSERT_EQ(5, segment.get_payload_size());
 
