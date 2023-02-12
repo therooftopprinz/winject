@@ -26,13 +26,12 @@ struct IPDCP
 
     struct tx_config_t
     {
-        bool is_segmented = false;
         std::vector<uint8_t> tx_cipher_key;
         std::vector<uint8_t> tx_integrity_key;
         cipher_algo_e tx_cipher_algorigthm = E_CIPHER_ALGO_NONE;
         integrity_algo_e tx_integrity_algorigthm = E_INT_ALGO_NONE;
         compressiom_alg_e tx_compression_algorigthm = E_COMPRESSION_ALGO_NONE;
-        uint8_t rx_compression_leve = 0;
+        uint8_t rx_compression_level = 0;
 
         bool allow_segmentation = false;
         size_t min_commit_size = 1000;

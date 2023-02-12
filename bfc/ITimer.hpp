@@ -1,8 +1,11 @@
-#ifndef __WINJECTUM_ITIMER_HPP__
-#define __WINJECTUM_ITIMER_HPP__
+#ifndef __BFC_ITIMER_HPP__
+#define __BFC_ITIMER_HPP__
 
 #include <functional>
 #include <chrono>
+
+namespace bfc
+{
 
 struct ITimer
 {
@@ -10,4 +13,6 @@ struct ITimer
     virtual void cancel(int) = 0;
 };
 
-#endif // __WINJECTUM_ITIMER_HPP__
+} // namespace bfc
+
+#endif // __BFC_ITIMER_HPP__

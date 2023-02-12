@@ -42,8 +42,7 @@
 // Enumeration:  ('RRC_IntegrityAlgorithm', ('E_RRC_CipherAlgorithm_HMAC_SHA1', None))
 // Enumeration:  ('RRC_CompressionAlgorithm', ('RRC_CompressionAlgorithm_NONE', None))
 // Enumeration:  ('RRC_CompressionAlgorithm', ('RRC_CompressionAlgorithm_ZLIB', None))
-// Sequence:  RRC_PDCPConfig ('RRC_U8', 'pdcpid')
-// Sequence:  RRC_PDCPConfig ('RRC_U8', 'linkedLcid')
+// Sequence:  RRC_PDCPConfig ('RRC_U8', 'lcid')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allow_segmentation')
 // Sequence:  RRC_PDCPConfig ('RRC_U16', 'min_commit_size')
 // Sequence:  RRC_PDCPConfig ('RRC_U8A', 'cipher_key')
@@ -178,8 +177,7 @@ enum class RRC_CompressionAlgorithm : uint8_t
 
 struct RRC_PDCPConfig
 {
-    RRC_U8 pdcpid;
-    RRC_U8 linkedLcid;
+    RRC_U8 lcid;
     RRC_BOOL allow_segmentation;
     RRC_U16 min_commit_size;
     RRC_U8A cipher_key;
@@ -536,8 +534,7 @@ inline void str(const char* pName, const RRC_CompressionAlgorithm& pIe, std::str
 inline void encode_per(const RRC_PDCPConfig& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
-    encode_per(pIe.pdcpid, pCtx);
-    encode_per(pIe.linkedLcid, pCtx);
+    encode_per(pIe.lcid, pCtx);
     encode_per(pIe.allow_segmentation, pCtx);
     encode_per(pIe.min_commit_size, pCtx);
     encode_per(pIe.cipher_key, pCtx);
@@ -553,8 +550,7 @@ inline void encode_per(const RRC_PDCPConfig& pIe, cum::per_codec_ctx& pCtx)
 inline void decode_per(RRC_PDCPConfig& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
-    decode_per(pIe.pdcpid, pCtx);
-    decode_per(pIe.linkedLcid, pCtx);
+    decode_per(pIe.lcid, pCtx);
     decode_per(pIe.allow_segmentation, pCtx);
     decode_per(pIe.min_commit_size, pCtx);
     decode_per(pIe.cipher_key, pCtx);
@@ -579,9 +575,8 @@ inline void str(const char* pName, const RRC_PDCPConfig& pIe, std::string& pCtx,
         pCtx = pCtx + "\"" + pName + "\":{";
     }
     size_t nOptional = 0;
-    size_t nMandatory = 12;
-    str("pdcpid", pIe.pdcpid, pCtx, !(--nMandatory+nOptional));
-    str("linkedLcid", pIe.linkedLcid, pCtx, !(--nMandatory+nOptional));
+    size_t nMandatory = 11;
+    str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
     str("allow_segmentation", pIe.allow_segmentation, pCtx, !(--nMandatory+nOptional));
     str("min_commit_size", pIe.min_commit_size, pCtx, !(--nMandatory+nOptional));
     str("cipher_key", pIe.cipher_key, pCtx, !(--nMandatory+nOptional));

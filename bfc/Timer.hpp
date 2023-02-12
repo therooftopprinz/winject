@@ -1,5 +1,5 @@
-#ifndef __WINJECTUM_TIMER_HPP__
-#define __WINJECTUM_TIMER_HPP__
+#ifndef __BFC_TIMER_HPP__
+#define __BFC_TIMER_HPP__
 
 #include <map>
 #include <unordered_map>
@@ -176,4 +176,4 @@ private:
 };
 } // namespace bfc
 
-#endif // __TIMER_HPP__
+#endif // __BFC_TIMER_HPP__

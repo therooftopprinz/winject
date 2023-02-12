@@ -15,21 +15,21 @@ struct ILLC
 
     enum tx_mode_e
     {
-        E_TX_MODE_UM,
+        E_TX_MODE_TM,
         E_TX_MODE_AM
     };
 
     struct tx_config_t
     {
-        tx_mode_e mode;
+        tx_mode_e mode = E_TX_MODE_TM;
         size_t arq_window_size = 0;
         size_t max_retx_count = 0;
-        crc_type_e crc_type;
+        crc_type_e crc_type = E_CRC_TYPE_NONE;
     };
 
     struct rx_config_t
     {
-        crc_type_e crc_type;
+        crc_type_e crc_type = E_CRC_TYPE_NONE;
     };
 
     virtual ~ILLC(){} 

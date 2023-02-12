@@ -122,8 +122,7 @@ Enumeration RRC_CompressionAlgorithm
 
 Sequence RRC_PDCPConfig
 {
-    RRC_U8 pdcpid,
-    RRC_U8 linkedLcid,
+    RRC_U8 lcid,
     RRC_BOOL allow_segmentation,
     RRC_U16 min_commit_size,
     RRC_U8A cipher_key,
