@@ -8,6 +8,7 @@
 #include "ITxScheduler.hpp"
 #include "ILLC.hpp"
 #include "IWIFI.hpp"
+#include "Logger.hpp"
 
 class TxScheduler : public ITxScheduler
 {
@@ -28,6 +29,7 @@ public:
 
     void add_llc(lcid_t lcid, ILLC* llc)
     {
+        Logless(*main_logger, Logger::DEBUG, "DBG | TxScheduler | Adding lcid=# to schedulables...", (int)lcid);
         std::unique_lock<std::mutex> lg(this_mutex);
         if (lcid>=llcs.size())
         {
@@ -40,6 +42,7 @@ public:
 
     void remove_llc(lcid_t lcid)
     {
+        Logless(*main_logger, Logger::DEBUG, "DBG | TxScheduler | Removing lcid=# from schedulables...", (int)lcid);
         std::unique_lock<std::mutex> lg(this_mutex);
 
         llcs[lcid] = nullptr;
@@ -56,6 +59,11 @@ public:
             timer.cancel(*slot_timer_id);
             slot_timer_id.reset();
         }
+
+        frame_info.slot_interval_us = c.slot_interval_us;
+        frame_info.fec_type = c.fec_type;
+
+        Logless(*main_logger, Logger::DEBUG, "DBG | TxScheduler | Scheduler tick will run in every #us", frame_info.slot_interval_us);
         schedule_tick();
     }
 
@@ -89,6 +97,7 @@ private:
     void tick()
     {
         std::unique_lock<std::mutex> lg(this_mutex);
+        Logless(*main_logger, Logger::DEBUG, "DBG | TxScheduler | Tick slot_number=#", frame_info.slot_number);
         frame_info.slot_number++;
 
         tx_info_t tx_info{frame_info};

@@ -30,10 +30,10 @@ struct Ip4Port
 
 struct ISocket
 {
-    virtual void bind(const Ip4Port& pAddr) = 0;
+    virtual int bind(const Ip4Port& pAddr) = 0;
     virtual ssize_t sendto(const bfc::ConstBufferView& pData, const Ip4Port& pAddr, int pFlags=0) = 0;
     virtual ssize_t recvfrom(bfc::BufferView& pData, Ip4Port& pAddr, int pFlags=0) = 0;
-    virtual void setsockopt(int pLevel, int pOptionName, const void *pOptionValue, socklen_t pOptionLen) = 0;
+    virtual int setsockopt(int pLevel, int pOptionName, const void *pOptionValue, socklen_t pOptionLen) = 0;
     virtual int handle() = 0 ;
 };
 
@@ -63,7 +63,7 @@ public:
         }
     }
 
-    void bind(const Ip4Port& pAddr)
+    int bind(const Ip4Port& pAddr)
     {
         sockaddr_in myaddr;
         memset((char *)&myaddr, 0, sizeof(myaddr));
@@ -71,12 +71,7 @@ public:
         myaddr.sin_addr.s_addr = htonl(pAddr.addr);
         myaddr.sin_port = htons(pAddr.port);
 
-        int rv = ::bind(mSockFd, (sockaddr *)&myaddr, sizeof(myaddr));
-        if (rv < 0)
-        {
-            std::string err = std::string("Bind failed: ") + std::to_string(pAddr.port) + " Error: " + strerror(errno);
-            throw std::runtime_error(err);
-        }
+        return ::bind(mSockFd, (sockaddr *)&myaddr, sizeof(myaddr));
     }
 
     ssize_t sendto(const bfc::ConstBufferView& pData, const Ip4Port& pAddr, int pFlags=0)
@@ -98,14 +93,9 @@ public:
         return sz;
     }
 
-    void setsockopt(int pLevel, int pOptionName, const void *pOptionValue, socklen_t pOptionLen)
+    int setsockopt(int pLevel, int pOptionName, const void *pOptionValue, socklen_t pOptionLen)
     {
-        int rv = ::setsockopt(mSockFd, pLevel, pOptionName, pOptionValue, pOptionLen);
-        if (rv < 0)
-        {
-            std::string err = std::string("Setsockopt failed: ") + std::to_string(rv) + " Error: " + strerror(errno);
-            throw std::runtime_error(err);
-        }
+        return ::setsockopt(mSockFd, pLevel, pOptionName, pOptionValue, pOptionLen);
     }
 
     int handle()

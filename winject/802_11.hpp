@@ -144,7 +144,7 @@ struct seq_ctl_t
 class frame_t
 {
 public:
-    frame_t() = delete;
+    frame_t() = default;
     frame_t(uint8_t* buffer, uint8_t* last)
         : last(last)
         , is_enabled_fcs(true)

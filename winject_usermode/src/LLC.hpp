@@ -16,7 +16,7 @@ class LLC : public ILLC
 public:
     LLC(
         std::shared_ptr<IPDCP> pdcp,
-        std::shared_ptr<IRRC> rrc,
+        IRRC& rrc,
         uint8_t lcid,
         tx_config_t tx_config,
         rx_config_t rx_config)
@@ -241,7 +241,7 @@ public:
             retx_count = retx_pdu.retry_count + 1;
             if (retx_count >= tx_config.max_retx_count)
             {
-                rrc->on_rlf(lcid);
+                rrc.on_rlf(lcid);
                 info.out_allocated = 0;
                 return;
             }
@@ -403,7 +403,7 @@ private:
     };
 
     std::shared_ptr<IPDCP> pdcp;
-    std::shared_ptr<IRRC> rrc;
+    IRRC& rrc;
 
     // @brief Used for pdpc cache and retx cache
     std::list<buffer_t> buffer_pool;

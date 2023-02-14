@@ -42,11 +42,20 @@ struct IRRC
         std::string udp_console_host;
         int udp_console_port;
         std::string wifi_device;
+        std::string hwsrc;
+        std::string hwdst;
+    };
+
+    struct frame_config_t
+    {
+        fec_type_e fec_type = E_FEC_TYPE_NONE;
+        uint64_t slot_interval_us = 0;
+        size_t frame_size = 0;
     };
 
     struct config_t
     {
-        frame_info_t frame_info;
+        frame_config_t frame_info;
         std::vector<fec_config_t> fec_configs;
         std::map<uint8_t, ILLC::tx_config_t> llc_configs;
         std::map<uint8_t, ITxScheduler::llc_scheduling_config_t> scheduling_configs;

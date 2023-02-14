@@ -83,11 +83,11 @@ public:
             {
                 // std::cout << "RUN " << mToRunId << "\n";
                 mToRun();
-                mToRun.reset();
+                mToRun = {};
             }
             else if (mToRun && mCancelCurrent)
             {
-                mToRun.reset();
+                mToRun = {};
             }
 
             std::unique_lock<std::mutex> lg(mSchedulesMutex);
@@ -138,7 +138,7 @@ public:
             }
             else
             {
-                mToRun.reset();
+                mToRun = {};
                 mAddRequest = false;
                 mCancelRequest = false;
                 mCancelCurrent = false;

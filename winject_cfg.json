@@ -1,7 +1,7 @@
 {
   "rrc_config" :{
     "frame_config" : {
-      "slot_interval_us" : 1000,
+      "slot_interval_us" : 500000,
       "frame_size" : 1450,
       "fec_configs" : [
         {
@@ -103,7 +103,9 @@
     {
       "wifi_device" : "/dev/wlan0",
       "udp_console_host" : "127.0.0.1",
-      "udp_console_port" : 9999
+      "udp_console_port" : 9999,
+      "hwsrc" : "123456",
+      "hwdst" : "7890ab"
     }
   }
 }
