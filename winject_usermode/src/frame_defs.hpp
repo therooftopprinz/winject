@@ -12,6 +12,9 @@ using llc_sz_t = uint16_t;
 using pdcp_sn_t = uint8_t;
 using pdcp_segment_offset_t = uint16_t;
 
+constexpr llc_sn_t llc_sn_mask = 0b00111111;
+constexpr size_t llc_sn_size = llc_sn_mask+1;
+
 //    +---+---+-----------------------+
 // 00 | D | R | LLC SN                |
 //    +---+---+-------+---+-----------+

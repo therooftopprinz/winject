@@ -11,13 +11,13 @@ struct ITxScheduler
         uint8_t *buffer = nullptr;
         size_t buffer_size = 0;
         size_t header_size = 0;
-        size_t frame_payload_max_size = 0;
     };
 
     struct frame_scheduling_config_t
     {
         uint64_t slot_interval_us;
         fec_type_e fec_type;
+        size_t frame_payload_size = 0;
     };
 
     struct llc_scheduling_config_t

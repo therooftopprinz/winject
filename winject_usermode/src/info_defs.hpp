@@ -7,6 +7,7 @@
 enum fec_type_e
 {
     E_FEC_TYPE_NONE,
+    E_FEC_TYPE_RS_255_247,
     E_FEC_TYPE_RS_255_239,
     E_FEC_TYPE_RS_255_223,
     E_FEC_TYPE_RS_255_191,
@@ -18,7 +19,7 @@ struct frame_info_t
     size_t slot_number = 0;
     fec_type_e fec_type = E_FEC_TYPE_NONE;
     uint64_t slot_interval_us = 0;
-    size_t frame_size = 0;
+    size_t frame_payload_size = 0;
 };
 
 class pdu_t;
@@ -38,7 +39,7 @@ struct tx_info_t
 
 struct rx_info_t
 {
-    const frame_info_t& in_frame_info;
+    size_t slot_number = 0;
     pdu_t in_pdu;
 };
 

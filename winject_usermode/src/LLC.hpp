@@ -25,7 +25,8 @@ public:
         , lcid(lcid)
         , tx_config(tx_config)
         , rx_config(rx_config)
-        , tx_ring(64)
+        , tx_ring(256)
+        , sn_to_tx_ring(llc_sn_size, -1)
     {
     }
 
@@ -50,10 +51,6 @@ public:
                 tx_ring_elem.acknowledged = true;
                 tx_ring_elem.to_check = -1;
             }
-        }
-        else
-        {
-            tx_ring.clear();
         }
     }
 
@@ -110,7 +107,7 @@ public:
             rx_config = config;
             status = is_rx_enabled;
         }
-        set_tx_enabled(status);
+        set_rx_enabled(status);
     }
 
     /**
@@ -274,7 +271,7 @@ public:
         }
         increment_sn();
 
-        if (tx_config.mode = E_TX_MODE_AM)
+        if (E_TX_MODE_AM == tx_config.mode)
         {
             tx_elem.retry_count = retx_count;
             tx_elem.acknowledged = false;
@@ -282,6 +279,7 @@ public:
             std::memcpy(tx_elem.pdcp_pdu.data(), llc.payload(), llc.get_payload_size());
             // @note copy PDCP to tx_ring elem needed when retransmitting
             tx_elem.pdcp_pdu_size = llc.get_payload_size();
+            sn_to_tx_ring[llc.get_SN()] = tx_idx;
         }
     }
 
@@ -297,11 +295,29 @@ public:
         // @note Handle ack
         if (llc.get_A())
         {
-            auto idx = tx_ring_index(info.in_frame_info.slot_number);
-            auto& current_slot = tx_ring[idx];
-            auto sent_idx = tx_ring_index(current_slot.to_check);
-            auto& sent_slot = tx_ring[sent_idx];
-            sent_slot.acknowledged = true;
+            llc_payload_ack_t* acks = (llc_payload_ack_t*) llc.payload();
+            size_t acks_n = llc.get_payload_size()/sizeof(llc_payload_ack_t);
+
+            for (size_t i=0; i < acks_n; i++)
+            {
+                auto& ack = acks[i];
+                llc_sn_t sn = ack.sn;
+                for (size_t i=0; i<ack.count; i++)
+                {
+                    if (sn >= llc_max_size)
+                    {
+                        continue;
+                    }
+
+                    size_t slot_number = sn_to_tx_ring[sn];
+                    auto idx = tx_ring_index(slot_number);
+                    auto& current_slot = tx_ring[idx];
+                    auto sent_idx = tx_ring_index(current_slot.to_check);
+                    auto& sent_slot = tx_ring[sent_idx];
+                    sent_slot.acknowledged = true;
+                    sn = llc_sn_mask & (sn+1);
+                }
+            }
         }
         // @note Handle data
         else
@@ -417,6 +433,8 @@ private:
 
     // @brief Context for the checking of acknowledgments and PDCP cache
     std::vector<tx_ring_elem_t> tx_ring;
+    // @brief Mapping for sn to tx_ring index
+    std::vector<size_t> sn_to_tx_ring;
     // @brief LLC sequence number list pending for acknowledgement
     std::list<std::pair<size_t,size_t>> to_ack_list;
     // @brief PDCP frames that needs retransmission (multithreaded)

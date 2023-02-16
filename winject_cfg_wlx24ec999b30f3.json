@@ -1,0 +1,57 @@
+{
+  "rrc_config" :{
+    "frame_config" : {
+      "slot_interval_us" : 1000000,
+      "frame_payload_size" : 1450,
+      "fec_configs" : [
+        {
+          "fec_type" : "RS(255,239)",
+          "threshold" : 10
+        },
+        {
+          "fec_type" : "RS(255,223)",
+          "threshold" : 20
+        },
+        {
+          "fec_type" : "RS(255,191)",
+          "threshold" : 40
+        },
+        {
+          "fec_type" : "RS(255,127)",
+          "threshold" : 80
+        }
+      ]
+    },
+    "llc_configs": [
+      {
+        "lcid" : 0,
+        "tx_mode" : "TM",
+        "scheduling_config" : {
+          "nd_pdu_size" : -1,
+          "quanta" : 5000
+        },
+        "tx_config" :
+        {
+          "crc_type" : "CRC32(04C11DB7)"
+        }
+      }
+    ],
+    "pdcp_configs": [
+      {
+        "description" : "RRC",
+        "lcid" : 0,
+        "type" : "internal",
+        "allow_segmentation" : false,
+        "min_commit_size" : 0
+      }
+    ],
+    "app_config" :
+    {
+      "wifi_device" : "wlx24ec999b30f3",
+      "udp_console_host" : "127.0.0.1",
+      "udp_console_port" : 9998,
+      "hwsrc" : "7890ab",
+      "hwdst" : "123456"
+    }
+  }
+}

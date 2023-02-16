@@ -7,15 +7,15 @@
 #include <bfc/ITimer.hpp>
 #include "ITxScheduler.hpp"
 #include "ILLC.hpp"
-#include "IWIFI.hpp"
+#include "IRRC.hpp"
 #include "Logger.hpp"
 
 class TxScheduler : public ITxScheduler
 {
 public:
-    TxScheduler(bfc::ITimer& timer, IWIFI& wifi)
+    TxScheduler(bfc::ITimer& timer, IRRC& rrc)
         : timer(timer)
-        , wifi(wifi)
+        , rrc(rrc)
     {
     }
 
@@ -62,6 +62,7 @@ public:
 
         frame_info.slot_interval_us = c.slot_interval_us;
         frame_info.fec_type = c.fec_type;
+        frame_info.frame_payload_size = c.frame_payload_size;
 
         Logless(*main_logger, Logger::DEBUG, "DBG | TxScheduler | Scheduler tick will run in every #us", frame_info.slot_interval_us);
         schedule_tick();
@@ -80,7 +81,6 @@ public:
         buffer = c.buffer;
         buffer_size = c.buffer_size;
         header_size = c.header_size;
-        frame_payload_max_size = c.frame_payload_max_size;
     }
 
 private:
@@ -97,17 +97,21 @@ private:
     void tick()
     {
         std::unique_lock<std::mutex> lg(this_mutex);
-        Logless(*main_logger, Logger::DEBUG, "DBG | TxScheduler | Tick slot_number=#", frame_info.slot_number);
         frame_info.slot_number++;
 
         tx_info_t tx_info{frame_info};
         uint8_t* cursor = buffer + header_size;
-        size_t frame_payload_remaining = frame_payload_max_size;
+        size_t frame_payload_remaining = frame_info.frame_payload_size;
+
+        auto advance_cursor = [&cursor, &frame_payload_remaining](size_t size)
+        {
+            cursor += size;
+            frame_payload_remaining -= size;
+        };
 
         uint8_t *fec_type = cursor;
         *fec_type = frame_info.fec_type;
-        cursor += sizeof(*fec_type);
-        frame_payload_remaining -= sizeof(*fec_type);
+        advance_cursor (sizeof(*fec_type));
 
         // @todo : setup fec structure
 
@@ -132,8 +136,7 @@ private:
 
             llc->on_tx(tx_info);
 
-            cursor += tx_info.out_allocated;
-            frame_payload_remaining -= tx_info.out_allocated;
+            advance_cursor (tx_info.out_allocated);
 
             schedule.llc = llc;
             schedule.has_schedulable = tx_info.out_tx_available;
@@ -169,7 +172,7 @@ private:
             {
                 auto& schedule = *i;
                 // @note : last schedulable
-                if (!schedule.has_data_allocated)
+                if (schedule.has_data_allocated)
                 {
                     break;
                 }
@@ -184,20 +187,19 @@ private:
                 tx_info.out_allocated = 0;
                 tx_info.out_has_data_loaded = false;
                 schedule.llc->on_tx(tx_info);
-                cursor += tx_info.out_allocated;
-                frame_payload_remaining -= tx_info.out_allocated;
+                advance_cursor(tx_info.out_allocated);
             }
 
-            if (max_quanta_allocated>frame_payload_max_size || schedulable_count==0)
+            if (max_quanta_allocated>frame_info.frame_payload_size || schedulable_count==0)
             {
                 break;
             }
         }
 
-        size_t send_size = header_size + (frame_payload_max_size - frame_payload_remaining);
-        if (send_size)
+        size_t send_size = frame_info.frame_payload_size - frame_payload_remaining;
+        if (send_size > (header_size+1))
         {
-            wifi.send(buffer, send_size);
+            rrc.perform_tx(send_size);
         }
 
         schedule_tick();
@@ -221,7 +223,7 @@ private:
     };
 
     bfc::ITimer& timer;
-    IWIFI& wifi;
+    IRRC& rrc;
     frame_info_t frame_info;
     std::optional<int> slot_timer_id;
 
@@ -235,7 +237,6 @@ private:
     uint8_t *buffer = nullptr;
     size_t buffer_size = 0;
     size_t header_size = 0;
-    size_t frame_payload_max_size = 0;
 
     std::mutex this_mutex;
 };

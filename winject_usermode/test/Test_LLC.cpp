@@ -34,7 +34,8 @@ struct Test_LLC : public testing::Test
 
     rx_info_t trigger_data_rx(size_t slot_number, lcid_t lcid, llc_sn_t sn, std::string pdcp_hex)
     {
-        rx_info_t rx_info{rx_frame_info};
+        rx_info_t rx_info{};
+        rx_info.slot_number = slot_number;
         rx_info.in_pdu.base = buffer;
 
         auto pdcp_data = to_buffer(pdcp_hex);
@@ -80,7 +81,7 @@ TEST_F(Test_LLC, should_allocate_ACK_first)
 {
     EXPECT_CALL(*mock_pdcp, on_rx(testing::_)).Times(1);
     trigger_data_rx(0, 0, 0x3A, "AABBCCDDEE");
-    
+
     size_t expected_pdu_size = 3 + sizeof(llc_payload_ack_t);
     EXPECT_CALL(*mock_pdcp, on_tx(testing::_)).Times(1);
     auto tx_info = trigger_tx(0, buffer, expected_pdu_size);

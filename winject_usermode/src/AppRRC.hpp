@@ -9,6 +9,7 @@
 #include <bfc/Timer.hpp>
 
 #include <winject/802_11.hpp>
+#include <winject/802_11_filters.hpp>
 #include <winject/radiotap.hpp>
 
 #include "Logger.hpp"
@@ -16,9 +17,13 @@
 #include "WIFI.hpp"
 #include "IRRC.hpp"
 #include "TxScheduler.hpp"
+#include "interface/rrc.hpp"
+#include <cum/cum.hpp>
 
 #include "LLC.hpp"
 #include "PDCP.hpp"
+
+#include "rrc_utils.hpp"
 
 class AppRRC : public IRRC
 {
@@ -26,29 +31,42 @@ public:
     AppRRC(const config_t& config)
         : config(config)
         , wifi(config.app_config.wifi_device)
-        , tx_scheduler(timer, wifi)
+        , tx_scheduler(timer, *this)
     {
+        std::stringstream srcss;
+        uint32_t srcraw;
+        srcss << std::hex << config.app_config.hwdst;
+        srcss >> srcraw;
+        winject::ieee_802_11::filters::winject_src src_filter(srcraw);
+        winject::ieee_802_11::filters::attach(wifi.handle(), src_filter);
+
         setup_80211_base_frame();
         setup_console();
         setup_pdcps();
         setup_llcs();
         setup_eps();
-
         setup_scheduler();
-        timer_thread = std::thread([this](){timer.run();});
-        rx_thread = std::thread([this](){run_rx();});
+        setup_rrc();
     }
 
     ~AppRRC()
     {
         Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | AppRRC stopping...");
-        rx_thread.join();
-        timer_thread.join();
+
+        if (wifi_rx_thread.joinable())
+        {
+            wifi_rx_thread.join();
+        }
+
+        if (timer_thread.joinable())
+        {
+            timer_thread.join();
+        }
     }
 
     void stop()
     {
-        rx_thread_running = false;
+        wifi_rx_running = false;
         reactor.stop();
         timer.stop();
     }
@@ -63,8 +81,9 @@ public:
             console_buff[rv] = 0;
             int pFd = console_sock.handle();
             std::string result = cmdman.executeCommand(std::string_view((char*)console_buff, rv));
-
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | console: #", result.c_str());
+            auto res_copy = result;
+            res_copy.pop_back();
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | console: #", res_copy.c_str());
 
             reactor.addWriteHandler(console_sock.handle(), [pFd, this, result, sender_addr]()
                 {
@@ -76,26 +95,57 @@ public:
 
     std::string on_cmd_push(bfc::ArgsMap&& args)
     {
-        return "push:\n";
+        std::shared_lock<std::shared_mutex> lg(this_mutex);
+
+        RRC rrc;
+        rrc.requestID = rrc_req_id++;
+        rrc.message = RRC_PushRequest{};
+        auto& message = std::get<RRC_PushRequest>(rrc.message);
+
+        fill_from_config(
+            args.argAs<int>("lcid").value_or(0),
+            args.argAs<int>("include_frame").value_or(0),
+            args.argAs<int>("include_llc").value_or(0),
+            args.argAs<int>("include_pdcp").value_or(0),
+            message);
+
+        send_rrc(rrc);
+        return "pushing...\n";
     }
 
     std::string on_cmd_pull(bfc::ArgsMap&& args)
     {
-        return "pull:\n";
+        std::shared_lock<std::shared_mutex> lg(this_mutex);
+
+        RRC rrc;
+        rrc.requestID = rrc_req_id++;
+        rrc.message = RRC_PullRequest{};
+        auto& msg = std::get<RRC_PullRequest>(rrc.message);
+        msg.lcid = args.argAs<int>("lcid").value_or(0);
+        msg.includeFrameConfig = args.argAs<int>("include_frame").value_or(0);
+        msg.includeLLCConfig = args.argAs<int>("include_llc").value_or(0);
+        msg.includePDCPConfig = args.argAs<int>("include_pdcp").value_or(0);
+
+        send_rrc(rrc);
+
+        return "pulling...\n";
     }
 
     std::string on_cmd_reset(bfc::ArgsMap&& args)
     {
+        // std::unique_lock<std::shared_mutex> lg(this_mutex);
         return "reset:\n";
     }
 
     std::string on_cmd_activate(bfc::ArgsMap&& args)
     {
+        // std::unique_lock<std::shared_mutex> lg(this_mutex);
         return "activate:\n";
     }
 
     std::string on_cmd_deactivate(bfc::ArgsMap&& args)
     {
+        // std::unique_lock<std::shared_mutex> lg(this_mutex);
         return "deactivate:\n";
     }
 
@@ -112,7 +162,21 @@ public:
 
     void on_rlf(lcid_t)
     {
-        
+        std::unique_lock<std::shared_mutex> lg(this_mutex);
+    }
+
+    void perform_tx(size_t payload_size)
+    {
+        tx_frame.set_body_size(payload_size);
+        size_t sz = radiotap.size() + tx_frame.size();
+
+        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | wifi send buffer[#]:\n#", sz, buffer_str(tx_buff, sz).c_str());
+        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
+        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
+        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC |   frame body size: #", payload_size);
+        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | -----------------------\n");
+
+        wifi.send(tx_buff, sz);
     }
 
 private:
@@ -126,7 +190,6 @@ private:
         radiotap.header->presence |= winject::radiotap::E_FIELD_PRESENCE_MCS;
         radiotap.rescan(true);
         radiotap.header->version = 0;
-        radiotap.flags->flags |= winject::radiotap::flags_t::E_FLAGS_FCS;
         radiotap.rate->value = 65*2;
         radiotap.tx_flags->value |= winject::radiotap::tx_flags_t::E_FLAGS_NOACK;
         radiotap.tx_flags->value |= winject::radiotap::tx_flags_t::E_FLAGS_NOREORDER;
@@ -152,6 +215,7 @@ private:
         uint64_t address2 = (srcraw << 24) | (dstraw);
         tx_frame.address2->set(address2); // IBSS Source
         tx_frame.address3->set(0xDEADBEEFCAFE); // IBSS BSSID
+        tx_frame.set_enable_fcs(false);
 
         Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | radiotap:\n#", winject::radiotap::to_string(radiotap).c_str());
         Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | 802.11:\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
@@ -214,12 +278,12 @@ private:
             tx_config.arq_window_size = llc_config.arq_window_size;
             tx_config.max_retx_count =  llc_config.max_retx_count;
             tx_config.crc_type = tx_config.crc_type;
-
             rx_config.crc_type = tx_config.crc_type;
 
             auto pdcp = pdcps[id];
             auto llc = std::make_shared<LLC>(pdcp, *this, id,
                 tx_config, rx_config);
+
             llcs.emplace(id, llc);
         }
     }
@@ -235,7 +299,6 @@ private:
         buffer_config.buffer = tx_buff;
         buffer_config.buffer_size = sizeof(tx_buff);
         buffer_config.header_size = tx_frame.frame_body - tx_buff;
-        buffer_config.frame_payload_max_size = tx_frame.end() - tx_frame.frame_body;
 
         tx_scheduler.reconfigure(buffer_config);
 
@@ -244,46 +307,345 @@ private:
             auto id = llc_.first;
             auto llc = llc_.second;
             tx_scheduler.add_llc(id, llc.get());
-            ITxScheduler::llc_scheduling_config_t llc_sched_config{};
-            llc_sched_config.llcid = id;
             auto sched_config_ = config.scheduling_configs.find(id);
             if (sched_config_ != config.scheduling_configs.end())
             {
                 auto& sched_config = sched_config_->second;
                 sched_config.nd_gpdu_max_size = sched_config.nd_gpdu_max_size;
                 sched_config.quanta = sched_config.quanta;
+                tx_scheduler.reconfigure(sched_config);
             }
-            tx_scheduler.reconfigure(llc_sched_config);
         }
 
         ITxScheduler::frame_scheduling_config_t frame_config{};
         frame_config.fec_type = fec_type_e::E_FEC_TYPE_NONE;
-        frame_config.slot_interval_us = config.frame_info.slot_interval_us;
+        frame_config.slot_interval_us = config.frame_config.slot_interval_us;
+        frame_config.frame_payload_size = config.frame_config.frame_payload_size;
 
         tx_scheduler.reconfigure(frame_config);
+
+        timer_thread = std::thread([this](){timer.run();});
     }
 
-    void run_rx()
+    void setup_rrc()
     {
-        rx_thread_running = true;
-        while (rx_thread_running)
+        rrc_rx_thread =  std::thread([this](){run_rrc_rx();});
+        wifi_rx_thread = std::thread([this](){run_wifi_rx();});
+    }
+
+    void run_wifi_rx()
+    {
+        wifi_rx_running = true;
+        while (wifi_rx_running)
         {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            int rv = wifi.recv(rx_buff, sizeof(rx_buff));
+            if (rv<0)
+            {
+                Logless(*main_logger, Logger::ERROR, "ERR | AppRRC | wifi recv failed! errno=# error=#\n", errno, strerror(errno));
+                stop();
+                return;
+            }
+
+            winject::radiotap::radiotap_t radiotap(rx_buff);
+            winject::ieee_802_11::frame_t frame80211(radiotap.end(), rx_buff+sizeof(rx_buff));
+
+            auto frame80211end = rx_buff+rv;
+            size_t size =  frame80211end-frame80211.frame_body-4;
+
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
+
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | recv size #", rv);
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC |   frame body size: #", size);
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | -----------------------\n");
+
+            if (!frame80211.frame_body)
+            {
+                continue;
+            }
+
+            process_rx_frame(frame80211.frame_body, size);
         }
     }
 
+    void process_rx_frame(uint8_t* start, size_t size)
+    {
+
+        uint8_t* cursor = start;
+        size_t frame_payload_remaining = size;
+
+        auto advance_cursor = [&cursor, &frame_payload_remaining](size_t size)
+        {
+            cursor += size;
+            frame_payload_remaining -= size;
+        };
+
+        uint8_t fec = *cursor;
+        advance_cursor(sizeof(fec));
+
+        while (true)
+        {
+            llc_t llc_pdu(cursor, frame_payload_remaining);
+            auto lcid = llc_pdu.get_LCID();
+
+            std::shared_lock<std::shared_mutex> lg(this_mutex);
+            auto llc_config_it = peer_config.llc_configs.find(lcid);
+            if (config.llc_configs.end() == llc_config_it)
+            {
+                Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Couldnt find the llc_config for lcid=#, couldn't process more.", lcid);
+                return;
+            }
+
+            auto& llc_config = llc_config_it->second;
+            llc_pdu.crc_size = to_size(llc_config.crc_type);
+            auto llc_it = llcs.find(lcid);
+            if (llcs.end() == llc_it)
+            {
+                Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Couldnt find the llc for lcid=#, skipping...", lcid);
+                advance_cursor(llc_pdu.get_SIZE());
+                continue;
+            }
+            auto llc = llc_it->second;
+            lg.unlock();
+
+            rx_info_t info;
+            llc->on_rx(info);
+
+            advance_cursor(llc_pdu.get_SIZE());
+        }
+    }
+
+    void run_rrc_rx()
+    {
+        auto lcc0 = llcs.at(0);
+        auto pdcp0 = pdcps.at(0);
+
+        pdcp0->set_rx_enabled(true);
+        pdcp0->set_tx_enabled(true);
+        lcc0->set_rx_enabled(true);
+        lcc0->set_tx_enabled(true);
+
+        rrc_rx_running = true;
+        while (rrc_rx_running)
+        {
+            auto b = pdcp0->to_rx(1000*1000);
+            if (b.size())
+            {
+                RRC rrc;
+                cum::per_codec_ctx context((std::byte*)b.data(), b.size());
+                cum::decode_per(rrc, context);
+                on_rrc(rrc);
+            }
+        }
+    }
+
+    void on_rrc(const RRC& rrc)
+    {
+        if (main_logger->getLevel() >= Logger::DEBUG)
+        {
+            std::string rrc_str;
+            str("rrc", rrc, rrc_str, true);
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | received rrc msg=#",
+                rrc_str.c_str());
+        }
+
+        std::visit([this, &rrc](auto& msg){
+                on_rrc_message(rrc.requestID, msg);
+            }, rrc.message);
+    }
+
+    template<typename T>
+    void fill_from_config(
+        int lcid,
+        bool include_frame,
+        bool include_llc,
+        bool include_pdcp,
+        T& message)
+    {
+        std::shared_lock<std::shared_mutex> lg(this_mutex);
+        bool has_llc = config.llc_configs.count(lcid);
+        bool has_sched = config.scheduling_configs.count(lcid);
+        bool has_pdcp = config.pdcp_configs.count(lcid);
+
+        if (include_llc && has_llc)
+        {
+            auto& llc_src = config.llc_configs.at(lcid);
+            message.llcConfig = RRC_LLCConfig{};
+            auto& llcConfig = message.llcConfig;
+            llcConfig->llcid = lcid;
+            llcConfig->txConfig.mode = to_rrc(llc_src.mode);
+            llcConfig->txConfig.arqWindowSize = llc_src.arq_window_size;
+            llcConfig->txConfig.maxRetxCount = llc_src.max_retx_count;
+            llcConfig->txConfig.crcType = to_rrc(llc_src.crc_type);
+
+            llcConfig->schedulingConfig.ndGpduMaxSize = 0;
+            llcConfig->schedulingConfig.quanta = 0;
+            if (has_sched)
+            {
+                auto& sched_src = config.scheduling_configs.at(lcid);
+                llcConfig->schedulingConfig.ndGpduMaxSize = sched_src.nd_gpdu_max_size;
+                llcConfig->schedulingConfig.quanta = sched_src.quanta;
+            }
+        }
+
+        if (include_pdcp && has_pdcp)
+        {
+            auto& pdcp_src = config.pdcp_configs.at(lcid);
+            message.pdcpConfig = RRC_PDCPConfig{};
+            auto& pdcpConfig = message.pdcpConfig;
+            pdcpConfig->lcid = lcid;
+            // @todo : fill up correctly
+            pdcpConfig->type = RRC_EPType::E_RRC_EPType_INTERNAL;
+            pdcpConfig->minCommitSize = pdcp_src.min_commit_size;
+            pdcpConfig->allowSegmentation = pdcp_src.allow_segmentation;
+        }
+
+        if (include_frame)
+        {
+            message.frameConfig = RRC_FrameConfig{};
+            auto& frameConfig = message.frameConfig;
+            for (auto& fec_config_src : config.fec_configs)
+            {
+                frameConfig->fecConfig.emplace_back();
+                auto& fecConfig = frameConfig->fecConfig.back();
+                fecConfig.threshold = fec_config_src.threshold;
+                fecConfig.type = to_rrc(fec_config_src.type);
+            }
+            message.frameConfig->slotInterval = config.frame_config.slot_interval_us;
+            message.frameConfig->framePayloadSize = config.frame_config.frame_payload_size;
+        }
+    }
+
+    void on_rrc_message(int req_id, const RRC_PullRequest& req)
+    {
+        RRC rrc;
+        rrc.requestID = req_id;
+        rrc.message = RRC_PullResponse{};
+        auto& message = std::get<RRC_PullResponse>(rrc.message);
+        fill_from_config(
+            req.lcid,
+            req.includeFrameConfig,
+            req.includeLLCConfig,
+            req.includePDCPConfig,
+            message);
+        send_rrc(rrc);
+    }
+
+    template<typename T>
+    void update_peer_config_and_reconfigure_rx(const T& msg)
+    {
+        std::unique_lock<std::shared_mutex> lg(this_mutex);
+
+        if (msg.frameConfig)
+        {
+            auto& frameConfig = msg.frameConfig;
+            peer_config.frame_config.slot_interval_us = frameConfig->slotInterval;
+            peer_config.frame_config.frame_payload_size = frameConfig->framePayloadSize;
+        }
+
+        if (msg.llcConfig)
+        {
+            auto& llcConfig = msg.llcConfig;
+            auto& llc_config = peer_config.llc_configs[llcConfig->llcid];
+            auto& sched_config = peer_config.scheduling_configs[llcConfig->llcid];
+
+            llc_config.mode = to_config(llcConfig->txConfig.mode);
+            llc_config.arq_window_size = llcConfig->txConfig.arqWindowSize;
+            llc_config.crc_type = to_config(llcConfig->txConfig.crcType);
+            llc_config.max_retx_count = llcConfig->txConfig.maxRetxCount;
+            sched_config.nd_gpdu_max_size = llcConfig->schedulingConfig.ndGpduMaxSize;
+            sched_config.quanta = llcConfig->schedulingConfig.quanta;
+
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Reconfiguring LLC lcid=\"#\"", msg.llcConfig->llcid);
+            ILLC::rx_config_t llc_config_rx{};
+            llc_config_rx.crc_type = llc_config.crc_type;
+            if (llcs.count(msg.llcConfig->llcid))
+            {
+                auto& llc = llcs.at(msg.llcConfig->llcid);
+                llc->reconfigure(llc_config_rx);
+                llc->set_rx_enabled(true);
+            }
+        }
+
+        if (msg.pdcpConfig)
+        {
+            auto& pdcpConfig = msg.pdcpConfig;
+            auto& tx_config = peer_config.pdcp_configs[msg.pdcpConfig->lcid];
+            tx_config.allow_segmentation = pdcpConfig->allowSegmentation;
+            tx_config.min_commit_size = pdcpConfig->minCommitSize;
+
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Reconfiguring PDCP linked-lcid=\"#\"", msg.llcConfig->llcid);
+            IPDCP::rx_config_t pdcp_config_rx{};
+            pdcp_config_rx.allow_segmentation = tx_config.allow_segmentation;
+            if (pdcps.count(msg.pdcpConfig->lcid))
+            {
+                auto& pdcp = pdcps.at(msg.pdcpConfig->lcid);
+                pdcp->reconfigure(pdcp_config_rx);
+            }
+        }
+    }
+
+    void on_rrc_message(int req_id, const RRC_PullResponse& rsp)
+    {
+        update_peer_config_and_reconfigure_rx(rsp);
+    }
+
+    void on_rrc_message(int req_id, const RRC_PushRequest& req)
+    {
+        update_peer_config_and_reconfigure_rx(req);
+        RRC rrc;
+        rrc.requestID = req_id;
+        rrc.message = RRC_PushResponse{};
+        send_rrc(rrc);
+    }
+
+    void on_rrc_message(int req_id, const RRC_PushResponse& msg)
+    {
+    }
+
+    void on_rrc_message(int req_id, const RRC_ActivateRequest& msg)
+    {}
+
+    void on_rrc_message(int req_id, const RRC_ActivateResponse& msg)
+    {}
+
+    void send_rrc(const RRC& rrc)
+    {
+        auto pdcp0 = pdcps.at(0);
+        buffer_t b(1024*5);
+        cum::per_codec_ctx context((std::byte*)b.data(), b.size());
+        cum::encode_per(rrc, context);
+        size_t encode_size = b.size() - context.size();
+        if (main_logger->getLevel() >= Logger::DEBUG)
+        {
+            std::string rrc_str;
+            str("rrc", rrc, rrc_str, true);
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | sending rrc msg=#",
+                rrc_str.c_str());
+        }
+
+        b.resize(encode_size);
+        pdcp0->to_tx(std::move(b));
+    }
+
     config_t config;
+    config_t peer_config;
+
     bfc::Timer<> timer;
     std::thread timer_thread;
-    std::thread rx_thread;
-    std::atomic_bool rx_thread_running = true;
-
+    std::thread wifi_rx_thread;
+    std::atomic_bool wifi_rx_running = true;
+    uint8_t rrc_req_id = 0;
     WIFI wifi;
     TxScheduler tx_scheduler;
 
     uint8_t console_buff[1024];
 
-    uint8_t tx_buff[1024];
+    // @note : tx_buff size should be enough for frame_payload_size + 802 and radiotap headers
+    uint8_t tx_buff[1024*2];
+    uint8_t rx_buff[1024*2];
+
     winject::radiotap::radiotap_t radiotap;
     winject::ieee_802_11::frame_t tx_frame;
 
@@ -294,6 +656,10 @@ private:
     std::map<uint8_t, std::shared_ptr<LLC>> llcs;
     std::map<uint8_t, std::shared_ptr<PDCP>> pdcps;
 
+    std::thread rrc_rx_thread;
+    std::atomic_bool rrc_rx_running = true;
+
+    std::shared_mutex this_mutex;
 };
 
 #endif // __WINJECTUM_APPRRC_HPP__

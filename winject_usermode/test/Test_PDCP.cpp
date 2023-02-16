@@ -95,7 +95,7 @@ TEST_F(Test_PDCP, should_allocate_basic)
 TEST_F(Test_PDCP, should_allocate_segmented_halving)
 {
     configure_sut_segmented();
-    tx_frame_info.frame_size = 1000;
+    tx_frame_info.frame_payload_size = 1000;
     sut->to_tx(to_buffer("ABCD112233EFAA445566"));
     {
         auto tx_info = trigger_tx(1, buffer, 10);
@@ -151,7 +151,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
 TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
 {
     configure_sut_segmented();
-    tx_frame_info.frame_size = 1000;
+    tx_frame_info.frame_payload_size = 1000;
     sut->to_tx(to_buffer("ABCD112233EFAA445566"));
     sut->to_tx(to_buffer("001122"));
     {

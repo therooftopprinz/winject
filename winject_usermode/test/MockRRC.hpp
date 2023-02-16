@@ -7,6 +7,7 @@
 struct MockRRC : public IRRC
 {
     MOCK_METHOD1(on_rlf, void(lcid_t));
+    MOCK_METHOD1(perform_tx, void(size_t));
 };
 
 #endif // __WINJECTUMTST_MOCKRRC_HPP__

@@ -10,7 +10,7 @@ Type RRC_U8
 
 Type RRC_U8A
 {
-    type(u8) dynamic_array(256)
+    type(RRC_U8) dynamic_array(256)
 };
 
 Type RRC_U16
@@ -27,8 +27,6 @@ Type RRC_U64
 {
     type(unsigned) width(64)
 };
-
-
 
 Type RRC_STR
 {
@@ -59,14 +57,15 @@ Type RRC_FECConfigList
 Sequence RRC_FrameConfig
 {
     RRC_U64 slotInterval,
-    RRC_FECConfigList fecConfig
+    RRC_FECConfigList fecConfig,
+    RRC_U16 framePayloadSize
 };
 
 Enumeration RRC_LLCTxMode
 {
     E_RRC_LLCTxMode_TM,
     E_RRC_LLCTxMode_AM
-}
+};
 
 Enumeration RRC_LLCCRCType
 {
@@ -78,12 +77,13 @@ Sequence RRC_LLCTxConfig
 {
     RRC_LLCTxMode mode,
     RRC_U16 arqWindowSize,
+    RRC_U16 maxRetxCount,
     RRC_LLCCRCType crcType
 };
 
 Sequence RRC_SchedulingConfig
 {
-    RRC_U16 nd_gpdu_max_size,
+    RRC_U16 ndGpduMaxSize,
     RRC_U16 quanta
 };
 
@@ -91,12 +91,12 @@ Sequence RRC_LLCConfig
 {
     RRC_U8 llcid,
     RRC_LLCTxConfig txConfig,
-    RRC_SchedulingConfig scheduling_config
+    RRC_SchedulingConfig schedulingConfig
 };
 
 Enumeration RRC_EPType
 {
-    E_RRC_EPType_INTERNAL
+    E_RRC_EPType_INTERNAL,
     E_RRC_EPType_UDP,
     E_RRC_EPType_UART,
     E_RRC_EPType_TUN
@@ -123,14 +123,14 @@ Enumeration RRC_CompressionAlgorithm
 Sequence RRC_PDCPConfig
 {
     RRC_U8 lcid,
-    RRC_BOOL allow_segmentation,
-    RRC_U16 min_commit_size,
-    RRC_U8A cipher_key,
-    RRC_U8A integrity_key,
+    RRC_BOOL allowSegmentation,
+    RRC_U16 minCommitSize,
+    RRC_U8A cipherKey,
+    RRC_U8A integrityKey,
     RRC_CipherAlgorithm cipherAlgorithm,
     RRC_IntegrityAlgorithm integrityAlgorithm,
     RRC_CompressionAlgorithm compressionAlgorithm,
-    U8 compressionLevel,
+    RRC_U8 compressionLevel,
     RRC_EPType type,
     RRC_STR address
 };
@@ -140,7 +140,7 @@ Sequence RRC_PullRequest
     RRC_BOOL includeFrameConfig,
     RRC_BOOL includeLLCConfig,
     RRC_BOOL includePDCPConfig,
-    RRC_U8A lcids
+    RRC_U8 lcid
 };
 
 Type RRC_FrameConfigOptional
@@ -169,7 +169,8 @@ Sequence RRC_PushRequest
 {
     RRC_FrameConfigOptional frameConfig,
     RRC_LLCConfigOptional llcConfig,
-    RRC_PDCPConfigOptional pdcpConfig
+    RRC_PDCPConfigOptional pdcpConfig,
+    RRC_U8 lcid
 };
 
 Sequence RRC_PushResponse
@@ -180,7 +181,7 @@ Sequence RRC_PushResponse
 Sequence RRC_ActivateRequest
 {
     RRC_U8 llcid,
-    RRC_BOOL isTxActive
+    RRC_BOOL isTxActive,
     RRC_BOOL isRxActive
 };
 
@@ -196,11 +197,11 @@ Choice RRC_Message
     RRC_PushRequest,
     RRC_PushResponse,
     RRC_ActivateRequest,
-    RRC_ActivateResponse,
+    RRC_ActivateResponse
 };
 
 Sequence RRC
 {
-    U8 requestID,
+    RRC_U8 requestID,
     RRC_Message message
 }

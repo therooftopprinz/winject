@@ -34,6 +34,7 @@ ILLC::crc_type_e to_crc_type(std::string s)
 int main()
 {
     main_logger = std::make_unique<Logger>("main.log");
+    main_logger->setLevel(Logger::TRACE);
     main_logger->logful();
 
     Logless(*main_logger, Logger::DEBUG, "DBG | main | Reading from config.json");
@@ -59,12 +60,12 @@ int main()
             (int) fec_config.type);
     }
 
-    rrc_config.frame_info.frame_size = frame.at("frame_size");
-    rrc_config.frame_info.slot_interval_us = frame.at("slot_interval_us");
+    rrc_config.frame_config.frame_payload_size = frame.at("frame_payload_size");
+    rrc_config.frame_config.slot_interval_us = frame.at("slot_interval_us");
 
     Logless(*main_logger, Logger::DEBUG, "DBG | main | --- FRAME ---");
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | frame_info.frame_size=#", rrc_config.frame_info.frame_size);
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | frame_info.slot_interval_us=#", rrc_config.frame_info.slot_interval_us);
+    Logless(*main_logger, Logger::DEBUG, "DBG | main | frame_config.frame_payload_size=#", rrc_config.frame_config.frame_payload_size);
+    Logless(*main_logger, Logger::DEBUG, "DBG | main | frame_config.slot_interval_us=#", rrc_config.frame_config.slot_interval_us);
 
     Logless(*main_logger, Logger::DEBUG, "DBG | main | --- LLCs ---");
     for (auto& llc : llcs)
@@ -94,6 +95,8 @@ int main()
         Logless(*main_logger, Logger::DEBUG, "DBG | main |   arq_window_size: #", llc_config.arq_window_size);
         Logless(*main_logger, Logger::DEBUG, "DBG | main |   max_retx_count: #", llc_config.max_retx_count);
         Logless(*main_logger, Logger::DEBUG, "DBG | main |   crc_type: #", (int) llc_config.crc_type);
+        Logless(*main_logger, Logger::DEBUG, "DBG | main |   nd_gpdu_max_size: #", scheduling_config.nd_gpdu_max_size);
+        Logless(*main_logger, Logger::DEBUG, "DBG | main |   quanta: #", scheduling_config.quanta);
     }
 
     Logless(*main_logger, Logger::DEBUG, "DBG | main | --- PDCPs ---");

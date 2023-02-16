@@ -253,9 +253,16 @@ private:
 template <typename... Ts>
 void Logless(Logger& logger, Logger::level_e level, const char* id, Ts... ts)
 {
-    uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    uint64_t threadId = std::hash<std::thread::id>()(std::this_thread::get_id());
-    logger.log(id, timeNow, threadId, ts...);
+    if (logger.getLevel() >= level)
+    {
+        uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        uint64_t threadId = std::hash<std::thread::id>()(std::this_thread::get_id());
+        logger.log(id, timeNow, threadId, ts...);
+        if (Logger::level_e::ERROR >= level)
+        {
+            logger.flush();
+        }
+    }
 }
 
 struct LoglessTrace

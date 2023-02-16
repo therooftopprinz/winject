@@ -130,13 +130,15 @@ public:
                     break;
                 }
 
-                buffer_t pdu = std::move(to_tx_queue.front());
 
                 // @note : wait for the allocation to increase 
-                if (pdu.size() > available_for_data)
+                if (to_tx_queue.front().size() > available_for_data)
                 {
                     break;
                 }
+
+                buffer_t pdu = std::move(to_tx_queue.front());
+
                 to_tx_queue.pop_front();
                 // @todo: Implement PDCP compression
                 std::memcpy(segment.payload, pdu.data(), pdu.size());
