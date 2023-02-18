@@ -17,7 +17,7 @@ struct Test_PDCP : public testing::Test
         tx_config.allow_segmentation = false;
         IPDCP::rx_config_t rx_config{};
 
-        sut = std::make_shared<PDCP>(tx_config, rx_config);
+        sut = std::make_shared<PDCP>(0, tx_config, rx_config);
         sut->set_tx_enabled(true);
         sut->set_rx_enabled(true);
     }
@@ -29,7 +29,7 @@ struct Test_PDCP : public testing::Test
         tx_config.allow_segmentation = true;
         IPDCP::rx_config_t rx_config{};
 
-        sut = std::make_shared<PDCP>(tx_config, rx_config);
+        sut = std::make_shared<PDCP>(0, tx_config, rx_config);
         sut->set_tx_enabled(true);
         sut->set_rx_enabled(true);
     }

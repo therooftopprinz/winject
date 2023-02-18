@@ -34,7 +34,7 @@ ILLC::crc_type_e to_crc_type(std::string s)
 int main()
 {
     main_logger = std::make_unique<Logger>("main.log");
-    main_logger->setLevel(Logger::TRACE);
+    main_logger->setLevel(Logger::TRACE2);
     main_logger->logful();
 
     Logless(*main_logger, Logger::DEBUG, "DBG | main | Reading from config.json");
@@ -64,8 +64,8 @@ int main()
     rrc_config.frame_config.slot_interval_us = frame.at("slot_interval_us");
 
     Logless(*main_logger, Logger::DEBUG, "DBG | main | --- FRAME ---");
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | frame_config.frame_payload_size=#", rrc_config.frame_config.frame_payload_size);
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | frame_config.slot_interval_us=#", rrc_config.frame_config.slot_interval_us);
+    Logless(*main_logger, Logger::DEBUG, "DBG | main | frame_config.frame_payload_size: #", rrc_config.frame_config.frame_payload_size);
+    Logless(*main_logger, Logger::DEBUG, "DBG | main | frame_config.slot_interval_us: #", rrc_config.frame_config.slot_interval_us);
 
     Logless(*main_logger, Logger::DEBUG, "DBG | main | --- LLCs ---");
     for (auto& llc : llcs)

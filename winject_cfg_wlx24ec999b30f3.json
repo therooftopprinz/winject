@@ -43,7 +43,7 @@
           "quanta" : 1200
         },
         "tx_config": {
-          "arq_window_size" : 5,
+          "arq_window_size" : 20,
           "max_retx_count" : 3,
           "crc_type" : "NONE"
         }

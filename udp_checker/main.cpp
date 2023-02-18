@@ -215,7 +215,7 @@ int main(int argc, char* argv[])
         double send_period = 1/send_rate;
         uint64_t send_period_us = send_period*1000*1000;
 
-        LOG("bitrate=%8.3lf Kbps send_rate=%.3lf Hz", rate*1000, send_rate);
+        LOG("bitrate=%8.3lf bps send_rate=%.3lf Hz", rate*1000, send_rate);
 
         sockaddr_in bindaddr;
         sockaddr_in sendaddr;

@@ -36,7 +36,7 @@ public:
             llcs.resize(lcid+1);
             schedules_info.resize(lcid+1);
             llcs[lcid] = llc;
-            schedules_info[lcid] = {};
+            schedules_info[lcid] = {llc};
         }
     }
 
@@ -138,12 +138,18 @@ private:
 
             advance_cursor (tx_info.out_allocated);
 
-            schedule.llc = llc;
             schedule.has_schedulable = tx_info.out_tx_available;
+            schedule.has_data_allocated = tx_info.out_has_data_loaded;
 
             if (schedule.has_schedulable)
             {
                 schedules_cache.emplace_back(&schedule);
+                Logless(*main_logger, Logger::TRACE2,
+                    "TR2 | TxSched | has schedule slot=# lcid=# def=# n-dalloc=#",
+                    frame_info.slot_number,
+                    (int) i,
+                    schedule.deficit,
+                    tx_info.out_allocated);
             }
             else
             {
@@ -188,6 +194,16 @@ private:
                 tx_info.out_has_data_loaded = false;
                 schedule.llc->on_tx(tx_info);
                 advance_cursor(tx_info.out_allocated);
+
+                schedule.has_data_allocated = tx_info.out_has_data_loaded;
+
+                Logless(*main_logger, Logger::TRACE2,
+                    "TR2 | TxSched | has schedule slot=# lcid=# def=# alloc=# has_data=#",
+                    frame_info.slot_number,
+                    (int) i->llc->get_lcid(),
+                    schedule.deficit,
+                    tx_info.out_allocated,
+                    (int) tx_info.out_has_data_loaded);
             }
 
             if (max_quanta_allocated>frame_info.frame_payload_size || schedulable_count==0)

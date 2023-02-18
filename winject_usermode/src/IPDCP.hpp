@@ -3,6 +3,7 @@
 
 #include "pdu.hpp"
 #include "info_defs.hpp"
+#include "frame_defs.hpp"
 
 struct IPDCP
 {
@@ -55,6 +56,8 @@ struct IPDCP
     virtual void on_rx(rx_info_t&) = 0;
     virtual buffer_t to_rx(uint64_t=-1) = 0;
     virtual void to_tx(buffer_t) = 0;
+
+    virtual lcid_t get_attached_lcid() = 0;
 
     // virtual void set_tx_enabled(bool) = 0;
     // virtual void set_rx_enabled(bool) = 0;

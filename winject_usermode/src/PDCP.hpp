@@ -1,44 +1,63 @@
 #ifndef __WINJECTUM_PDCP_HPP__
 #define __WINJECTUM_PDCP_HPP__
 
-#include "IPDCP.hpp"
-#include "frame_defs.hpp"
 #include <deque>
 #include <mutex>
 #include <condition_variable>
 #include <cstring>
 
+#include "IPDCP.hpp"
+#include "frame_defs.hpp"
+
+#include "Logger.hpp"
+
 class PDCP : public IPDCP
 {
 public:
-    PDCP(const tx_config_t& tx_config, const rx_config_t& rx_config)
-        : tx_config(tx_config)
+    PDCP(lcid_t lcid, const tx_config_t& tx_config, const rx_config_t& rx_config)
+        : lcid(lcid)
+        , tx_config(tx_config)
         , rx_config(rx_config)
     {}
 
+    lcid_t get_attached_lcid()
+    {
+        return lcid;
+    }
+
     void set_tx_enabled(bool value)
     {
-        std::unique_lock<std::mutex> lg(tx_mutex);
+        std::unique_lock<std::shared_mutex> lg(tx_mutex);
         // std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
         is_tx_enabled = value;
         // to_tx_queue.clear();
         current_tx_buffer.clear();
         current_tx_offset = 0;
+        lg.unlock();
+
+        Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  | tx_enabled=#",
+            (int) lcid,
+            (int) is_tx_enabled);
     }
 
     void set_rx_enabled(bool value)
     {
-        std::unique_lock<std::mutex> lg(rx_mutex);
+        std::unique_lock<std::shared_mutex> lg(rx_mutex);
         // std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
         is_rx_enabled = value;
         // to_rx_queue.clear();
         current_rx_buffer.clear();
         current_rx_offset = 0;
+        lg.unlock();
+
+        Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  | rx_enabled=#",
+            (int) lcid,
+            (int) is_rx_enabled);
     }
 
     virtual tx_config_t get_tx_confg()
     {
-        std::unique_lock<std::mutex> lg(tx_mutex);
+        std::shared_lock<std::shared_mutex> lg(tx_mutex);
         return tx_config;
     }
 
@@ -46,8 +65,13 @@ public:
     {
         bool status;
         {
-            std::unique_lock<std::mutex> lg(tx_mutex);
+            std::unique_lock<std::shared_mutex> lg(tx_mutex);
             tx_config = config;
+
+            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  | reconfigure tx:", (int)lcid);
+            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   allow_segmentation: #", (int)lcid, (int) tx_config.allow_segmentation);
+            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   min_commit_size: #", (int)lcid, tx_config.min_commit_size);
+
             status = is_tx_enabled;
         }
         set_tx_enabled(status);
@@ -55,7 +79,7 @@ public:
 
     virtual rx_config_t get_rx_confg()
     {
-        std::unique_lock<std::mutex> lg(rx_mutex);
+        std::shared_lock<std::shared_mutex> lg(rx_mutex);
         return rx_config;
     }
 
@@ -63,8 +87,12 @@ public:
     {
         bool status;
         {
-            std::unique_lock<std::mutex> lg(rx_mutex);
+            std::unique_lock<std::shared_mutex> lg(rx_mutex);
             rx_config = config;
+
+            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  | reconfigure rx:", (int) lcid);
+            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   allow_segmentation: #", (int) lcid, (int) rx_config.allow_segmentation);
+
             status = is_rx_enabled;
         }
         set_rx_enabled(status);
@@ -72,7 +100,7 @@ public:
 
     void on_tx(tx_info_t& info)
     {
-        std::unique_lock<std::mutex> lg(tx_mutex);
+        std::unique_lock<std::shared_mutex> lg(tx_mutex);
         if (!is_tx_enabled)
         {
             return;
@@ -83,22 +111,24 @@ public:
             info.out_tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
         }
 
+        if (info.out_pdu.size == 0 || !info.out_tx_available)
+        {
+            return;
+        }
+
         pdcp_t pdcp(info.out_pdu.base, info.out_pdu.size);
         pdcp.iv_size = tx_cipher_iv_size;
         pdcp.hmac_size = tx_hmac_size;
         pdcp.rescan();
 
-        if (!info.out_tx_available ||
-            info.out_pdu.size == 0 ||
-            pdcp.get_header_size() >= info.out_pdu.size)
-        {
-            return;
-        }
-
         // @note : wait for the allocation to increase
         // current_tx_buffer.size()
-        if (tx_config.min_commit_size > info.out_pdu.size)
+
+        if(
+            tx_config.min_commit_size > info.out_pdu.size ||
+            pdcp.get_header_size() >= info.out_pdu.size)
         {
+            Logless(*main_logger, Logger::TRACE2, "TR2 | PDCP#  | not enough allocation", (int)lcid);
             return;
         }
 
@@ -112,7 +142,7 @@ public:
             segment.has_offset = tx_config.allow_segmentation;
             segment.rescan();
 
-            if (segment.get_header_size() > available_for_data)
+            if (segment.get_header_size() >= available_for_data)
             {
                 break;
             }
@@ -138,6 +168,11 @@ public:
                 }
 
                 buffer_t pdu = std::move(to_tx_queue.front());
+                Logless(*main_logger, Logger::TRACE2, "TR2 | PDCP#  | allocated data sn=# to_tx_queue_sz=# data_sz=#",
+                    (int) lcid,
+                    (int) tx_sn,
+                    to_tx_queue.size(),
+                    pdu.size());
 
                 to_tx_queue.pop_front();
                 // @todo: Implement PDCP compression
@@ -146,6 +181,7 @@ public:
             }
             else
             {
+                // @note : end of current tx buffer
                 if (current_tx_offset >= current_tx_buffer.size())
                 {
                     std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
@@ -162,10 +198,13 @@ public:
                 size_t remaining_size = current_tx_buffer.size() - current_tx_offset;
                 size_t alloc_size = std::min(remaining_size, available_for_data);
 
-                if (alloc_size > remaining_size)
-                {
-                    break;
-                }
+                Logless(*main_logger, Logger::TRACE2,
+                    "TR2 | PDCP#  | allocated data sn=# cur=# cur_sz=# data_sz=#",
+                    (int)lcid,
+                    (int) tx_sn,
+                    current_tx_offset,
+                    current_tx_buffer.size(),
+                    alloc_size);
 
                 // @todo: Implement PDCP compression
                 std::memcpy(segment.payload, current_tx_buffer.data() + current_tx_offset, alloc_size);
@@ -195,7 +234,7 @@ public:
 
     void on_rx(rx_info_t& info)
     {
-        std::unique_lock<std::mutex> lg(rx_mutex);
+        std::unique_lock<std::shared_mutex> lg(rx_mutex);
         if (!is_tx_enabled)
         {
             return;
@@ -232,9 +271,28 @@ public:
                 std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
                 to_rx_queue.emplace_back(std::move(buffer));
                 to_rx_queue_cv.notify_one();
+                Logless(*main_logger, Logger::TRACE2,
+                    "TR2 | PDCP#  | received data complete sn=# data_sz=#",
+                    (int) lcid,
+                    (int) segment.get_SN(),
+                    segment.get_payload_size());
             }
             else
             {
+                if (rx_sn != segment.get_SN())
+                {
+                    rx_sn = segment.get_SN();
+                    if (current_rx_buffer.size())
+                    {
+                        Logless(*main_logger, Logger::TRACE2,
+                            "TR2 | PDCP#  | received data complete new_sn=#",
+                            (int) rx_sn);
+                        std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
+                        to_rx_queue.emplace_back(std::move(current_rx_buffer));
+                        to_rx_queue_cv.notify_one();
+                    }
+                }
+
                 pdcp_segment_offset_t offset = *segment.get_OFFSET();
                 pdcp_segment_offset_t size = segment.get_payload_size();
 
@@ -246,15 +304,14 @@ public:
                 // @todo : Implement PDCP encryption
                 // @todo : Implement PDCP integrity
                 // @todo : Implement PDCP decompression
-                std::memcpy(current_rx_buffer.data(), segment.payload, segment.get_payload_size());
+                std::memcpy(current_rx_buffer.data() + offset, segment.payload, segment.get_payload_size());
 
-                if (rx_sn != segment.get_SN())
-                {
-                    rx_sn = segment.get_SN();
-                    std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
-                    to_rx_queue.emplace_back(std::move(current_rx_buffer));
-                    to_rx_queue_cv.notify_one();
-                }
+                Logless(*main_logger, Logger::TRACE2,
+                    "TR2 | PDCP#  | received data sn=# cur=#  data_sz=#",
+                    (int) lcid,
+                    (int) segment.get_SN(),
+                    offset,
+                    segment.get_payload_size());
             }
         }
     }
@@ -267,6 +324,7 @@ public:
             };
 
         std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
+
         if (timeout_us==-1)
         {
             to_rx_queue_cv.wait(lg, pred);
@@ -290,15 +348,27 @@ public:
     void to_tx(buffer_t buffer)
     {
         std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
+
+        if (!is_tx_enabled)
+        {
+            return;
+        }
+
+        Logless(*main_logger, Logger::TRACE2,
+            "TR2 | PDCP#  | to tx msg_sz=# queue_sz=#",
+            (int) lcid,
+            buffer.size(),
+            to_tx_queue.size());
         to_tx_queue.emplace_back(std::move(buffer));
     }
 
 private:
+    lcid_t lcid;
     tx_config_t tx_config;
     rx_config_t rx_config;
 
     pdcp_sn_t tx_sn = 0;
-    size_t rx_sn = -1;
+    pdcp_sn_t rx_sn = -1;
     size_t tx_cipher_iv_size = 0;
     size_t rx_cipher_iv_size = 0;
     size_t tx_hmac_size = 0;
@@ -320,8 +390,8 @@ private:
 
     bool is_tx_enabled = false;
     bool is_rx_enabled = false;
-    std::mutex tx_mutex;
-    std::mutex rx_mutex;
+    std::shared_mutex tx_mutex;
+    std::shared_mutex rx_mutex;
 };
 
 #endif // __WINJECTUM_PDCP_HPP__

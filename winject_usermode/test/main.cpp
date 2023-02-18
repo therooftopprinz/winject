@@ -7,7 +7,7 @@ std::unique_ptr<Logger> main_logger;
 int main(int argc, char **argv)
 {
     main_logger = std::make_unique<Logger>("test.log");
-    main_logger->setLevel(Logger::TRACE);
+    main_logger->setLevel(Logger::TRACE2);
     main_logger->logful();
 
     ::testing::InitGoogleTest(&argc, argv);

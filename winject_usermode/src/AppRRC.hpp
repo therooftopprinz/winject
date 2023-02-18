@@ -143,9 +143,9 @@ public:
         auto lcid = args.argAs<int>("lcid").value_or(0);
         auto pdcp = pdcps.at(lcid);
         auto llc = llcs.at(lcid);
+        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | activating llc and pdcp id=#", (int)lcid);
         pdcp->set_tx_enabled(true);
         llc->set_tx_enabled(true);
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | activating llc and pdcp id=#\n", (int)lcid);
         return "activating...\n";
     }
 
@@ -166,9 +166,15 @@ public:
         reactor.run();
     }
 
-    void on_rlf(lcid_t)
+    void on_rlf(lcid_t lcid)
     {
         std::unique_lock<std::shared_mutex> lg(this_mutex);
+        Logless(*main_logger, Logger::ERROR, "ERR | AppRRC | RLF lcid=#", (int) lcid);
+        auto lcc0 = llcs.at(lcid);
+        auto pdcp0 = pdcps.at(lcid);
+
+        pdcp0->set_tx_enabled(false);    
+        lcc0->set_tx_enabled(false);
     }
 
     void perform_tx(size_t payload_size)
@@ -178,10 +184,10 @@ public:
 
         Logless(*main_logger, Logger::TRACE, "TRC | AppRRC | wifi send buffer[#]:\n#", sz, buffer_str(tx_buff, sz).c_str());
         Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | send size #", sz);
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC |   frame body size: #", payload_size);
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | -----------------------\n");
+        Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
+        Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
+        Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC |   frame body size: #", payload_size);
+        Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | -----------------------");
 
         wifi.send(tx_buff, sz);
     }
@@ -265,7 +271,7 @@ private:
 
             rx_config.allow_segmentation = pdcp_config.allow_segmentation;
 
-            auto pdcp = std::make_shared<PDCP>(tx_config, rx_config);
+            auto pdcp = std::make_shared<PDCP>(id, tx_config, rx_config);
             pdcps.emplace(id, pdcp);
         }
     }
@@ -383,10 +389,10 @@ private:
 
             Logless(*main_logger, Logger::TRACE, "TRC | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
             Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | recv size #", rv);
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC |   frame body size: #", size);
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | -----------------------\n");
+            Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
+            Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
+            Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC |   frame body size: #", size);
+            Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | -----------------------");
 
             if (!frame80211.frame_body)
             {
@@ -609,6 +615,7 @@ private:
             {
                 auto& pdcp = pdcps.at(msg.pdcpConfig->lcid);
                 pdcp->reconfigure(pdcp_config_rx);
+                pdcp->set_rx_enabled(true);
             }
         }
     }

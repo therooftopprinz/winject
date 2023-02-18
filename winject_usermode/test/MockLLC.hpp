@@ -14,6 +14,7 @@ struct MockLLC : public ILLC
     MOCK_METHOD0(get_rx_confg, rx_config_t());
     MOCK_METHOD1(reconfigure, void(const tx_config_t&));
     MOCK_METHOD1(reconfigure, void(const rx_config_t&));
+    MOCK_METHOD0(get_lcid, lcid_t());
 };
 
 #endif // __WINJECTUMTST_MOCKLLC_HPP__

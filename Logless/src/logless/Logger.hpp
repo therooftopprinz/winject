@@ -65,7 +65,14 @@ public:
     using TagType    = uint8_t;
     using TailType   = uint8_t;
 
-    enum level_e{FATAL, ERROR, WARNING, DEBUG, TRACE};
+    enum level_e{
+        FATAL,
+        ERROR,
+        WARNING,
+        DEBUG,
+        DEBUG2,
+        TRACE,
+        TRACE2};
 
     Logger(const char* pFilename)
         : mOutputFile(std::fopen(pFilename, "wb"))

@@ -33,15 +33,15 @@ public:
     {
     }
 
+    lcid_t get_lcid()
+    {
+        return lcid;
+    }
+
     void set_tx_enabled(bool value)
     {
         std::unique_lock<std::mutex> lg(tx_mutex);
         is_tx_enabled = value;
-
-        if (tx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
-        {
-            tx_crc_size = 4;
-        }
 
         if (tx_config.mode == E_TX_MODE_AM)
         {
@@ -55,18 +55,17 @@ public:
                 tx_ring_elem.to_check = -1;
             }
         }
+
+        Logless(*main_logger, Logger::TRACE2,
+            "TR2 | LLC# | tx_enable=#",
+            (int) lcid,
+            (int) is_tx_enabled);
     }
 
     void set_rx_enabled(bool value)
     {
         std::unique_lock<std::mutex> lg(rx_mutex);
         is_rx_enabled = value;
-
-        if (rx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
-        {
-            rx_crc_size = 4;
-
-        }
 
         for (auto& i : to_retx_list)
         {
@@ -77,6 +76,11 @@ public:
         }
 
         to_retx_list.clear();
+
+        Logless(*main_logger, Logger::TRACE2,
+            "TR2 | LLC# | rx_enable=#",
+            (int) lcid,
+            (int)is_rx_enabled);
     }
 
     virtual tx_config_t get_tx_confg()
@@ -92,6 +96,17 @@ public:
             std::unique_lock<std::mutex> lg(tx_mutex);
             tx_config = config;
             status = is_tx_enabled;
+            if (tx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
+            {
+                tx_crc_size = 4;
+            }
+
+            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# | reconfigure tx:", (int)lcid);
+            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# |   mode: #", (int)lcid, (int)tx_config.mode);
+            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# |   arq_window_size: #", (int)lcid, tx_config.arq_window_size);
+            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# |   max_retx_count: #", (int)lcid, tx_config.max_retx_count);
+            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# |   crc_type: #", (int)lcid, (int)tx_config.crc_type);
+            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# |   crc_size: #", (int)lcid, tx_crc_size);
         }
         set_tx_enabled(status);
     }
@@ -109,6 +124,16 @@ public:
             std::unique_lock<std::mutex> lg(rx_mutex);
             rx_config = config;
             status = is_rx_enabled;
+
+            if (rx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
+            {
+                rx_crc_size = 4;
+            }
+
+            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# | reconfigure rx:", (int) lcid);
+            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# |   mode: #", (int) lcid, (int) rx_config.peer_mode);
+            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# |   crc_type: #", (int) lcid, (int) rx_config.crc_type);
+            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# |   crc_size: #", (int) lcid, rx_crc_size);
         }
         set_rx_enabled(status);
     }
@@ -176,6 +201,9 @@ public:
                     acks[n_acks].count = ack.second;
                     info.out_pdu.size -= sizeof(llc_payload_ack_t);
 
+                    Logless(*main_logger, Logger::TRACE2, "TR2 | LLC# | ack sn=# cx=#",
+                        int(lcid), ack.first, ack.second);
+
                     n_acks++;
                 }
                 
@@ -239,6 +267,14 @@ public:
         {
             auto& retx_pdu = to_retx_list.front();
             retx_count = retx_pdu.retry_count + 1;
+
+            Logless(*main_logger, Logger::TRACE2,
+                "TR2 | LLC# | retx=#/# to_retx_list_sz=#",
+                int(lcid),
+                retx_count,
+                tx_config.max_retx_count,
+                to_retx_list.size());
+
             if (retx_count >= tx_config.max_retx_count)
             {
                 rrc.on_rlf(lcid);
@@ -282,12 +318,16 @@ public:
             std::memcpy(tx_elem.pdcp_pdu.data(), llc.payload(), llc.get_payload_size());
             // @note copy PDCP to tx_ring elem needed when retransmitting
             tx_elem.pdcp_pdu_size = llc.get_payload_size();
-            sn_to_tx_ring[llc.get_SN()] = tx_idx;
+            sn_to_tx_ring[llc.get_SN()] = ack_ck_idx;
         }
 
-        Logless(*main_logger, Logger::TRACE, "TRC | LLC# | txing slot=# size=#",
-            int(lcid),
+        Logless(*main_logger, Logger::TRACE,
+            "TRC | LLC# | pdu slot=# tx_idx=# ack_idx=# sn=# size=#",
+            (int) lcid,
             info.in_frame_info.slot_number,
+            tx_idx,
+            ack_ck_idx,
+            (int) llc.get_SN(),
             info.out_allocated);
     }
 
@@ -321,14 +361,16 @@ public:
                 llc_sn_t sn = ack.sn & llc_sn_mask;
                 for (size_t i=0; i<ack.count; i++)
                 {
-                    Logless(*main_logger, Logger::TRACE, "TRC | LLC# | ack sn=#",
-                        int(lcid), sn);
-                    size_t slot_number = sn_to_tx_ring[sn];
-                    auto idx = tx_ring_index(slot_number);
-                    auto& current_slot = tx_ring[idx];
-                    auto sent_idx = tx_ring_index(current_slot.to_check);
+                    size_t idx_ = sn_to_tx_ring[sn];
+                    auto idx = tx_ring_index(idx_);
+                    auto& ack_slot = tx_ring[idx];
+                    auto sent_idx = tx_ring_index(ack_slot.to_check);
                     auto& sent_slot = tx_ring[sent_idx];
                     sent_slot.acknowledged = true;
+                    Logless(*main_logger, Logger::TRACE2,
+                        "TR2 | LLC# | acked idx=# sn=#",
+                        (int) lcid, ack_slot.to_check,
+                        (int) sn);
                     sn = llc_sn_mask & (sn+1);
                 }
             }
@@ -343,6 +385,10 @@ public:
 
             info.in_pdu.base += llc.get_header_size();
             info.in_pdu.size -= llc.get_header_size();
+
+            Logless(*main_logger, Logger::TRACE, "TRC | LLC# | data rx pdu_sz=#",
+                int(lcid), info.in_pdu.size);
+ 
             pdcp->on_rx(info);
         }
     }
@@ -355,16 +401,18 @@ private:
             return;
         }
 
-
         auto& this_slot = tx_ring[tx_ring_index(slot_number)];
         auto& sent_slot = tx_ring[tx_ring_index(this_slot.to_check)];
         if (sent_slot.acknowledged)
         {
             return;
         }
- 
-        Logless(*main_logger, Logger::TRACE, "TRC | LLC# | retxing slot=#",
-            int(lcid), this_slot.to_check);
+
+        Logless(*main_logger, Logger::TRACE,
+            "TRC | LLC# | retxing slot=# resend_slot=#",
+            int(lcid),
+            slot_number,
+            this_slot.to_check);
  
         // @note Reset state to default
         sent_slot.acknowledged = true;

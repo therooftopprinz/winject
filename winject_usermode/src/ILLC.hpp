@@ -44,6 +44,7 @@ struct ILLC
     virtual rx_config_t get_rx_confg() = 0;
     virtual void reconfigure(const tx_config_t&) = 0;
     virtual void reconfigure(const rx_config_t&) = 0;
+    virtual lcid_t get_lcid() = 0;
 };
 
 #endif // __WINJECTUM_ILLC_HPP__
