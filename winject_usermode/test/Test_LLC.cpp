@@ -14,6 +14,7 @@ struct Test_LLC : public testing::Test
         tx_config.arq_window_size = 3;
         tx_config.max_retx_count = 3;
         tx_config.mode = ILLC::E_TX_MODE_AM;
+        rx_config.peer_mode = ILLC::E_TX_MODE_AM;
         tx_config.crc_type = ILLC::E_CRC_TYPE_NONE;
         rx_config.crc_type = ILLC::E_CRC_TYPE_NONE;
 
@@ -35,7 +36,6 @@ struct Test_LLC : public testing::Test
     rx_info_t trigger_data_rx(size_t slot_number, lcid_t lcid, llc_sn_t sn, std::string pdcp_hex)
     {
         rx_info_t rx_info{};
-        rx_info.slot_number = slot_number;
         rx_info.in_pdu.base = buffer;
 
         auto pdcp_data = to_buffer(pdcp_hex);
@@ -44,7 +44,6 @@ struct Test_LLC : public testing::Test
         memcpy(rcv_pdu.payload(), pdcp_data.data(), pdcp_data.size());
         rx_info.in_pdu.size = rcv_pdu.get_SIZE();
 
-        rx_frame_info.slot_number = slot_number;
         sut->on_rx(rx_info);
         return rx_info;
     }

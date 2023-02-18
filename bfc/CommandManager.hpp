@@ -58,7 +58,7 @@ public:
     {
         using namespace std::string_literals;
 
-        const std::regex cmdArgsPattern("^([\\S]+)[\\s]*(.*)$");
+        const std::regex cmdArgsPattern("^([\\S]+)[\\s]*(.*)[\\s]*$");
         std::string cmd;
         std::string args;
         ArgsMap argsMap;

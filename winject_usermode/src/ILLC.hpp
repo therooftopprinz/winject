@@ -30,6 +30,7 @@ struct ILLC
     struct rx_config_t
     {
         crc_type_e crc_type = E_CRC_TYPE_NONE;
+        tx_mode_e peer_mode = E_TX_MODE_TM;
     };
 
     virtual ~ILLC(){} 

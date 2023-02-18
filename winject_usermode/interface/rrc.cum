@@ -169,8 +169,7 @@ Sequence RRC_PushRequest
 {
     RRC_FrameConfigOptional frameConfig,
     RRC_LLCConfigOptional llcConfig,
-    RRC_PDCPConfigOptional pdcpConfig,
-    RRC_U8 lcid
+    RRC_PDCPConfigOptional pdcpConfig
 };
 
 Sequence RRC_PushResponse

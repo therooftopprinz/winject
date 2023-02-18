@@ -128,6 +128,30 @@ inline Ip4Port toIp4Port(std::string host, int port)
     return Ip4Port(htonl(sa.sin_addr.s_addr), port);
 }
 
+inline Ip4Port toIp4Port(std::string hostport)
+{
+    std::stringstream ss(hostport);
+    std::string line;
+    std::vector<std::string> parts;
+
+    while(std::getline(ss, line, ':'))
+    {
+        parts.push_back(line);
+    }
+
+    if (parts.size()!=2)
+    {
+        return {};
+    }
+
+    auto& host = parts[0];
+    auto port = std::stoul(parts[1]);
+
+    sockaddr_in sa;
+    inet_pton(AF_INET, host.c_str(), &(sa.sin_addr));
+    return Ip4Port(htonl(sa.sin_addr.s_addr), port);
+}
+
 
 } // namespace bfc
 

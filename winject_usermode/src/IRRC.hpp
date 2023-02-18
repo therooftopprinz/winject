@@ -7,6 +7,7 @@
 
 #include "IPDCP.hpp"
 #include "ILLC.hpp"
+#include "IEndPoint.hpp"
 #include "ITxScheduler.hpp"
 
 struct IRRC
@@ -53,6 +54,7 @@ struct IRRC
         std::map<uint8_t, ILLC::tx_config_t> llc_configs;
         std::map<uint8_t, ITxScheduler::llc_scheduling_config_t> scheduling_configs;
         std::map<uint8_t, IPDCP::tx_config_t> pdcp_configs;
+        std::map<uint8_t, IEndPoint::config_t> ep_configs;
         app_config_t app_config;
     };
 

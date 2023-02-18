@@ -14,29 +14,24 @@
 class UDPEndPoint : public IEndPoint
 {
 public:
-    struct config_t
-    {
-        int lcid;
-        std::string to_host;
-        int to_port;
-        std::string from_host;
-        int from_port;
-    };
 
-    UDPEndPoint(const config_t& config, bfc::IReactor& reactor,
+
+    UDPEndPoint(const IEndPoint::config_t& config, bfc::IReactor& reactor,
         IPDCP& pdcp)
         : config(config)
         , reactor(reactor)
         , pdcp(pdcp)
     {
-        if (0 > sock.bind(bfc::toIp4Port(config.from_host, config.from_port)))
+        if (0 > sock.bind(bfc::toIp4Port(config.address1)))
         {
-            Logless(*main_logger, Logger::DEBUG,
-                "DBG | UDPEndPoint | Bind error(_)", strerror(errno));
+            Logless(*main_logger, Logger::ERROR,
+                "ERR | UDPEndPoint# | Bind error(_)",
+                (int)config.lcid,
+                strerror(errno));
             throw std::runtime_error("UDPEndPoint: failed");
         }
 
-        target_addr = bfc::toIp4Port(config.to_host, config.to_port);
+        target_addr = bfc::toIp4Port(config.address2);
 
         reactor.addReadHandler(sock.handle(), [this](){
                 on_sock_read();
@@ -84,8 +79,8 @@ private:
         auto rv = sock.recvfrom(bv, sender_addr);
         if (rv>0)
         {
-            buffer_t b(bv.size());
-            std::memcpy(b.data(), bv.data(), bv.size());
+            buffer_t b(rv);
+            std::memcpy(b.data(), bv.data(), rv);
             pdcp.to_tx(std::move(b));
         }
     }

@@ -114,9 +114,23 @@ int main()
         // pdcp_config.tx_compression_algorigthm;
         // pdcp_config.rx_compression_level;
 
+        auto& ep_config = rrc_config.ep_configs[lcid];
+        ep_config.lcid = lcid;
+        ep_config.type = pdcp.at("type");
+
         Logless(*main_logger, Logger::DEBUG, "DBG | main | lcid: #", (int) lcid);
         Logless(*main_logger, Logger::DEBUG, "DBG | main |   allow_segmentation: #", (int) pdcp_config.allow_segmentation);
         Logless(*main_logger, Logger::DEBUG, "DBG | main |   min_commit_size: #", pdcp_config.min_commit_size);
+
+        Logless(*main_logger, Logger::DEBUG, "DBG | main |   type: #", ep_config.type.c_str());
+
+        if (ep_config.type == "udp")
+        {
+            ep_config.address1 = pdcp.at("rx_address");
+            ep_config.address2 = pdcp.at("tx_address");
+            Logless(*main_logger, Logger::DEBUG, "DBG | main |   rx_address: #", ep_config.address1.c_str());
+            Logless(*main_logger, Logger::DEBUG, "DBG | main |   tx_address: #", ep_config.address2.c_str());
+        }
     }
 
     rrc_config.app_config.wifi_device = app.at("wifi_device");

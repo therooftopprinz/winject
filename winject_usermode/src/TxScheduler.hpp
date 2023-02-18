@@ -197,7 +197,7 @@ private:
         }
 
         size_t send_size = frame_info.frame_payload_size - frame_payload_remaining;
-        if (send_size > (header_size+1))
+        if (send_size > 1)
         {
             rrc.perform_tx(send_size);
         }

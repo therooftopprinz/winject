@@ -252,15 +252,14 @@ struct pdcp_segment_t
         uint8_t *ptr = base;
         sn = ptr;
         ptr += sizeof(*sn);
+        size = (winject::BEU16UA*) ptr;
+        ptr += sizeof(*size);
 
         if (has_offset)
         {
             offset = (winject::BEU16UA*) ptr;
             ptr += sizeof(*offset);
         }
-
-        size = (winject::BEU16UA*) ptr;
-        ptr += sizeof(*size);
 
         payload = ptr;
     }
@@ -294,11 +293,6 @@ struct pdcp_segment_t
         return *offset;
     }
 
-    void set_SIZE(pdcp_segment_offset_t value)
-    {
-        *size = value;
-    }
-
     pdcp_segment_offset_t get_SIZE()
     {
         return *size;
@@ -306,8 +300,9 @@ struct pdcp_segment_t
 
     size_t get_header_size()
     {
-        return sizeof(*sn) + (has_offset ? sizeof(*offset) : 0) +
-            sizeof(*size); 
+        return sizeof(*sn) +
+            sizeof(*size) +
+            (has_offset ? sizeof(*offset) : 0);
     }
 
     pdcp_segment_offset_t get_payload_size()
@@ -315,18 +310,18 @@ struct pdcp_segment_t
         return get_SIZE()-get_header_size();
     }
 
-    void set_payload_size(pdcp_segment_offset_t size)
+    void set_payload_size(pdcp_segment_offset_t payload_size)
     {
-        set_SIZE(size+get_header_size());
+        *size = get_header_size() + payload_size;
     }
     
 
     uint8_t *base = nullptr;
     size_t max_size = 0;
     pdcp_sn_t *sn = nullptr;
+    winject::BEU16UA *size = nullptr;
     bool has_offset = false;
     winject::BEU16UA *offset = nullptr;
-    winject::BEU16UA *size = nullptr;
     uint8_t *payload = nullptr;
 };
 

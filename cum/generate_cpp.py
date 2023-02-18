@@ -311,7 +311,7 @@ class CppGenerator:
             print "    " + oelse + "if ("+ js + " == type)"
             print "    {"
             print "        if (pName)"
-            print "            pCtx += std::string(pName) + \":{\";"
+            print "            pCtx += \"\\\"\" + std::string(pName) + \"\\\":{\";"
             print "        else"
             print "            pCtx += \"{\";"
             print "        std::string name = \"" + i + "\";"
@@ -336,7 +336,6 @@ class CppGenerator:
 
         for i in es:
             print "    if ("+ name + "::" + i[0] +" == pIe) pCtx += \"\\\"" + i[0] + "\\\"\";"
-        print "    pCtx = pCtx + \"}\";"
         print "    if (!pIsLast)"
         print "    {"
         print "        pCtx += \",\";"

@@ -3,6 +3,14 @@
 
 struct IEndPoint
 {
+    struct config_t
+    {
+        lcid_t lcid;
+        std::string type;
+        std::string address1;
+        std::string address2;
+    };
+
     virtual ~IEndPoint() {}
 };
 

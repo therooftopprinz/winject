@@ -1,15 +1,18 @@
 #ifndef __WINJECTUM_LLC_HPP__
 #define __WINJECTUM_LLC_HPP__
 
-#include "ILLC.hpp"
-#include "IPDCP.hpp"
-#include "IRRC.hpp"
-#include "frame_defs.hpp"
 #include <memory>
 #include <optional>
 #include <cstring>
 #include <list>
 #include <mutex>
+
+
+#include "ILLC.hpp"
+#include "IPDCP.hpp"
+#include "IRRC.hpp"
+#include "frame_defs.hpp"
+#include "Logger.hpp"
 
 class LLC : public ILLC
 {
@@ -281,6 +284,11 @@ public:
             tx_elem.pdcp_pdu_size = llc.get_payload_size();
             sn_to_tx_ring[llc.get_SN()] = tx_idx;
         }
+
+        Logless(*main_logger, Logger::TRACE, "TRC | LLC# | txing slot=# size=#",
+            int(lcid),
+            info.in_frame_info.slot_number,
+            info.out_allocated);
     }
 
     void on_rx(rx_info_t& info)
@@ -297,18 +305,24 @@ public:
         {
             llc_payload_ack_t* acks = (llc_payload_ack_t*) llc.payload();
             size_t acks_n = llc.get_payload_size()/sizeof(llc_payload_ack_t);
+            size_t llc_header_size = llc.get_header_size();
+            size_t llc_size = llc.get_SIZE();
 
             for (size_t i=0; i < acks_n; i++)
             {
+                if (llc_header_size+i*sizeof(llc_payload_ack_t) > llc_size)
+                {
+                    Logless(*main_logger, Logger::ERROR, "ERR | LLC# | ack overrun, llc_size=# ack_idx=#",
+                        int(lcid), llc_size, i);
+                    break;
+                }
+
                 auto& ack = acks[i];
-                llc_sn_t sn = ack.sn;
+                llc_sn_t sn = ack.sn & llc_sn_mask;
                 for (size_t i=0; i<ack.count; i++)
                 {
-                    if (sn >= llc_max_size)
-                    {
-                        continue;
-                    }
-
+                    Logless(*main_logger, Logger::TRACE, "TRC | LLC# | ack sn=#",
+                        int(lcid), sn);
                     size_t slot_number = sn_to_tx_ring[sn];
                     auto idx = tx_ring_index(slot_number);
                     auto& current_slot = tx_ring[idx];
@@ -322,7 +336,11 @@ public:
         // @note Handle data
         else
         {
-            to_acknowledge(llc.get_SN());
+            if (rx_config.peer_mode == ILLC::E_TX_MODE_AM)
+            {
+                to_acknowledge(llc.get_SN());
+            }
+
             info.in_pdu.base += llc.get_header_size();
             info.in_pdu.size -= llc.get_header_size();
             pdcp->on_rx(info);
@@ -337,12 +355,17 @@ private:
             return;
         }
 
+
         auto& this_slot = tx_ring[tx_ring_index(slot_number)];
         auto& sent_slot = tx_ring[tx_ring_index(this_slot.to_check)];
         if (sent_slot.acknowledged)
         {
             return;
         }
+ 
+        Logless(*main_logger, Logger::TRACE, "TRC | LLC# | retxing slot=#",
+            int(lcid), this_slot.to_check);
+ 
         // @note Reset state to default
         sent_slot.acknowledged = true;
         // @note Queue back retx PDCP

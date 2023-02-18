@@ -74,7 +74,6 @@
 // Sequence:  RRC_PushRequest ('RRC_FrameConfigOptional', 'frameConfig')
 // Sequence:  RRC_PushRequest ('RRC_LLCConfigOptional', 'llcConfig')
 // Sequence:  RRC_PushRequest ('RRC_PDCPConfigOptional', 'pdcpConfig')
-// Sequence:  RRC_PushRequest ('RRC_U8', 'lcid')
 // Sequence:  RRC_PushResponse ('RRC_U8', 'spare')
 // Sequence:  RRC_ActivateRequest ('RRC_U8', 'llcid')
 // Sequence:  RRC_ActivateRequest ('RRC_BOOL', 'isTxActive')
@@ -228,7 +227,6 @@ struct RRC_PushRequest
     RRC_FrameConfigOptional frameConfig;
     RRC_LLCConfigOptional llcConfig;
     RRC_PDCPConfigOptional pdcpConfig;
-    RRC_U8 lcid;
 };
 
 struct RRC_PushResponse
@@ -274,7 +272,6 @@ inline void str(const char* pName, const RRC_FECType& pIe, std::string& pCtx, bo
     if (RRC_FECType::E_RRC_FECType_RS_255_223 == pIe) pCtx += "\"E_RRC_FECType_RS_255_223\"";
     if (RRC_FECType::E_RRC_FECType_RS_255_191 == pIe) pCtx += "\"E_RRC_FECType_RS_255_191\"";
     if (RRC_FECType::E_RRC_FECType_RS_255_127 == pIe) pCtx += "\"E_RRC_FECType_RS_255_127\"";
-    pCtx = pCtx + "}";
     if (!pIsLast)
     {
         pCtx += ",";
@@ -365,7 +362,6 @@ inline void str(const char* pName, const RRC_LLCTxMode& pIe, std::string& pCtx, 
     }
     if (RRC_LLCTxMode::E_RRC_LLCTxMode_TM == pIe) pCtx += "\"E_RRC_LLCTxMode_TM\"";
     if (RRC_LLCTxMode::E_RRC_LLCTxMode_AM == pIe) pCtx += "\"E_RRC_LLCTxMode_AM\"";
-    pCtx = pCtx + "}";
     if (!pIsLast)
     {
         pCtx += ",";
@@ -381,7 +377,6 @@ inline void str(const char* pName, const RRC_LLCCRCType& pIe, std::string& pCtx,
     }
     if (RRC_LLCCRCType::E_RRC_LLCCRCType_NONE == pIe) pCtx += "\"E_RRC_LLCCRCType_NONE\"";
     if (RRC_LLCCRCType::E_RRC_LLCCRCType_CRC32_04C11DB7 == pIe) pCtx += "\"E_RRC_LLCCRCType_CRC32_04C11DB7\"";
-    pCtx = pCtx + "}";
     if (!pIsLast)
     {
         pCtx += ",";
@@ -516,7 +511,6 @@ inline void str(const char* pName, const RRC_EPType& pIe, std::string& pCtx, boo
     if (RRC_EPType::E_RRC_EPType_UDP == pIe) pCtx += "\"E_RRC_EPType_UDP\"";
     if (RRC_EPType::E_RRC_EPType_UART == pIe) pCtx += "\"E_RRC_EPType_UART\"";
     if (RRC_EPType::E_RRC_EPType_TUN == pIe) pCtx += "\"E_RRC_EPType_TUN\"";
-    pCtx = pCtx + "}";
     if (!pIsLast)
     {
         pCtx += ",";
@@ -532,7 +526,6 @@ inline void str(const char* pName, const RRC_CipherAlgorithm& pIe, std::string& 
     }
     if (RRC_CipherAlgorithm::E_RRC_CipherAlgorithm_NONE == pIe) pCtx += "\"E_RRC_CipherAlgorithm_NONE\"";
     if (RRC_CipherAlgorithm::E_RRC_CipherAlgorithm_AES128_CBC == pIe) pCtx += "\"E_RRC_CipherAlgorithm_AES128_CBC\"";
-    pCtx = pCtx + "}";
     if (!pIsLast)
     {
         pCtx += ",";
@@ -548,7 +541,6 @@ inline void str(const char* pName, const RRC_IntegrityAlgorithm& pIe, std::strin
     }
     if (RRC_IntegrityAlgorithm::E_RRC_CipherAlgorithm_NONE == pIe) pCtx += "\"E_RRC_CipherAlgorithm_NONE\"";
     if (RRC_IntegrityAlgorithm::E_RRC_CipherAlgorithm_HMAC_SHA1 == pIe) pCtx += "\"E_RRC_CipherAlgorithm_HMAC_SHA1\"";
-    pCtx = pCtx + "}";
     if (!pIsLast)
     {
         pCtx += ",";
@@ -564,7 +556,6 @@ inline void str(const char* pName, const RRC_CompressionAlgorithm& pIe, std::str
     }
     if (RRC_CompressionAlgorithm::RRC_CompressionAlgorithm_NONE == pIe) pCtx += "\"RRC_CompressionAlgorithm_NONE\"";
     if (RRC_CompressionAlgorithm::RRC_CompressionAlgorithm_ZLIB == pIe) pCtx += "\"RRC_CompressionAlgorithm_ZLIB\"";
-    pCtx = pCtx + "}";
     if (!pIsLast)
     {
         pCtx += ",";
@@ -793,7 +784,6 @@ inline void encode_per(const RRC_PushRequest& pIe, cum::per_codec_ctx& pCtx)
     {
         encode_per(*pIe.pdcpConfig, pCtx);
     }
-    encode_per(pIe.lcid, pCtx);
 }
 
 inline void decode_per(RRC_PushRequest& pIe, cum::per_codec_ctx& pCtx)
@@ -816,7 +806,6 @@ inline void decode_per(RRC_PushRequest& pIe, cum::per_codec_ctx& pCtx)
         pIe.pdcpConfig = decltype(pIe.pdcpConfig)::value_type{};
         decode_per(*pIe.pdcpConfig, pCtx);
     }
-    decode_per(pIe.lcid, pCtx);
 }
 
 inline void str(const char* pName, const RRC_PushRequest& pIe, std::string& pCtx, bool pIsLast)
@@ -834,7 +823,7 @@ inline void str(const char* pName, const RRC_PushRequest& pIe, std::string& pCtx
     if (pIe.frameConfig) nOptional++;
     if (pIe.llcConfig) nOptional++;
     if (pIe.pdcpConfig) nOptional++;
-    size_t nMandatory = 1;
+    size_t nMandatory = 0;
     if (pIe.frameConfig)
     {
         str("frameConfig", *pIe.frameConfig, pCtx, !(nMandatory+--nOptional));
@@ -847,7 +836,6 @@ inline void str(const char* pName, const RRC_PushRequest& pIe, std::string& pCtx
     {
         str("pdcpConfig", *pIe.pdcpConfig, pCtx, !(nMandatory+--nOptional));
     }
-    str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
     pCtx = pCtx + "}";
     if (!pIsLast)
     {
@@ -1038,7 +1026,7 @@ inline void str(const char* pName, const RRC_Message& pIe, std::string& pCtx, bo
     if (0 == type)
     {
         if (pName)
-            pCtx += std::string(pName) + ":{";
+            pCtx += "\"" + std::string(pName) + "\":{";
         else
             pCtx += "{";
         std::string name = "RRC_PullRequest";
@@ -1048,7 +1036,7 @@ inline void str(const char* pName, const RRC_Message& pIe, std::string& pCtx, bo
     else if (1 == type)
     {
         if (pName)
-            pCtx += std::string(pName) + ":{";
+            pCtx += "\"" + std::string(pName) + "\":{";
         else
             pCtx += "{";
         std::string name = "RRC_PullResponse";
@@ -1058,7 +1046,7 @@ inline void str(const char* pName, const RRC_Message& pIe, std::string& pCtx, bo
     else if (2 == type)
     {
         if (pName)
-            pCtx += std::string(pName) + ":{";
+            pCtx += "\"" + std::string(pName) + "\":{";
         else
             pCtx += "{";
         std::string name = "RRC_PushRequest";
@@ -1068,7 +1056,7 @@ inline void str(const char* pName, const RRC_Message& pIe, std::string& pCtx, bo
     else if (3 == type)
     {
         if (pName)
-            pCtx += std::string(pName) + ":{";
+            pCtx += "\"" + std::string(pName) + "\":{";
         else
             pCtx += "{";
         std::string name = "RRC_PushResponse";
@@ -1078,7 +1066,7 @@ inline void str(const char* pName, const RRC_Message& pIe, std::string& pCtx, bo
     else if (4 == type)
     {
         if (pName)
-            pCtx += std::string(pName) + ":{";
+            pCtx += "\"" + std::string(pName) + "\":{";
         else
             pCtx += "{";
         std::string name = "RRC_ActivateRequest";
@@ -1088,7 +1076,7 @@ inline void str(const char* pName, const RRC_Message& pIe, std::string& pCtx, bo
     else if (5 == type)
     {
         if (pName)
-            pCtx += std::string(pName) + ":{";
+            pCtx += "\"" + std::string(pName) + "\":{";
         else
             pCtx += "{";
         std::string name = "RRC_ActivateResponse";

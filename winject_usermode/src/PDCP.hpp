@@ -30,7 +30,7 @@ public:
     {
         std::unique_lock<std::mutex> lg(rx_mutex);
         // std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
-        is_tx_enabled = value;
+        is_rx_enabled = value;
         // to_rx_queue.clear();
         current_rx_buffer.clear();
         current_rx_offset = 0;
@@ -67,7 +67,7 @@ public:
             rx_config = config;
             status = is_rx_enabled;
         }
-        set_tx_enabled(status);
+        set_rx_enabled(status);
     }
 
     void on_tx(tx_info_t& info)
@@ -214,7 +214,12 @@ public:
             pdcp_segment_t segment(payload, available_data);
             segment.has_offset = rx_config.allow_segmentation;
             segment.rescan();
-            available_data -= segment.get_header_size();
+            if (segment.get_SIZE() > available_data)
+            {
+                break;
+            }
+            payload += segment.get_SIZE();
+            available_data -= segment.get_SIZE();
 
             if (!segment.has_offset)
             {

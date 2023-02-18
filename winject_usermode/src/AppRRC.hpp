@@ -18,10 +18,10 @@
 #include "IRRC.hpp"
 #include "TxScheduler.hpp"
 #include "interface/rrc.hpp"
-#include <cum/cum.hpp>
 
 #include "LLC.hpp"
 #include "PDCP.hpp"
+#include "UDPEndPoint.hpp"
 
 #include "rrc_utils.hpp"
 
@@ -139,8 +139,14 @@ public:
 
     std::string on_cmd_activate(bfc::ArgsMap&& args)
     {
-        // std::unique_lock<std::shared_mutex> lg(this_mutex);
-        return "activate:\n";
+        std::unique_lock<std::shared_mutex> lg(this_mutex);
+        auto lcid = args.argAs<int>("lcid").value_or(0);
+        auto pdcp = pdcps.at(lcid);
+        auto llc = llcs.at(lcid);
+        pdcp->set_tx_enabled(true);
+        llc->set_tx_enabled(true);
+        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | activating llc and pdcp id=#\n", (int)lcid);
+        return "activating...\n";
     }
 
     std::string on_cmd_deactivate(bfc::ArgsMap&& args)
@@ -170,7 +176,8 @@ public:
         tx_frame.set_body_size(payload_size);
         size_t sz = radiotap.size() + tx_frame.size();
 
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | wifi send buffer[#]:\n#", sz, buffer_str(tx_buff, sz).c_str());
+        Logless(*main_logger, Logger::TRACE, "TRC | AppRRC | wifi send buffer[#]:\n#", sz, buffer_str(tx_buff, sz).c_str());
+        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | send size #", sz);
         Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
         Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
         Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC |   frame body size: #", payload_size);
@@ -290,6 +297,27 @@ private:
 
     void setup_eps()
     {
+        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Setting up EPs...");
+        for (auto& ep_ : config.ep_configs)
+        {
+            auto id = ep_.first;
+            auto& ep_config = ep_.second;
+
+           if (ep_config.type == "udp")
+           {
+                auto pdcp_it = pdcps.find(id);
+                if (pdcp_it == pdcps.end())
+                {
+                    continue;
+                }
+
+                auto ep = std::make_shared<UDPEndPoint>(ep_config,
+                    reactor,
+                    *pdcp_it->second);
+
+                ieps.emplace(id, ep);
+           }
+        }
     }
 
     void setup_scheduler()
@@ -313,6 +341,7 @@ private:
                 auto& sched_config = sched_config_->second;
                 sched_config.nd_gpdu_max_size = sched_config.nd_gpdu_max_size;
                 sched_config.quanta = sched_config.quanta;
+                sched_config.llcid = id;
                 tx_scheduler.reconfigure(sched_config);
             }
         }
@@ -352,8 +381,7 @@ private:
             auto frame80211end = rx_buff+rv;
             size_t size =  frame80211end-frame80211.frame_body-4;
 
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
-
+            Logless(*main_logger, Logger::TRACE, "TRC | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
             Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | recv size #", rv);
             Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
             Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
@@ -387,32 +415,30 @@ private:
         while (true)
         {
             llc_t llc_pdu(cursor, frame_payload_remaining);
+            if (llc_pdu.get_SIZE() > frame_payload_remaining)
+            {
+                break;
+            }
+
+            advance_cursor(llc_pdu.get_SIZE());
+
             auto lcid = llc_pdu.get_LCID();
 
             std::shared_lock<std::shared_mutex> lg(this_mutex);
-            auto llc_config_it = peer_config.llc_configs.find(lcid);
-            if (config.llc_configs.end() == llc_config_it)
-            {
-                Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Couldnt find the llc_config for lcid=#, couldn't process more.", lcid);
-                return;
-            }
-
-            auto& llc_config = llc_config_it->second;
-            llc_pdu.crc_size = to_size(llc_config.crc_type);
             auto llc_it = llcs.find(lcid);
             if (llcs.end() == llc_it)
             {
-                Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Couldnt find the llc for lcid=#, skipping...", lcid);
-                advance_cursor(llc_pdu.get_SIZE());
+                Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Couldnt find the llc for lcid=#, skipping...", (int)lcid);
                 continue;
             }
             auto llc = llc_it->second;
             lg.unlock();
 
-            rx_info_t info;
+            rx_info_t info{};
+            info.in_pdu.base = llc_pdu.base;
+            info.in_pdu.size = llc_pdu.get_SIZE();
             llc->on_rx(info);
 
-            advance_cursor(llc_pdu.get_SIZE());
         }
     }
 
@@ -422,7 +448,7 @@ private:
         auto pdcp0 = pdcps.at(0);
 
         pdcp0->set_rx_enabled(true);
-        pdcp0->set_tx_enabled(true);
+        pdcp0->set_tx_enabled(true);    
         lcc0->set_rx_enabled(true);
         lcc0->set_tx_enabled(true);
 
@@ -434,7 +460,7 @@ private:
             {
                 RRC rrc;
                 cum::per_codec_ctx context((std::byte*)b.data(), b.size());
-                cum::decode_per(rrc, context);
+                decode_per(rrc, context);
                 on_rrc(rrc);
             }
         }
@@ -557,9 +583,10 @@ private:
             sched_config.nd_gpdu_max_size = llcConfig->schedulingConfig.ndGpduMaxSize;
             sched_config.quanta = llcConfig->schedulingConfig.quanta;
 
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Reconfiguring LLC lcid=\"#\"", msg.llcConfig->llcid);
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Reconfiguring LLC lcid=\"#\"", (int)msg.llcConfig->llcid);
             ILLC::rx_config_t llc_config_rx{};
             llc_config_rx.crc_type = llc_config.crc_type;
+            llc_config_rx.peer_mode = llc_config.mode;
             if (llcs.count(msg.llcConfig->llcid))
             {
                 auto& llc = llcs.at(msg.llcConfig->llcid);
@@ -575,7 +602,7 @@ private:
             tx_config.allow_segmentation = pdcpConfig->allowSegmentation;
             tx_config.min_commit_size = pdcpConfig->minCommitSize;
 
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Reconfiguring PDCP linked-lcid=\"#\"", msg.llcConfig->llcid);
+            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Reconfiguring PDCP linked-lcid=\"#\"", (int)msg.llcConfig->llcid);
             IPDCP::rx_config_t pdcp_config_rx{};
             pdcp_config_rx.allow_segmentation = tx_config.allow_segmentation;
             if (pdcps.count(msg.pdcpConfig->lcid))
@@ -615,7 +642,7 @@ private:
         auto pdcp0 = pdcps.at(0);
         buffer_t b(1024*5);
         cum::per_codec_ctx context((std::byte*)b.data(), b.size());
-        cum::encode_per(rrc, context);
+        encode_per(rrc, context);
         size_t encode_size = b.size() - context.size();
         if (main_logger->getLevel() >= Logger::DEBUG)
         {
@@ -655,6 +682,7 @@ private:
 
     std::map<uint8_t, std::shared_ptr<LLC>> llcs;
     std::map<uint8_t, std::shared_ptr<PDCP>> pdcps;
+    std::map<uint8_t, std::shared_ptr<IEndPoint>> ieps;
 
     std::thread rrc_rx_thread;
     std::atomic_bool rrc_rx_running = true;

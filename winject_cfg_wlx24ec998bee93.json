@@ -1,7 +1,7 @@
 {
   "rrc_config" :{
     "frame_config" : {
-      "slot_interval_us" : 1000000,
+      "slot_interval_us" : 1000,
       "frame_payload_size" : 1450,
       "fec_configs" : [
         {
@@ -32,7 +32,20 @@
         },
         "tx_config" :
         {
-          "crc_type" : "CRC32(04C11DB7)"
+          "crc_type" : "NONE"
+        }
+      },
+      {
+        "lcid" : 1,
+        "tx_mode" : "AM",
+        "scheduling_config" : {
+          "nd_pdu_size" : 50,
+          "quanta" : 1200
+        },
+        "tx_config": {
+          "arq_window_size" : 5,
+          "max_retx_count" : 3,
+          "crc_type" : "NONE"
         }
       }
     ],
@@ -40,9 +53,18 @@
       {
         "description" : "RRC",
         "lcid" : 0,
-        "type" : "internal",
         "allow_segmentation" : false,
-        "min_commit_size" : 0
+        "min_commit_size" : 0,
+        "type" : "internal"
+      },
+      {
+        "description" : "video",
+        "lcid" : 1,
+        "allow_segmentation" : false,
+        "min_commit_size" : 0,      
+        "type" : "udp",
+        "rx_address" : "127.0.0.1:1234",
+        "tx_address" : "127.0.0.1:1235"
       }
     ],
     "app_config" :

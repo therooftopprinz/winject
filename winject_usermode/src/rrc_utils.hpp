@@ -107,11 +107,4 @@ inline fec_type_e to_config(RRC_FECType fec_type)
     return E_FEC_TYPE_NONE;
 }
 
-inline size_t to_size(ILLC::crc_type_e crc_type)
-{
-    if (crc_type == ILLC::E_CRC_TYPE_CRC32_04C11DB7)
-        return 4;
-    return 0;
-}
-
 #endif // __WINJECTUM_RRC_UTILS_HPP__

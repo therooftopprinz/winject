@@ -39,7 +39,6 @@ struct tx_info_t
 
 struct rx_info_t
 {
-    size_t slot_number = 0;
     pdu_t in_pdu;
 };
 
