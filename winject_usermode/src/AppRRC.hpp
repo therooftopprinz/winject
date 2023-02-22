@@ -15,6 +15,7 @@
 #include "Logger.hpp"
 
 #include "WIFI.hpp"
+#include "WIFIUDP.hpp"
 #include "IRRC.hpp"
 #include "TxScheduler.hpp"
 #include "interface/rrc.hpp"
@@ -30,15 +31,26 @@ class AppRRC : public IRRC
 public:
     AppRRC(const config_t& config)
         : config(config)
-        , wifi(config.app_config.wifi_device)
         , tx_scheduler(timer, *this)
-    {
+    {        
         std::stringstream srcss;
         uint32_t srcraw;
         srcss << std::hex << config.app_config.hwdst;
         srcss >> srcraw;
         winject::ieee_802_11::filters::winject_src src_filter(srcraw);
-        winject::ieee_802_11::filters::attach(wifi.handle(), src_filter);
+
+        // @dont attach filter for wifi over udp
+        if (!config.app_config.woudp_rx.size() && !config.app_config.woudp_rx.size())
+        {
+            wifi = std::make_shared<WIFI>(config.app_config.wifi_device);
+            winject::ieee_802_11::filters::attach(wifi->handle(), src_filter);
+        }
+        else
+        {
+            wifi = std::make_shared<WIFIUDP>(
+                config.app_config.woudp_tx,
+                config.app_config.woudp_rx);
+        }
 
         setup_80211_base_frame();
         setup_console();
@@ -113,6 +125,26 @@ public:
         return "pushing...\n";
     }
 
+    std::string on_cmd_exchange(bfc::ArgsMap&& args)
+    {
+        std::shared_lock<std::shared_mutex> lg(this_mutex);
+
+        RRC rrc;
+        rrc.requestID = rrc_req_id++;
+        rrc.message = RRC_ExchangeRequest{};
+        auto& message = std::get<RRC_ExchangeRequest>(rrc.message);
+        message.lcid = args.argAs<int>("lcid").value_or(0);
+        fill_from_config(
+            message.lcid,
+            args.argAs<int>("include_frame").value_or(0),
+            args.argAs<int>("include_llc").value_or(0),
+            args.argAs<int>("include_pdcp").value_or(0),
+            message);
+
+        send_rrc(rrc);
+        return "exchanging...\n";
+    }
+
     std::string on_cmd_pull(bfc::ArgsMap&& args)
     {
         std::shared_lock<std::shared_mutex> lg(this_mutex);
@@ -139,13 +171,21 @@ public:
 
     std::string on_cmd_activate(bfc::ArgsMap&& args)
     {
-        std::unique_lock<std::shared_mutex> lg(this_mutex);
-        auto lcid = args.argAs<int>("lcid").value_or(0);
-        auto pdcp = pdcps.at(lcid);
-        auto llc = llcs.at(lcid);
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | activating llc and pdcp id=#", (int)lcid);
-        pdcp->set_tx_enabled(true);
-        llc->set_tx_enabled(true);
+        std::shared_lock<std::shared_mutex> lg(this_mutex);
+
+        RRC rrc;
+        rrc.requestID = rrc_req_id++;
+        rrc.message = RRC_ActivateRequest{};
+        auto& message = std::get<RRC_ActivateRequest>(rrc.message);
+        message.llcid = args.argAs<int>("lcid").value_or(0);
+        message.activateTx = args.argAs<int>("tx").value_or(0);
+        message.activateRx = args.argAs<int>("rx").value_or(0);
+        proc_activate_ongoing = true;
+        proc_activate_should_activate_rx = message.activateTx;
+        proc_activate_should_activate_tx = message.activateRx;
+        proc_activate_lcid = message.llcid;
+
+        send_rrc(rrc);
         return "activating...\n";
     }
 
@@ -170,11 +210,11 @@ public:
     {
         std::unique_lock<std::shared_mutex> lg(this_mutex);
         Logless(*main_logger, Logger::ERROR, "ERR | AppRRC | RLF lcid=#", (int) lcid);
-        auto lcc0 = llcs.at(lcid);
-        auto pdcp0 = pdcps.at(lcid);
-
-        pdcp0->set_tx_enabled(false);    
-        lcc0->set_tx_enabled(false);
+        auto llc = llcs.at(lcid);
+        auto pdcp = pdcps.at(lcid);
+        lg.unlock();
+        pdcp->set_tx_enabled(false);    
+        llc->set_tx_enabled(false);
     }
 
     void perform_tx(size_t payload_size)
@@ -182,14 +222,14 @@ public:
         tx_frame.set_body_size(payload_size);
         size_t sz = radiotap.size() + tx_frame.size();
 
-        Logless(*main_logger, Logger::TRACE, "TRC | AppRRC | wifi send buffer[#]:\n#", sz, buffer_str(tx_buff, sz).c_str());
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | send size #", sz);
+        Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | wifi send buffer[#]:\n#", sz, buffer_str(tx_buff, sz).c_str());
+        Logless(*main_logger, Logger::TRACE, "TRC | AppRRC | send size #", sz);
         Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
         Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
         Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC |   frame body size: #", payload_size);
         Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | -----------------------");
 
-        wifi.send(tx_buff, sz);
+        wifi->send(tx_buff, sz);
     }
 
 private:
@@ -238,8 +278,7 @@ private:
     {
         Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Setting up console...");
         if (console_sock.bind(bfc::toIp4Port(
-            config.app_config.udp_console_host,
-            config.app_config.udp_console_port)) < 0)
+            config.app_config.udp_console)) < 0)
         {
             Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Bind error(_) console is now disabled!", strerror(errno));
             return;
@@ -247,6 +286,7 @@ private:
 
         cmdman.addCommand("push", [this](bfc::ArgsMap&& args){return on_cmd_push(std::move(args));});
         cmdman.addCommand("pull", [this](bfc::ArgsMap&& args){return on_cmd_pull(std::move(args));});
+        cmdman.addCommand("exchange", [this](bfc::ArgsMap&& args){return on_cmd_exchange(std::move(args));});
         cmdman.addCommand("reset", [this](bfc::ArgsMap&& args){return on_cmd_reset(std::move(args));});
         cmdman.addCommand("activate", [this](bfc::ArgsMap&& args){return on_cmd_activate(std::move(args));});
         cmdman.addCommand("deactivate", [this](bfc::ArgsMap&& args){return on_cmd_deactivate(std::move(args));});
@@ -373,7 +413,7 @@ private:
         wifi_rx_running = true;
         while (wifi_rx_running)
         {
-            int rv = wifi.recv(rx_buff, sizeof(rx_buff));
+            int rv = wifi->recv(rx_buff, sizeof(rx_buff));
             if (rv<0)
             {
                 Logless(*main_logger, Logger::ERROR, "ERR | AppRRC | wifi recv failed! errno=# error=#\n", errno, strerror(errno));
@@ -387,8 +427,8 @@ private:
             auto frame80211end = rx_buff+rv;
             size_t size =  frame80211end-frame80211.frame_body-4;
 
-            Logless(*main_logger, Logger::TRACE, "TRC | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | recv size #", rv);
+            Logless(*main_logger, Logger::TRACE, "TR2 | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
+            Logless(*main_logger, Logger::TRACE2, "TRC | AppRRC | recv size #", rv);
             Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
             Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
             Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC |   frame body size: #", size);
@@ -405,7 +445,6 @@ private:
 
     void process_rx_frame(uint8_t* start, size_t size)
     {
-
         uint8_t* cursor = start;
         size_t frame_payload_remaining = size;
 
@@ -421,7 +460,7 @@ private:
         while (true)
         {
             llc_t llc_pdu(cursor, frame_payload_remaining);
-            if (llc_pdu.get_SIZE() > frame_payload_remaining)
+            if (llc_pdu.get_header_size() > frame_payload_remaining)
             {
                 break;
             }
@@ -634,15 +673,100 @@ private:
         send_rrc(rrc);
     }
 
+    void on_rrc_message(int req_id, const RRC_ExchangeRequest& req)
+    {
+        update_peer_config_and_reconfigure_rx(req);
+        RRC rrc;
+        rrc.requestID = req_id;
+        rrc.message = RRC_PullResponse{};
+        auto& message = std::get<RRC_PullResponse>(rrc.message);
+        fill_from_config(
+            req.lcid,
+            req.frameConfig.has_value(),
+            req.llcConfig.has_value(),
+            req.pdcpConfig.has_value(),
+            message);
+        send_rrc(rrc);
+    }
+
+    void on_rrc_message(int req_id, const RRC_ExchangeResponse& rsp)
+    {
+        update_peer_config_and_reconfigure_rx(rsp);
+    }
+
     void on_rrc_message(int req_id, const RRC_PushResponse& msg)
     {
     }
 
     void on_rrc_message(int req_id, const RRC_ActivateRequest& msg)
-    {}
+    {
+        std::unique_lock<std::shared_mutex> lg(this_mutex);
+        auto llc_ = llcs.find(msg.llcid);
+        auto pdcp_ = pdcps.find(msg.llcid);
+        if (msg.activateTx)
+        {
+            if (pdcps.end() != pdcp_)
+            {
+                pdcp_->second->set_rx_enabled(true);
+            }
+            if (llcs.end() != llc_)
+            {
+                llc_->second->set_rx_enabled(true);
+            }
+        }
+        if (msg.activateRx)
+        {
+            if (pdcps.end() != pdcp_)
+            {
+                pdcp_->second->set_tx_enabled(true);
+            }
+            if (llcs.end() != llc_)
+            {
+                llc_->second->set_tx_enabled(true);
+            }
+        }
+
+        RRC rrc;
+        rrc.requestID = req_id;
+        rrc.message = RRC_ActivateResponse{};
+        auto& message = std::get<RRC_ActivateResponse>(rrc.message);
+        send_rrc(rrc);
+    }
 
     void on_rrc_message(int req_id, const RRC_ActivateResponse& msg)
-    {}
+    {
+        std::unique_lock<std::shared_mutex> lg(this_mutex);
+        if (!proc_activate_ongoing)
+        {
+            return;
+        }
+        proc_activate_ongoing = false;
+
+        auto llc_ = llcs.find(proc_activate_lcid);
+        auto pdcp_ = pdcps.find(proc_activate_lcid);
+        if (proc_activate_should_activate_tx)
+        {
+            if (pdcps.end() != pdcp_)
+            {
+                pdcp_->second->set_tx_enabled(true);
+            }
+            if (llcs.end() != llc_)
+            {
+                llc_->second->set_tx_enabled(true);
+            }
+        }
+        if (proc_activate_should_activate_rx)
+        {
+            if (pdcps.end() != pdcp_)
+            {
+                pdcp_->second->set_rx_enabled(true);
+            }
+            if (llcs.end() != llc_)
+            {
+                llc_->second->set_rx_enabled(true);
+            }
+        }
+    }
 
     void send_rrc(const RRC& rrc)
     {
@@ -671,7 +795,7 @@ private:
     std::thread wifi_rx_thread;
     std::atomic_bool wifi_rx_running = true;
     uint8_t rrc_req_id = 0;
-    WIFI wifi;
+    std::shared_ptr<IWIFI> wifi;
     TxScheduler tx_scheduler;
 
     uint8_t console_buff[1024];
@@ -693,6 +817,12 @@ private:
 
     std::thread rrc_rx_thread;
     std::atomic_bool rrc_rx_running = true;
+
+    // RRC Procedure states
+    bool proc_activate_ongoing = false;
+    bool proc_activate_should_activate_tx = false;
+    bool proc_activate_should_activate_rx = false;
+    lcid_t proc_activate_lcid = -1;
 
     std::shared_mutex this_mutex;
 };

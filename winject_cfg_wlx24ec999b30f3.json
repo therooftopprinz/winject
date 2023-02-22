@@ -69,9 +69,13 @@
     ],
     "app_config" :
     {
-      "wifi_device" : "wlx24ec999b30f3",
-      "udp_console_host" : "127.0.0.1",
-      "udp_console_port" : 9998,
+      "wifi_over_udp" :
+      {
+        "tx_address" : "127.0.0.1:1324",
+        "rx_address" : "127.0.0.1:1323"
+      },
+      "wifi_device_" : "wlx24ec999b30f3",
+      "udp_console" : "127.0.0.1:9998",
       "hwsrc" : "7890ab",
       "hwdst" : "123456"
     }

@@ -277,8 +277,9 @@ public:
 
             if (retx_count >= tx_config.max_retx_count)
             {
-                rrc.on_rlf(lcid);
                 info.out_allocated = 0;
+                lg.unlock();
+                rrc.on_rlf(lcid);
                 return;
             }
             else

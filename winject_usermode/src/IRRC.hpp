@@ -34,9 +34,10 @@ struct IRRC
 
     struct app_config_t
     {
-        std::string udp_console_host;
-        int udp_console_port;
+        std::string udp_console;
         std::string wifi_device;
+        std::string woudp_tx;
+        std::string woudp_rx;
         std::string hwsrc;
         std::string hwdst;
     };

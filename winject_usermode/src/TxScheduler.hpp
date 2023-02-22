@@ -96,6 +96,7 @@ private:
 
     void tick()
     {
+        schedule_tick();
         std::unique_lock<std::mutex> lg(this_mutex);
         frame_info.slot_number++;
 
@@ -217,8 +218,6 @@ private:
         {
             rrc.perform_tx(send_size);
         }
-
-        schedule_tick();
     }
 
 

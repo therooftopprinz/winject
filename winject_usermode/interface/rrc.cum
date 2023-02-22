@@ -172,6 +172,22 @@ Sequence RRC_PushRequest
     RRC_PDCPConfigOptional pdcpConfig
 };
 
+Sequence RRC_ExchangeRequest
+{
+    RRC_FrameConfigOptional frameConfig,
+    RRC_LLCConfigOptional llcConfig,
+    RRC_PDCPConfigOptional pdcpConfig,
+    RRC_U8 lcid
+};
+
+Sequence RRC_ExchangeResponse
+{
+    RRC_FrameConfigOptional frameConfig,
+    RRC_LLCConfigOptional llcConfig,
+    RRC_PDCPConfigOptional pdcpConfig
+};
+
+
 Sequence RRC_PushResponse
 {
     RRC_U8 spare
@@ -180,8 +196,8 @@ Sequence RRC_PushResponse
 Sequence RRC_ActivateRequest
 {
     RRC_U8 llcid,
-    RRC_BOOL isTxActive,
-    RRC_BOOL isRxActive
+    RRC_BOOL activateTx,
+    RRC_BOOL activateRx
 };
 
 Sequence RRC_ActivateResponse
@@ -195,6 +211,8 @@ Choice RRC_Message
     RRC_PullResponse,
     RRC_PushRequest,
     RRC_PushResponse,
+    RRC_ExchangeRequest,
+    RRC_ExchangeResponse,
     RRC_ActivateRequest,
     RRC_ActivateResponse
 };

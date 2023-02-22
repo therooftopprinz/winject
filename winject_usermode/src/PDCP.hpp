@@ -253,10 +253,11 @@ public:
             pdcp_segment_t segment(payload, available_data);
             segment.has_offset = rx_config.allow_segmentation;
             segment.rescan();
-            if (segment.get_SIZE() > available_data)
+            if (segment.get_header_size() > available_data)
             {
                 break;
             }
+
             payload += segment.get_SIZE();
             available_data -= segment.get_SIZE();
 
