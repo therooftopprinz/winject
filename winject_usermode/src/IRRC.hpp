@@ -36,6 +36,7 @@ struct IRRC
     {
         std::string udp_console;
         std::string wifi_device;
+        std::string wifi_device2;
         std::string woudp_tx;
         std::string woudp_rx;
         std::string hwsrc;

@@ -1,7 +1,7 @@
 {
   "rrc_config" :{
     "frame_config" : {
-      "slot_interval_us" : 1000,
+      "slot_interval_us" : 5000,
       "frame_payload_size" : 1450,
       "fec_configs" : [
         {
@@ -43,7 +43,7 @@
           "quanta" : 1200
         },
         "tx_config": {
-          "arq_window_size" : 20,
+          "arq_window_size" : 100,
           "max_retx_count" : 3,
           "crc_type" : "NONE"
         }
@@ -69,12 +69,12 @@
     ],
     "app_config" :
     {
-      "wifi_over_udp" :
+      "wifi_over_udp_" :
       {
         "tx_address" : "127.0.0.1:1324",
         "rx_address" : "127.0.0.1:1323"
       },
-      "wifi_device_" : "wlx24ec999b30f3",
+      "wifi_device" : "wlx24ec999b30f3",
       "udp_console" : "127.0.0.1:9998",
       "hwsrc" : "7890ab",
       "hwdst" : "123456"

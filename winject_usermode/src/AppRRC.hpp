@@ -15,6 +15,7 @@
 #include "Logger.hpp"
 
 #include "WIFI.hpp"
+#include "DualWIFI.hpp"
 #include "WIFIUDP.hpp"
 #include "IRRC.hpp"
 #include "TxScheduler.hpp"
@@ -40,9 +41,16 @@ public:
         winject::ieee_802_11::filters::winject_src src_filter(srcraw);
 
         // @dont attach filter for wifi over udp
-        if (!config.app_config.woudp_rx.size() && !config.app_config.woudp_rx.size())
+        if (!config.app_config.woudp_rx.size() && !config.app_config.wifi_device2.size())
         {
             wifi = std::make_shared<WIFI>(config.app_config.wifi_device);
+            winject::ieee_802_11::filters::attach(wifi->handle(), src_filter);
+        }
+        else if (config.app_config.wifi_device2.size())
+        {
+            wifi = std::make_shared<DualWIFI>(
+                config.app_config.wifi_device,
+                config.app_config.wifi_device2);
             winject::ieee_802_11::filters::attach(wifi->handle(), src_filter);
         }
         else
@@ -64,23 +72,30 @@ public:
     ~AppRRC()
     {
         Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | AppRRC stopping...");
-
-        if (wifi_rx_thread.joinable())
-        {
-            wifi_rx_thread.join();
-        }
-
-        if (timer_thread.joinable())
-        {
-            timer_thread.join();
-        }
     }
 
     void stop()
     {
-        wifi_rx_running = false;
+        stop_wifi_rx();
         reactor.stop();
-        timer.stop();
+    }
+
+    void stop_timer()
+    {
+        if (timer_thread.joinable())
+        {
+            timer.stop();
+            timer_thread.join();
+        }
+    }
+
+    void stop_wifi_rx()
+    {
+        if (wifi_rx_thread.joinable())
+        {
+            wifi_rx_running = false;
+            wifi_rx_thread.join();
+        }
     }
 
     void on_console_read()
@@ -793,7 +808,7 @@ private:
     bfc::Timer<> timer;
     std::thread timer_thread;
     std::thread wifi_rx_thread;
-    std::atomic_bool wifi_rx_running = true;
+    std::atomic_bool wifi_rx_running = false;
     uint8_t rrc_req_id = 0;
     std::shared_ptr<IWIFI> wifi;
     TxScheduler tx_scheduler;
@@ -816,7 +831,7 @@ private:
     std::map<uint8_t, std::shared_ptr<IEndPoint>> ieps;
 
     std::thread rrc_rx_thread;
-    std::atomic_bool rrc_rx_running = true;
+    std::atomic_bool rrc_rx_running = false;
 
     // RRC Procedure states
     bool proc_activate_ongoing = false;

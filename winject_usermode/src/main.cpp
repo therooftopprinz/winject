@@ -34,7 +34,7 @@ ILLC::crc_type_e to_crc_type(std::string s)
 int main()
 {
     main_logger = std::make_unique<Logger>("main.log");
-    main_logger->setLevel(Logger::TRACE);
+    main_logger->setLevel(Logger::TRACE2);
     main_logger->logful();
 
     Logless(*main_logger, Logger::DEBUG, "DBG | main | Reading from config.json");
@@ -137,18 +137,26 @@ int main()
     {
         rrc_config.app_config.wifi_device = app.at("wifi_device");
     }
+    else if (app.count("dual_wifi"))
+    {
+        auto& dual_wifi = app.at("dual_wifi");
+        rrc_config.app_config.wifi_device = dual_wifi.at("tx");
+        rrc_config.app_config.wifi_device2 = dual_wifi.at("rx");
+    }
     else
     {
         auto& wifi_over_udp = app.at("wifi_over_udp");
         rrc_config.app_config.woudp_tx = wifi_over_udp.at("tx_address");
         rrc_config.app_config.woudp_rx = wifi_over_udp.at("rx_address");
     }
+
     rrc_config.app_config.udp_console = app.at("udp_console");
     rrc_config.app_config.hwsrc = app.at("hwsrc");
     rrc_config.app_config.hwdst = app.at("hwdst");
 
     Logless(*main_logger, Logger::DEBUG, "DBG | main | --- APP ---");
     Logless(*main_logger, Logger::DEBUG, "DBG | main | wifi_device: #", rrc_config.app_config.wifi_device.c_str());
+    Logless(*main_logger, Logger::DEBUG, "DBG | main | wifi_device2: #", rrc_config.app_config.wifi_device2.c_str());
     Logless(*main_logger, Logger::DEBUG, "DBG | main | woudp_tx: #", rrc_config.app_config.woudp_tx.c_str());
     Logless(*main_logger, Logger::DEBUG, "DBG | main | woudp_rx: #", rrc_config.app_config.woudp_rx.c_str());
     Logless(*main_logger, Logger::DEBUG, "DBG | main | udp_console #", rrc_config.app_config.udp_console.c_str());

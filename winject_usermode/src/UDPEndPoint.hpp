@@ -14,8 +14,6 @@
 class UDPEndPoint : public IEndPoint
 {
 public:
-
-
     UDPEndPoint(const IEndPoint::config_t& config, bfc::IReactor& reactor,
         IPDCP& pdcp)
         : config(config)
@@ -42,10 +40,9 @@ public:
 
     ~UDPEndPoint()
     {
-        udp_sender_running = false;
-
         if (udp_sender_thread.joinable())
         {
+            udp_sender_running = false;
             udp_sender_thread.join();
         }
 
@@ -63,11 +60,16 @@ private:
             if (b.size())
             {
                 int pFd = sock.handle();
-                reactor.addWriteHandler(pFd, [pFd, this, b = std::move(b)]()
-                    {
-                        sock.sendto(bfc::BufferView((uint8_t*)b.data(), b.size()), target_addr);
-                        reactor.removeWriteHandler(pFd);
-                    });
+                Logless(*main_logger, Logger::ERROR,
+                    "ERR | UDPEndPoint# | Bind error(_)",
+                    (int)config.lcid,
+                    strerror(errno));
+                sock.sendto(bfc::BufferView((uint8_t*)b.data(), b.size()), target_addr);
+                // reactor.addWriteHandler(pFd, [pFd, this, b = std::move(b)]()
+                //     {
+                //         sock.sendto(bfc::BufferView((uint8_t*)b.data(), b.size()), target_addr);
+                //         reactor.removeWriteHandler(pFd);
+                //     });
             }
         }
     }

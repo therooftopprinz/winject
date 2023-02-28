@@ -1,11 +1,14 @@
-pull include_frame=1 include_llc=1 include_pdcp=1 lcid=1
+nc -u localhost 9999
 
+pull include_frame=1 include_llc=1 include_pdcp=1 lcid=1
 push include_frame=1 include_llc=1 include_pdcp=1 lcid=1
+exchange include_frame=1 include_llc=1 include_pdcp=1 lcid=1
 activate lcid=1
 
 
 exchange include_frame=1 include_llc=1 include_pdcp=1 lcid=1
 activate lcid=1 tx=1 rx=1
+
 
 nc -u localhost 1234 -p 1235
 nc -u localhost 1244 -p 1245

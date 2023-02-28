@@ -286,8 +286,10 @@ public:
                     if (current_rx_buffer.size())
                     {
                         Logless(*main_logger, Logger::TRACE2,
-                            "TR2 | PDCP#  | received data complete new_sn=#",
-                            (int) rx_sn);
+                            "TR2 | PDCP#  | received data complete new_sn=# data_sz=#",
+                            (int) lcid,
+                            (int) rx_sn,
+                            current_rx_buffer.size());
                         std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
                         to_rx_queue.emplace_back(std::move(current_rx_buffer));
                         to_rx_queue_cv.notify_one();
@@ -320,11 +322,17 @@ public:
     buffer_t to_rx(uint64_t timeout_us=-1)
     {
         auto pred = [this]() -> bool {
-                // return to_rx.size();
                 return to_rx_queue.size();
             };
 
         std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
+
+        if (to_rx_queue.size())
+        {
+            auto rv = std::move(to_rx_queue.front());
+            to_rx_queue.pop_front();
+            return rv;
+        }
 
         if (timeout_us==-1)
         {

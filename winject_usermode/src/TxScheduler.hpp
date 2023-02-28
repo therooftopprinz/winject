@@ -88,15 +88,41 @@ private:
     {
         if (frame_info.slot_interval_us)
         {
+            auto now = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::high_resolution_clock::now().time_since_epoch())
+                .count();
+            int64_t wait_time = 0;
+            int64_t diff_time = now - last_tick;
+            int64_t error = frame_info.slot_interval_us - diff_time;
+            tick_pid_integral += double(error)*0.1;
+
+            last_tick = now;
+
+            if (std::abs(error) > frame_info.slot_interval_us)
+            {
+                wait_time = frame_info.slot_interval_us;
+                tick_pid_integral = 0;
+            }
+            else
+            {
+                wait_time = frame_info.slot_interval_us
+                    + tick_pid_integral;
+            }
+
             slot_timer_id = timer.schedule(std::chrono::nanoseconds(
-                frame_info.slot_interval_us*1000), 
+                wait_time*1000), 
                 [this](){tick();});
         }
     }
 
     void tick()
     {
+        auto now = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::high_resolution_clock::now().time_since_epoch())
+                .count();
+
         schedule_tick();
+
         std::unique_lock<std::mutex> lg(this_mutex);
         frame_info.slot_number++;
 
@@ -216,6 +242,7 @@ private:
         size_t send_size = frame_info.frame_payload_size - frame_payload_remaining;
         if (send_size > 1)
         {
+            Logless(*main_logger, Logger::TRACE2, "TICK");
             rrc.perform_tx(send_size);
         }
     }
@@ -241,7 +268,8 @@ private:
     IRRC& rrc;
     frame_info_t frame_info;
     std::optional<int> slot_timer_id;
-
+    int64_t last_tick;
+    double tick_pid_integral = 0;
     // @note indexed by lcid
     std::vector<scheduling_ctx_t> schedules_info;
     // @note indexed by lcid
