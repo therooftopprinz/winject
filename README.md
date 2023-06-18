@@ -1,8 +1,6 @@
 # WInject
------------------------------
 
 ## Repository
------------------------------
 Dependencies:
 * [googletest](https://github.com/google/googletest)
 * [json](https://github.com/nlohmann/json)
@@ -29,7 +27,6 @@ Folder structure:
 * winject_udp_usermode - complete WInject ppWiFi implementation
 
 ## Abstract
------------------------------
 ppWiFi is an extension to the 802.xx protocols to support robust 
 point-to-point communication on a lossy wireless channel. It allows 
 transmission of multiple logical channels over a shared physical 
@@ -39,7 +36,6 @@ reassembly. And it supports message authentication and encryption.
 
 
 ## Problem
------------------------------
 SDR devices are expensive; if the application is just to be able to 
 communicate regardless of the physical interface used, one could just 
 use consumer devices implementing ZigBee, LoRa, Bluetooth, and others. 
@@ -61,7 +57,6 @@ layer, this is extremely useful in a radio-edge scenario where the
 signal drops and packets are dropped in traditional WiFi. 
 
 ## Protocol Roles
------------------------------
 ppWIFI MAC:
 - PHY Framing
 - Device Addressing
@@ -81,8 +76,6 @@ ppWIFI PDCP:
 ppWIFI RRC:
 - Radio Link Configuration management
 
-## Implementation
-----------------------------
 ## ppWiFi 802.11 Frame structure
 ```
 
@@ -179,7 +172,6 @@ ppWIFI RRC:
 ```
 
 # Architecture
-----------------------------
 ```
                +--------------+
                | WiFi Device  |
@@ -222,7 +214,6 @@ ppWIFI RRC:
 ```
 
 # RRC Procedures
------------------------------
 
 ## Unidirectional RX LLC Establishment
 ```

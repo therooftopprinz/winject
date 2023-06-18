@@ -461,7 +461,7 @@ private:
     void process_rx_frame(uint8_t* start, size_t size)
     {
         uint8_t* cursor = start;
-        size_t frame_payload_remaining = size;
+        ssize_t frame_payload_remaining = size;
 
         auto advance_cursor = [&cursor, &frame_payload_remaining](size_t size)
         {
@@ -472,15 +472,13 @@ private:
         uint8_t fec = *cursor;
         advance_cursor(sizeof(fec));
 
-        while (true)
+        while (frame_payload_remaining > 0)
         {
             llc_t llc_pdu(cursor, frame_payload_remaining);
             if (llc_pdu.get_header_size() > frame_payload_remaining)
             {
                 break;
             }
-
-            advance_cursor(llc_pdu.get_SIZE());
 
             auto lcid = llc_pdu.get_LCID();
 
@@ -497,7 +495,15 @@ private:
             rx_info_t info{};
             info.in_pdu.base = llc_pdu.base;
             info.in_pdu.size = llc_pdu.get_SIZE();
+
+            if (llc_pdu.get_SIZE() > frame_payload_remaining)
+            {
+                Logless(*main_logger, Logger::ERROR, "ERR | AppRRC | LLC truncated (not enough data).", (int)lcid);
+                break;
+            }
+
             llc->on_rx(info);
+            advance_cursor(llc_pdu.get_SIZE());
 
         }
     }

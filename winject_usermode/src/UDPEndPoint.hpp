@@ -23,7 +23,7 @@ public:
         if (0 > sock.bind(bfc::toIp4Port(config.address1)))
         {
             Logless(*main_logger, Logger::ERROR,
-                "ERR | UDPEndPoint# | Bind error(_)",
+                "ERR | UDPEP# | Bind error(_)",
                 (int)config.lcid,
                 strerror(errno));
             throw std::runtime_error("UDPEndPoint: failed");
@@ -60,10 +60,6 @@ private:
             if (b.size())
             {
                 int pFd = sock.handle();
-                Logless(*main_logger, Logger::ERROR,
-                    "ERR | UDPEndPoint# | Bind error(_)",
-                    (int)config.lcid,
-                    strerror(errno));
                 sock.sendto(bfc::BufferView((uint8_t*)b.data(), b.size()), target_addr);
                 // reactor.addWriteHandler(pFd, [pFd, this, b = std::move(b)]()
                 //     {

@@ -1,7 +1,7 @@
 {
   "rrc_config" :{
     "frame_config" : {
-      "slot_interval_us" : 1250,
+      "slot_interval_us" : 1000,
       "frame_payload_size" : 1450,
       "fec_configs" : [
         {
@@ -43,8 +43,8 @@
           "quanta" : 1200
         },
         "tx_config": {
-          "arq_window_size" : 100,
-          "max_retx_count" : 3,
+          "arq_window_size" : 20,
+          "max_retx_count" : 100,
           "crc_type" : "NONE"
         }
       }
@@ -74,12 +74,12 @@
         "tx_address" : "127.0.0.1:1323",
         "rx_address" : "127.0.0.1:1324"
       },
-      "dual_wifi" :
+      "dual_wifi_":
       {
         "tx" : "wlx24ec998bee93",
         "rx" : "wlx24ec999b30f3"
       },
-      "wifi_device_" : "wlx24ec998bee93",
+      "wifi_device" : "wlx24ec99ca8bd1",
       "udp_console" : "127.0.0.1:9999",
       "hwsrc" : "123456",
       "hwdst" : "7890ab"
