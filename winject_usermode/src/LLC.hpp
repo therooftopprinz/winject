@@ -52,7 +52,7 @@ public:
                     tx_ring_elem.pdcp_pdu = allocate_buffer();
                 }
                 tx_ring_elem.acknowledged = true;
-                tx_ring_elem.to_check = -1;
+                tx_ring_elem.sent_index = -1;
             }
         }
 
@@ -314,7 +314,7 @@ public:
         {
             tx_elem.retry_count = retx_count;
             tx_elem.acknowledged = false;
-            ack_elem.to_check = tx_idx;
+            ack_elem.sent_index = tx_idx;
             std::memcpy(tx_elem.pdcp_pdu.data(), llc.payload(), llc.get_payload_size());
             // @note copy PDCP to tx_ring elem needed when retransmitting
             tx_elem.pdcp_pdu_size = llc.get_payload_size();
@@ -364,12 +364,12 @@ public:
                     size_t idx_ = sn_to_tx_ring[sn];
                     auto idx = tx_ring_index(idx_);
                     auto& ack_slot = tx_ring[idx];
-                    auto sent_idx = tx_ring_index(ack_slot.to_check);
+                    auto sent_idx = tx_ring_index(ack_slot.sent_index);
                     auto& sent_slot = tx_ring[sent_idx];
                     sent_slot.acknowledged = true;
                     Logless(*main_logger, Logger::TRACE2,
                         "TR2 | LLC#   | acked idx=# sn=#",
-                        (int) lcid, ack_slot.to_check,
+                        (int) lcid, ack_slot.sent_index,
                         (int) sn);
                     sn = llc_sn_mask & (sn+1);
                 }
@@ -402,17 +402,17 @@ private:
         }
 
         auto& this_slot = tx_ring[tx_ring_index(slot_number)];
-        auto& sent_slot = tx_ring[tx_ring_index(this_slot.to_check)];
+        auto& sent_slot = tx_ring[tx_ring_index(this_slot.sent_index)];
         if (sent_slot.acknowledged)
         {
             return;
         }
 
         Logless(*main_logger, Logger::TRACE,
-            "TRC | LLC#   | retxing slot=# resend_slot=#",
+            "TRC | LLC#   | retxing current_slot=# sent_index=#",
             int(lcid),
             slot_number,
-            this_slot.to_check);
+            this_slot.sent_index);
  
         // @note Reset state to default
         sent_slot.acknowledged = true;
@@ -473,9 +473,10 @@ private:
         buffer_pool.emplace_back(std::move(buffer));
     }
 
+    // @brief Used to indicated retransmit slot
     struct tx_ring_elem_t
     {
-        size_t to_check;
+        size_t sent_index;
         size_t retry_count;
         size_t pdcp_pdu_size;
         buffer_t pdcp_pdu;

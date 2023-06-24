@@ -13,8 +13,8 @@
 #include <winject/radiotap.hpp>
 
 #include "Logger.hpp"
-
 #include "WIFI.hpp"
+
 #include "DualWIFI.hpp"
 #include "WIFIUDP.hpp"
 #include "IRRC.hpp"
@@ -216,6 +216,21 @@ public:
         return "stop:\n";
     }
 
+    std::string on_cmd_log(bfc::ArgsMap&& args)
+    {
+        // enum level_e{
+        //     FATAL,       0
+        //     ERROR,       1
+        //     WARNING,     2
+        //     DEBUG,       3
+        //     DEBUG2,      4
+        //     TRACE,       5
+        //     TRACE2};     6
+        auto level = args.argAs<int>("level").value_or(6);
+        main_logger->setLevel(Logger::level_e(level));
+        return "level set.\n";
+    }
+
     void run()
     {
         reactor.run();
@@ -306,6 +321,7 @@ private:
         cmdman.addCommand("activate", [this](bfc::ArgsMap&& args){return on_cmd_activate(std::move(args));});
         cmdman.addCommand("deactivate", [this](bfc::ArgsMap&& args){return on_cmd_deactivate(std::move(args));});
         cmdman.addCommand("stop", [this](bfc::ArgsMap&& args){return on_cmd_stop(std::move(args));});
+        cmdman.addCommand("log", [this](bfc::ArgsMap&& args){return on_cmd_log(std::move(args));});
 
         reactor.addReadHandler(console_sock.handle(), [this](){on_console_read();});
     }

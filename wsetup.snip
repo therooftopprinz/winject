@@ -6,12 +6,24 @@ sudo iw dev $interface set channel 9
 
 wifi1=wlx24ec99ca8bd1
 wifi2=wlx24ec99cab775
+wifi3=wlx24ec998bee93
+wifi4=wlx24ec999b30f3
 
 sudo ./iw_set_type $wifi1 monitor
 sudo ./iw_set_type $wifi2 monitor
+sudo ./iw_set_type $wifi3 monitor
+sudo ./iw_set_type $wifi4 monitor
 
-sudo iwconfig $wifi1 channel 11
-sudo iwconfig $wifi2 channel 11
+sudo iwconfig $wifi1 channel 1
+sudo iwconfig $wifi2 channel 6
+sudo iwconfig $wifi3 channel 6
+sudo iwconfig $wifi4 channel 1
+
+
+sudo iwconfig $wifi1 channel 1
+sudo iwconfig $wifi2 channel 1
+sudo iwconfig $wifi3 channel 1
+sudo iwconfig $wifi4 channel 1
 
 sudo iwconfig $wifi1 freq 2.412G
 sudo iwconfig $wifi2 freq 2.412G

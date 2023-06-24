@@ -124,8 +124,7 @@ public:
         // @note : wait for the allocation to increase
         // current_tx_buffer.size()
 
-        if(
-            tx_config.min_commit_size > info.out_pdu.size ||
+        if (tx_config.min_commit_size > info.out_pdu.size ||
             pdcp.get_header_size() >= info.out_pdu.size)
         {
             Logless(*main_logger, Logger::TRACE2, "TR2 | PDCP#  | not enough allocation", (int)lcid);
@@ -160,7 +159,6 @@ public:
                     break;
                 }
 
-
                 // @note : wait for the allocation to increase 
                 if (to_tx_queue.front().size() > available_for_data)
                 {
@@ -175,7 +173,6 @@ public:
                     pdu.size());
 
                 to_tx_queue.pop_front();
-                // @todo: Implement PDCP compression
                 std::memcpy(segment.payload, pdu.data(), pdu.size());
                 segment.set_payload_size(pdu.size());
             }
@@ -206,7 +203,6 @@ public:
                     current_tx_buffer.size(),
                     alloc_size);
 
-                // @todo: Implement PDCP compression
                 std::memcpy(segment.payload, current_tx_buffer.data() + current_tx_offset, alloc_size);
                 current_tx_offset += alloc_size;
 
@@ -267,7 +263,6 @@ public:
                 buffer.resize(segment.get_payload_size());
                 // @todo : Implement PDCP encryption
                 // @todo : Implement PDCP integrity
-                // @todo : Implement PDCP decompression
                 std::memcpy(buffer.data(), segment.payload, segment.get_payload_size());
                 std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
                 to_rx_queue.emplace_back(std::move(buffer));
@@ -306,7 +301,6 @@ public:
 
                 // @todo : Implement PDCP encryption
                 // @todo : Implement PDCP integrity
-                // @todo : Implement PDCP decompression
                 std::memcpy(current_rx_buffer.data() + offset, segment.payload, segment.get_payload_size());
 
                 Logless(*main_logger, Logger::TRACE2,
@@ -331,6 +325,7 @@ public:
         {
             auto rv = std::move(to_rx_queue.front());
             to_rx_queue.pop_front();
+            // @todo: Implement PDCP compression
             return rv;
         }
 
@@ -348,6 +343,7 @@ public:
         {
             auto rv = std::move(to_rx_queue.front());
             to_rx_queue.pop_front();
+            // @todo: Implement PDCP compression
             return rv;
         }
 
@@ -368,6 +364,8 @@ public:
             (int) lcid,
             buffer.size(),
             to_tx_queue.size());
+
+        // @todo: Implement PDCP compression
         to_tx_queue.emplace_back(std::move(buffer));
     }
 

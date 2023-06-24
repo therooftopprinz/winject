@@ -63,8 +63,8 @@
         "allow_segmentation" : false,
         "min_commit_size" : 0,      
         "type" : "udp",
-        "rx_address" : "127.0.0.1:1244",
-        "tx_address" : "127.0.0.1:1245"
+        "tx_address" : "127.0.0.1:1244",
+        "rx_address" : "127.0.0.1:1245"
       }
     ],
     "app_config" :

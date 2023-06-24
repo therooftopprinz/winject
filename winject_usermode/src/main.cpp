@@ -126,8 +126,8 @@ int main()
 
         if (ep_config.type == "udp")
         {
-            ep_config.address1 = pdcp.at("rx_address");
-            ep_config.address2 = pdcp.at("tx_address");
+            ep_config.address1 = pdcp.at("tx_address");
+            ep_config.address2 = pdcp.at("rx_address");
             Logless(*main_logger, Logger::DEBUG, "DBG | main |   rx_address: #", ep_config.address1.c_str());
             Logless(*main_logger, Logger::DEBUG, "DBG | main |   tx_address: #", ep_config.address2.c_str());
         }
