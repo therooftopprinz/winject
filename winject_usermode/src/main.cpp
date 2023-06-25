@@ -121,6 +121,7 @@ int main()
 
         Logless(*main_logger, Logger::DEBUG, "DBG | main | lcid: #", (int) lcid);
         Logless(*main_logger, Logger::DEBUG, "DBG | main |   allow_segmentation: #", (int) pdcp_config.allow_segmentation);
+        Logless(*main_logger, Logger::DEBUG, "DBG | main |   allow_reordering: #", (int) pdcp_config.allow_reordering);
         Logless(*main_logger, Logger::DEBUG, "DBG | main |   min_commit_size: #", pdcp_config.min_commit_size);
 
         Logless(*main_logger, Logger::DEBUG, "DBG | main |   type: #", ep_config.type.c_str());

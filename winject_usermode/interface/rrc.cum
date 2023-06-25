@@ -124,6 +124,7 @@ Sequence RRC_PDCPConfig
 {
     RRC_U8 lcid,
     RRC_BOOL allowSegmentation,
+    RRC_BOOL allowReordering,
     RRC_U16 minCommitSize,
     RRC_U8A cipherKey,
     RRC_U8A integrityKey,

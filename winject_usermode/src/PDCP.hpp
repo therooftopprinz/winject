@@ -16,7 +16,7 @@ class PDCP : public IPDCP
 public:
     PDCP(lcid_t lcid, const tx_config_t& tx_config, const rx_config_t& rx_config)
         : lcid(lcid)
-        , rx_buffer_ring(1024)
+        , rx_buffer_ring(256)
         , tx_config(tx_config)
         , rx_config(rx_config)
     {}
@@ -77,6 +77,7 @@ public:
 
             Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  | reconfigure tx:", (int)lcid);
             Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   allow_segmentation: #", (int)lcid, (int) tx_config.allow_segmentation);
+            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   allow_reordering: #", (int)lcid, (int) tx_config.allow_reordering);
             Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   min_commit_size: #", (int)lcid, tx_config.min_commit_size);
 
             status = is_tx_enabled;
@@ -99,6 +100,7 @@ public:
 
             Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  | reconfigure rx:", (int) lcid);
             Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   allow_segmentation: #", (int) lcid, (int) rx_config.allow_segmentation);
+            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   allow_reordering: #", (int) lcid, (int) rx_config.allow_reordering);
 
             status = is_rx_enabled;
         }
@@ -306,9 +308,14 @@ public:
                         if (current_rx_buffer_el.is_completed)
                         {
                             current_rx_buffer_el.is_completed = false;
+                            Logless(*main_logger, Logger::TRACE2,
+                                "TR2 | PDCP#  | transported packet sn=#",
+                                (int) lcid,
+                                (int) rx_sn);
+                            
                             rx_sn++;
                             std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
-                            to_rx_queue.emplace_back(std::move(rx_buffer_ring[0].buffer));
+                            to_rx_queue.emplace_back(std::move(current_rx_buffer));
                             to_rx_queue_cv.notify_one();
                         }
                         else
@@ -336,7 +343,7 @@ public:
             std::memcpy(current_rx_buffer.data() + offset, segment.payload, segment.get_payload_size());
 
             Logless(*main_logger, Logger::TRACE2,
-                "TR2 | PDCP#  | received data sn=# cur=#  data_sz=#",
+                "TR2 | PDCP#  | received data sn=# seg_off=# seg_sz=#",
                 (int) lcid,
                 (int) sn,
                 offset,
@@ -345,7 +352,7 @@ public:
             if (segment.is_LAST())
             {
                 Logless(*main_logger, Logger::TRACE2,
-                    "TR2 | PDCP#  | received data complete data_sz=#",
+                    "TR2 | PDCP#  | received data complete sn=# pack_sz=#",
                     (int) lcid,
                     (int) rx_sn,
                     current_rx_buffer.size());

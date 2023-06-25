@@ -242,11 +242,9 @@ private:
         size_t send_size = frame_info.frame_payload_size - frame_payload_remaining;
         if (send_size > 1)
         {
-            Logless(*main_logger, Logger::TRACE2, "TICK");
             rrc.perform_tx(send_size);
         }
     }
-
 
     struct scheduling_ctx_t
     {

@@ -102,7 +102,7 @@ public:
         if (mLogful)
         {
             uint8_t logbuff[4096*2];
-            int flen = std::sprintf((char*)logbuff, "%lluus %lluT ", (unsigned long long)pTime, (unsigned long long)(pThread%0xFFFF));
+            int flen = std::sprintf((char*)logbuff, "%lluus %lluT ", (unsigned long long)pTime, (unsigned long long)(pThread));
             size_t sz = logful(logbuff + flen, id, ts...) + flen;
             logbuff[sz++] = '\n';
             [[maybe_unused]] auto rv = ::write(1, logbuff, sz);
@@ -263,7 +263,7 @@ void Logless(Logger& logger, Logger::level_e level, const char* id, Ts... ts)
     if (logger.getLevel() >= level)
     {
         uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-        uint64_t threadId = std::hash<std::thread::id>()(std::this_thread::get_id());
+        uint64_t threadId = 100000 + std::hash<std::thread::id>()(std::this_thread::get_id())%100000;
         logger.log(id, timeNow, threadId, ts...);
         if (Logger::level_e::ERROR >= level)
         {

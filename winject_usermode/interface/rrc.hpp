@@ -49,6 +49,7 @@
 // Enumeration:  ('RRC_CompressionAlgorithm', ('RRC_CompressionAlgorithm_ZLIB', None))
 // Sequence:  RRC_PDCPConfig ('RRC_U8', 'lcid')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowSegmentation')
+// Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowReordering')
 // Sequence:  RRC_PDCPConfig ('RRC_U16', 'minCommitSize')
 // Sequence:  RRC_PDCPConfig ('RRC_U8A', 'cipherKey')
 // Sequence:  RRC_PDCPConfig ('RRC_U8A', 'integrityKey')
@@ -202,6 +203,7 @@ struct RRC_PDCPConfig
 {
     RRC_U8 lcid;
     RRC_BOOL allowSegmentation;
+    RRC_BOOL allowReordering;
     RRC_U16 minCommitSize;
     RRC_U8A cipherKey;
     RRC_U8A integrityKey;
@@ -591,6 +593,7 @@ inline void encode_per(const RRC_PDCPConfig& pIe, cum::per_codec_ctx& pCtx)
     using namespace cum;
     encode_per(pIe.lcid, pCtx);
     encode_per(pIe.allowSegmentation, pCtx);
+    encode_per(pIe.allowReordering, pCtx);
     encode_per(pIe.minCommitSize, pCtx);
     encode_per(pIe.cipherKey, pCtx);
     encode_per(pIe.integrityKey, pCtx);
@@ -607,6 +610,7 @@ inline void decode_per(RRC_PDCPConfig& pIe, cum::per_codec_ctx& pCtx)
     using namespace cum;
     decode_per(pIe.lcid, pCtx);
     decode_per(pIe.allowSegmentation, pCtx);
+    decode_per(pIe.allowReordering, pCtx);
     decode_per(pIe.minCommitSize, pCtx);
     decode_per(pIe.cipherKey, pCtx);
     decode_per(pIe.integrityKey, pCtx);
@@ -630,9 +634,10 @@ inline void str(const char* pName, const RRC_PDCPConfig& pIe, std::string& pCtx,
         pCtx = pCtx + "\"" + pName + "\":{";
     }
     size_t nOptional = 0;
-    size_t nMandatory = 11;
+    size_t nMandatory = 12;
     str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
     str("allowSegmentation", pIe.allowSegmentation, pCtx, !(--nMandatory+nOptional));
+    str("allowReordering", pIe.allowReordering, pCtx, !(--nMandatory+nOptional));
     str("minCommitSize", pIe.minCommitSize, pCtx, !(--nMandatory+nOptional));
     str("cipherKey", pIe.cipherKey, pCtx, !(--nMandatory+nOptional));
     str("integrityKey", pIe.integrityKey, pCtx, !(--nMandatory+nOptional));

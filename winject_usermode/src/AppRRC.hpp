@@ -338,9 +338,11 @@ private:
             IPDCP::rx_config_t rx_config{};
 
             tx_config.allow_segmentation = pdcp_config.allow_segmentation;
+            tx_config.allow_reordering = pdcp_config.allow_reordering;
             tx_config.min_commit_size = pdcp_config.min_commit_size;
 
             rx_config.allow_segmentation = pdcp_config.allow_segmentation;
+            rx_config.allow_reordering = pdcp_config.allow_reordering;
 
             auto pdcp = std::make_shared<PDCP>(id, tx_config, rx_config);
             pdcps.emplace(id, pdcp);
@@ -607,6 +609,7 @@ private:
             pdcpConfig->type = RRC_EPType::E_RRC_EPType_INTERNAL;
             pdcpConfig->minCommitSize = pdcp_src.min_commit_size;
             pdcpConfig->allowSegmentation = pdcp_src.allow_segmentation;
+            pdcpConfig->allowReordering = pdcp_src.allow_reordering;
         }
 
         if (include_frame)
@@ -682,11 +685,13 @@ private:
             auto& pdcpConfig = msg.pdcpConfig;
             auto& tx_config = peer_config.pdcp_configs[msg.pdcpConfig->lcid];
             tx_config.allow_segmentation = pdcpConfig->allowSegmentation;
+            tx_config.allow_reordering = pdcpConfig->allowReordering;
             tx_config.min_commit_size = pdcpConfig->minCommitSize;
 
             Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Reconfiguring PDCP linked-lcid=\"#\"", (int)msg.llcConfig->llcid);
             IPDCP::rx_config_t pdcp_config_rx{};
             pdcp_config_rx.allow_segmentation = tx_config.allow_segmentation;
+            pdcp_config_rx.allow_reordering = tx_config.allow_reordering;
             if (pdcps.count(msg.pdcpConfig->lcid))
             {
                 auto& pdcp = pdcps.at(msg.pdcpConfig->lcid);
