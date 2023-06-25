@@ -715,8 +715,8 @@ private:
         update_peer_config_and_reconfigure_rx(req);
         RRC rrc;
         rrc.requestID = req_id;
-        rrc.message = RRC_PullResponse{};
-        auto& message = std::get<RRC_PullResponse>(rrc.message);
+        rrc.message = RRC_ExchangeResponse{};
+        auto& message = std::get<RRC_ExchangeResponse>(rrc.message);
         fill_from_config(
             req.lcid,
             req.frameConfig.has_value(),

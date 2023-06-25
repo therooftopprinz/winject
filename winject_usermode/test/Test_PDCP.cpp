@@ -15,6 +15,7 @@ struct Test_PDCP : public testing::Test
         IPDCP::tx_config_t tx_config{};
         tx_config.min_commit_size = 5;
         tx_config.allow_segmentation = false;
+        tx_config.allow_reordering = true;
         IPDCP::rx_config_t rx_config{};
 
         sut = std::make_shared<PDCP>(0, tx_config, rx_config);
@@ -27,6 +28,7 @@ struct Test_PDCP : public testing::Test
         IPDCP::tx_config_t tx_config{};
         tx_config.min_commit_size = 5;
         tx_config.allow_segmentation = true;
+        tx_config.allow_reordering = true;
         IPDCP::rx_config_t rx_config{};
 
         sut = std::make_shared<PDCP>(0, tx_config, rx_config);
@@ -82,8 +84,9 @@ TEST_F(Test_PDCP, should_allocate_basic)
     pdcp.rescan();
 
     auto payload = pdcp.payload;
-    pdcp_segment_t segment(payload, 100);
+    pdcp_segment_t segment(payload, pdcp.pdu_size);
     segment.has_offset = false;
+    segment.has_sn = true;
     segment.rescan();
 
     EXPECT_EQ(0, segment.get_SN());
@@ -110,6 +113,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
         auto payload = pdcp.payload;
         pdcp_segment_t segment(payload, 5);
         segment.has_offset = true;
+        segment.has_sn = true;
         segment.rescan();
 
         EXPECT_EQ(0, segment.get_SN());
@@ -134,6 +138,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
         auto payload = pdcp.payload;
         pdcp_segment_t segment(payload, 5);
         segment.has_offset = true;
+        segment.has_sn = true;
         segment.rescan();
 
         EXPECT_EQ(1, segment.get_SN());
@@ -167,6 +172,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
         auto payload = pdcp.payload;
         pdcp_segment_t segment(payload, 5);
         segment.has_offset = true;
+        segment.has_sn = true;
         segment.rescan();
 
         EXPECT_EQ(0, segment.get_SN());
@@ -192,6 +198,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
         auto payload = pdcp.payload;
         pdcp_segment_t segment(payload, 5);
         segment.has_offset = true;
+        segment.has_sn = true;
         segment.rescan();
 
         EXPECT_EQ(1, segment.get_SN());
@@ -203,6 +210,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
         // SEGMENT 2
         segment.base += segment.get_SIZE();
         segment.has_offset = true;
+        segment.has_sn = true;
         segment.rescan();
 
         EXPECT_EQ(2, segment.get_SN());

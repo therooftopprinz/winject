@@ -105,6 +105,7 @@ int main()
         uint8_t lcid = pdcp.at("lcid");
         auto& pdcp_config = rrc_config.pdcp_configs[lcid];
         pdcp_config.allow_segmentation = pdcp.at("allow_segmentation");
+        pdcp_config.allow_reordering = pdcp.at("allow_reordering");
         pdcp_config.min_commit_size = pdcp.at("min_commit_size");
 
         // pdcp_config.tx_cipher_key;

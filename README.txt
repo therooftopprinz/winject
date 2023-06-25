@@ -130,15 +130,17 @@ ppWiFi PDCP:
       MAC: Message Authentication Code
 
 PDCP-SEGMENT Payload;
+      +---+---------------------------+
+   00 | L | SIZE                      | 02
+      +---+---------------------------+
+      | PACKET SN (OPTIONAL)          | 02
       +-------------------------------+
-   00 | PACKET SN                     |
-      +-------------------------------+
-      | SIZE                          | 02
-      +-------------------------------+
-   01 | OFFSET (OPTIONAL)             | 02
+      | OFFSET (OPTIONAL)             | 02
       +-------------------------------+
       | PAYLOAD                       | EOS
       +-------------------------------+
+
+      L: Segment completed
 
 Architecture:
                +--------------+

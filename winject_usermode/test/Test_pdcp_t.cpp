@@ -58,10 +58,12 @@ TEST(Test_pdcp_segment_t, should_set_fields)
 
     {
         pdcp_segment_t encode(buffer, sizeof(buffer));
+        encode.has_sn = true;
         encode.rescan();
         encode.set_SN(5);
         encode.set_payload_size(1);
         pdcp_segment_t decode(buffer, encode.get_SIZE());
+        decode.has_sn = true;
         decode.rescan();
         EXPECT_EQ(5, decode.get_SN());
         EXPECT_EQ(1, decode.get_payload_size());
@@ -70,12 +72,14 @@ TEST(Test_pdcp_segment_t, should_set_fields)
     {
         pdcp_segment_t encode(buffer, sizeof(buffer));
         encode.has_offset = true;
+        encode.has_sn = true;
         encode.rescan();
         encode.set_SN(8);
         encode.set_OFFSET(10);
         encode.set_payload_size(5);
         pdcp_segment_t decode(buffer, encode.get_SIZE());
         decode.has_offset = true;
+        decode.has_sn = true;
         decode.rescan();
         EXPECT_EQ(8, decode.get_SN());
         EXPECT_EQ(10, decode.get_OFFSET());

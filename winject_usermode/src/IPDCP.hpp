@@ -35,6 +35,7 @@ struct IPDCP
         uint8_t rx_compression_level = 0;
 
         bool allow_segmentation = false;
+        bool allow_reordering = false;
         size_t min_commit_size = 1000;
     };
 
@@ -48,6 +49,7 @@ struct IPDCP
         uint8_t tx_compression_level = 0;
 
         bool allow_segmentation = false;
+        bool allow_reordering = false;
     };
 
     virtual ~IPDCP(){} 

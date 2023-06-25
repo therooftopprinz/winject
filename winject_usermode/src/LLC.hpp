@@ -28,7 +28,7 @@ public:
         , lcid(lcid)
         , tx_config(tx_config)
         , rx_config(rx_config)
-        , tx_ring(256)
+        , tx_ring(1024)
         , sn_to_tx_ring(llc_sn_size, -1)
     {
     }
