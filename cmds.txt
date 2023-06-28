@@ -9,5 +9,9 @@ activate lcid=1 tx=1 rx=1
 nc -u localhost 1234 -p 1235
 nc -u localhost 1244 -p 1245
 
-./udp_checker --host=127.0.0.1 --port=1234 --mode=send --size=1250 --rate=1000
+./udp_checker --host=127.0.0.1 --port=1234 --mode=send --size=1250 --rate=3000
 ./udp_checker --host=127.0.0.1 --port=1245 --mode=recv --stats=1
+
+
+./udp_checker --host=127.0.0.1 --port=1244 --mode=send --size=1250 --rate=3000
+./udp_checker --host=127.0.0.1 --port=1235 --mode=recv --stats=1

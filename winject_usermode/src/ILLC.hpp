@@ -1,6 +1,8 @@
 #ifndef __WINJECTUM_ILLC_HPP__
 #define __WINJECTUM_ILLC_HPP__
 
+#include <atomic>
+
 #include "pdu.hpp"
 #include "frame_defs.hpp"
 #include "info_defs.hpp"
@@ -33,6 +35,16 @@ struct ILLC
         tx_mode_e peer_mode = E_TX_MODE_TM;
     };
 
+    struct stats_t
+    {
+        std::atomic<uint64_t> pkt_sent;
+        std::atomic<uint64_t> pkt_resent;
+        std::atomic<uint64_t> pkt_recv;
+        std::atomic<uint64_t> bytes_sent;
+        std::atomic<uint64_t> bytes_resent;
+        std::atomic<uint64_t> bytes_recv;
+    };
+
     virtual ~ILLC(){} 
 
     virtual void on_tx(tx_info_t&) = 0;
@@ -45,6 +57,8 @@ struct ILLC
     virtual void reconfigure(const tx_config_t&) = 0;
     virtual void reconfigure(const rx_config_t&) = 0;
     virtual lcid_t get_lcid() = 0;
+
+    virtual const stats_t& get_stats() = 0;
 };
 
 #endif // __WINJECTUM_ILLC_HPP__

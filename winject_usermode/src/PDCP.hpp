@@ -26,7 +26,7 @@ public:
         return lcid;
     }
 
-    void set_tx_enabled(bool value)
+    void set_tx_enabled(bool value) override
     {
         std::unique_lock<std::shared_mutex> lg(tx_mutex);
         // std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
@@ -36,12 +36,12 @@ public:
         current_tx_offset = 0;
         lg.unlock();
 
-        Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  | tx_enabled=#",
+        Logless(*main_logger, PDCP_INF, "INF | PDCP#  | tx_enabled=#",
             (int) lcid,
             (int) is_tx_enabled);
     }
 
-    void set_rx_enabled(bool value)
+    void set_rx_enabled(bool value) override
     {
         std::unique_lock<std::shared_mutex> lg(rx_mutex);
         // std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
@@ -57,61 +57,99 @@ public:
 
         lg.unlock();
 
-        Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  | rx_enabled=#",
+        Logless(*main_logger, PDCP_INF, "INF | PDCP#  | rx_enabled=#",
             (int) lcid,
             (int) is_rx_enabled);
     }
 
-    virtual tx_config_t get_tx_confg()
+    tx_config_t get_tx_confg()
     {
         std::shared_lock<std::shared_mutex> lg(tx_mutex);
         return tx_config;
     }
 
-    virtual void reconfigure(const tx_config_t& config)
+    void reconfigure(const tx_config_t& config) override
     {
         bool status;
         {
             std::unique_lock<std::shared_mutex> lg(tx_mutex);
             tx_config = config;
 
-            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  | reconfigure tx:", (int)lcid);
-            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   allow_segmentation: #", (int)lcid, (int) tx_config.allow_segmentation);
-            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   allow_reordering: #", (int)lcid, (int) tx_config.allow_reordering);
-            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   min_commit_size: #", (int)lcid, tx_config.min_commit_size);
+            Logless(*main_logger, PDCP_INF, "INF | PDCP#  | reconfigure tx:", (int)lcid);
+            Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_segmentation: #", (int)lcid, (int) tx_config.allow_segmentation);
+            Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_reordering: #", (int)lcid, (int) tx_config.allow_reordering);
+            Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   min_commit_size: #", (int)lcid, tx_config.min_commit_size);
 
             status = is_tx_enabled;
         }
         set_tx_enabled(status);
     }
 
-    virtual rx_config_t get_rx_confg()
+    rx_config_t get_rx_confg()
     {
         std::shared_lock<std::shared_mutex> lg(rx_mutex);
         return rx_config;
     }
 
-    virtual void reconfigure(const rx_config_t& config)
+    void reconfigure(const rx_config_t& config) override
     {
         bool status;
         {
             std::unique_lock<std::shared_mutex> lg(rx_mutex);
             rx_config = config;
 
-            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  | reconfigure rx:", (int) lcid);
-            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   allow_segmentation: #", (int) lcid, (int) rx_config.allow_segmentation);
-            Logless(*main_logger, Logger::DEBUG, "DBG | PDCP#  |   allow_reordering: #", (int) lcid, (int) rx_config.allow_reordering);
+            Logless(*main_logger, PDCP_INF, "INF | PDCP#  | reconfigure rx:", (int) lcid);
+            Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_segmentation: #", (int) lcid, (int) rx_config.allow_segmentation);
+            Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_reordering: #", (int) lcid, (int) rx_config.allow_reordering);
 
             status = is_rx_enabled;
         }
         set_rx_enabled(status);
     }
 
-    void on_tx(tx_info_t& info)
+    void print_stats()
     {
+        LoglessF(*main_logger, LLC_STS, "STS | LLC#   | RAW #,#,#,#,#,#,#", (int) lcid,
+            stats.tx_queue_size.load(),
+            stats.tx_ignored_pkt.load(),
+            stats.rx_reorder_size.load(),
+            stats.rx_invalid_pdu.load(),
+            stats.rx_ignored_pdu.load(),
+            stats.rx_invalid_segment.load(),
+            stats.rx_segment_rcvd.load());
+
+        std::atomic<uint64_t> tx_queue_size;
+        std::atomic<uint64_t> tx_ignored_pkt;
+        std::atomic<uint64_t> rx_reorder_size;
+        std::atomic<uint64_t> rx_invalid_pdu;
+        std::atomic<uint64_t> rx_ignored_pdu;
+        std::atomic<uint64_t> rx_invalid_segment;
+        std::atomic<uint64_t> rx_segment_rcvd;
+
+        Logless(*main_logger, PDCP_STS, "STS | PDCP#  | STATS:", (int) lcid);
+        Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   tx_queue_size:      #", (int) lcid, stats.tx_queue_size.load());
+        Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   tx_ignored_pkt:     #", (int) lcid, stats.tx_ignored_pkt.load());
+        Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   rx_reorder_size:    #", (int) lcid, stats.rx_reorder_size.load());
+        Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   rx_invalid_pdu:     #", (int) lcid, stats.rx_invalid_pdu.load());
+        Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   rx_ignored_pdu:     #", (int) lcid, stats.rx_ignored_pdu.load());
+        Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   rx_invalid_segment: #", (int) lcid, stats.rx_invalid_segment.load());
+        Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   rx_segment_rcvd:    #", (int) lcid, stats.rx_segment_rcvd.load());
+    }
+
+    void on_tx(tx_info_t& info) override
+    {
+        auto slot_number = info.in_frame_info.slot_number;
+        if (last_stats_slot != slot_number && (info.in_frame_info.slot_number & 0x7FF) == 0x7FF)
+        {
+            last_stats_slot = slot_number;
+            print_stats();
+        }
+
         std::unique_lock<std::shared_mutex> lg(tx_mutex);
+
         if (!is_tx_enabled)
         {
+            stats.tx_ignored_pkt.fetch_add(1);
             return;
         }
 
@@ -136,7 +174,7 @@ public:
         if (tx_config.min_commit_size > info.out_pdu.size ||
             pdcp.get_header_size() >= info.out_pdu.size)
         {
-            Logless(*main_logger, Logger::TRACE2, "TR2 | PDCP#  | not enough allocation", (int)lcid);
+            Logless(*main_logger, PDCP_TRC, "TRC | PDCP#  | not enough allocation", (int)lcid);
             return;
         }
 
@@ -176,7 +214,8 @@ public:
                 }
 
                 buffer_t pdu = std::move(to_tx_queue.front());
-                Logless(*main_logger, Logger::TRACE2, "TR2 | PDCP#  | allocated data sn=# to_tx_queue_sz=# data_sz=#",
+                stats.tx_queue_size = to_tx_queue.size();
+                Logless(*main_logger, PDCP_TRC, "TRC | PDCP#  | allocated data sn=# to_tx_queue_sz=# data_sz=#",
                     (int) lcid,
                     (int) tx_sn,
                     to_tx_queue.size(),
@@ -206,8 +245,8 @@ public:
                 size_t remaining_size = current_tx_buffer.size() - current_tx_offset;
                 size_t alloc_size = std::min(remaining_size, available_for_data);
 
-                Logless(*main_logger, Logger::TRACE2,
-                    "TR2 | PDCP#  | allocated data sn=# cur=# cur_sz=# data_sz=#",
+                Logless(*main_logger, PDCP_TRC,
+                    "TRC | PDCP#  | allocated data sn=# cur=# cur_sz=# data_sz=#",
                     (int)lcid,
                     (int) tx_sn,
                     current_tx_offset,
@@ -241,11 +280,12 @@ public:
         info.out_tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
     }
 
-    void on_rx(rx_info_t& info)
+    void on_rx(rx_info_t& info) override
     {
         std::unique_lock<std::shared_mutex> lg(rx_mutex);
         if (!is_rx_enabled)
         {
+            stats.rx_ignored_pdu.fetch_add(1);
             return;
         }
 
@@ -258,6 +298,7 @@ public:
 
         if (pdcp.get_header_size() >= info.in_pdu.size)
         {
+            stats.rx_invalid_pdu.fetch_add(1);
             return;
         }
 
@@ -272,8 +313,11 @@ public:
 
             if (segment.get_header_size() >= available_data)
             {
+                if (available_data) stats.rx_invalid_segment.fetch_add(1);
                 break;
             }
+
+            stats.rx_segment_rcvd.fetch_add(1);
 
             auto sn = segment.get_SN().value_or(0);
 
@@ -283,6 +327,7 @@ public:
             auto update_rx_sn = [this, sn](){
                     if (!rx_config.allow_reordering)
                     {
+                        stats.rx_reorder_size.fetch_sub(1);
                         std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
                         to_rx_queue.emplace_back(std::move(rx_buffer_ring[0].buffer));
                         to_rx_queue_cv.notify_one();
@@ -308,15 +353,17 @@ public:
                         if (current_rx_buffer_el.is_completed)
                         {
                             current_rx_buffer_el.is_completed = false;
-                            Logless(*main_logger, Logger::TRACE2,
-                                "TR2 | PDCP#  | transported packet sn=#",
+                            Logless(*main_logger, PDCP_TRC,
+                                "TRC | PDCP#  | transported packet sn=#",
                                 (int) lcid,
                                 (int) rx_sn);
                             
                             rx_sn++;
+                            stats.rx_reorder_size.fetch_sub(1);
                             std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
                             to_rx_queue.emplace_back(std::move(current_rx_buffer));
                             to_rx_queue_cv.notify_one();
+                            
                         }
                         else
                         {
@@ -342,17 +389,19 @@ public:
 
             std::memcpy(current_rx_buffer.data() + offset, segment.payload, segment.get_payload_size());
 
-            Logless(*main_logger, Logger::TRACE2,
-                "TR2 | PDCP#  | received data sn=# seg_off=# seg_sz=#",
+            Logless(*main_logger, PDCP_TRC,
+                "TRC | PDCP#  | received data sn=# seg_off=# seg_sz=#",
                 (int) lcid,
                 (int) sn,
                 offset,
                 segment.get_payload_size());
 
+            // @todo determine completeness by accumated segments size
             if (segment.is_LAST())
             {
-                Logless(*main_logger, Logger::TRACE2,
-                    "TR2 | PDCP#  | received data complete sn=# pack_sz=#",
+                stats.rx_reorder_size.fetch_add(1);
+                Logless(*main_logger, PDCP_TRC,
+                    "TRC | PDCP#  | received data complete sn=# pack_sz=#",
                     (int) lcid,
                     (int) rx_sn,
                     current_rx_buffer.size());
@@ -407,8 +456,8 @@ public:
             return;
         }
 
-        Logless(*main_logger, Logger::TRACE2,
-            "TR2 | PDCP#  | to tx msg_sz=# queue_sz=#",
+        Logless(*main_logger, PDCP_TRC,
+            "TRC | PDCP#  | to tx msg_sz=# queue_sz=#",
             (int) lcid,
             buffer.size(),
             to_tx_queue.size());
@@ -457,6 +506,9 @@ private:
     bool is_rx_enabled = false;
     std::shared_mutex tx_mutex;
     std::shared_mutex rx_mutex;
+
+    stats_t stats;
+    uint64_t last_stats_slot = -1;
 };
 
 #endif // __WINJECTUM_PDCP_HPP__

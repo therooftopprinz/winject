@@ -56,17 +56,6 @@ public:
             }
         }
 
-        Logless(*main_logger, Logger::TRACE2,
-            "TR2 | LLC#   | tx_enable=#",
-            (int) lcid,
-            (int) is_tx_enabled);
-    }
-
-    void set_rx_enabled(bool value)
-    {
-        std::unique_lock<std::mutex> lg(rx_mutex);
-        is_rx_enabled = value;
-
         for (auto& i : to_retx_list)
         {
             if (i.pdcp_pdu.size())
@@ -77,8 +66,19 @@ public:
 
         to_retx_list.clear();
 
-        Logless(*main_logger, Logger::TRACE2,
-            "TR2 | LLC#   | rx_enable=#",
+        Logless(*main_logger, LLC_INF,
+            "INF | LLC#   | tx_enable=#",
+            (int) lcid,
+            (int) is_tx_enabled);
+    }
+
+    void set_rx_enabled(bool value)
+    {
+        std::unique_lock<std::mutex> lg(rx_mutex);
+        is_rx_enabled = value;
+
+        Logless(*main_logger, LLC_INF,
+            "INF | LLC#   | rx_enable=#",
             (int) lcid,
             (int)is_rx_enabled);
     }
@@ -101,12 +101,12 @@ public:
                 tx_crc_size = 4;
             }
 
-            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   | reconfigure tx:", (int)lcid);
-            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   |   mode: #", (int)lcid, (int)tx_config.mode);
-            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   |   arq_window_size: #", (int)lcid, tx_config.arq_window_size);
-            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   |   max_retx_count: #", (int)lcid, tx_config.max_retx_count);
-            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   |   crc_type: #", (int)lcid, (int)tx_config.crc_type);
-            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   |   crc_size: #", (int)lcid, tx_crc_size);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   | reconfigure tx:", (int)lcid);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   |   mode: #", (int)lcid, (int)tx_config.mode);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   |   arq_window_size: #", (int)lcid, tx_config.arq_window_size);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   |   max_retx_count: #", (int)lcid, tx_config.max_retx_count);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   |   crc_type: #", (int)lcid, (int)tx_config.crc_type);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   |   crc_size: #", (int)lcid, tx_crc_size);
         }
         set_tx_enabled(status);
     }
@@ -130,12 +130,31 @@ public:
                 rx_crc_size = 4;
             }
 
-            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   | reconfigure rx:", (int) lcid);
-            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   |   mode: #", (int) lcid, (int) rx_config.peer_mode);
-            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   |   crc_type: #", (int) lcid, (int) rx_config.crc_type);
-            Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   |   crc_size: #", (int) lcid, rx_crc_size);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   | reconfigure rx:", (int) lcid);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   |   mode: #", (int) lcid, (int) rx_config.peer_mode);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   |   crc_type: #", (int) lcid, (int) rx_config.crc_type);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   |   crc_size: #", (int) lcid, rx_crc_size);
         }
         set_rx_enabled(status);
+    }
+
+    void print_stats()
+    {
+        LoglessF(*main_logger, LLC_STS, "STS | LLC#   | RAW #,#,#,#,#,#", (int) lcid,
+            stats.bytes_recv.load(),
+            stats.bytes_sent.load(),
+            stats.bytes_resent.load(),
+            stats.pkt_recv.load(),
+            stats.pkt_sent.load(),
+            stats.pkt_resent.load());
+
+        Logless(*main_logger, LLC_STS, "STS | LLC#   | STATS:", (int) lcid);
+        Logless(*main_logger, LLC_STS, "STS | LLC#   |   bytes_recv:    #", (int) lcid, stats.bytes_recv.load());
+        Logless(*main_logger, LLC_STS, "STS | LLC#   |   bytes_sent:    #", (int) lcid, stats.bytes_sent.load());
+        Logless(*main_logger, LLC_STS, "STS | LLC#   |   bytes_resent:  #", (int) lcid, stats.bytes_resent.load());
+        Logless(*main_logger, LLC_STS, "STS | LLC#   |   pkt_recv:      #", (int) lcid, stats.pkt_recv.load());
+        Logless(*main_logger, LLC_STS, "STS | LLC#   |   pkt_sent:      #", (int) lcid, stats.pkt_sent.load());
+        Logless(*main_logger, LLC_STS, "STS | LLC#   |   pkt_resent:    #", (int) lcid, stats.pkt_resent.load());
     }
 
     /**
@@ -146,16 +165,22 @@ public:
     */
     void on_tx(tx_info_t& info)
     {
+        auto slot_number = info.in_frame_info.slot_number;
+        if (last_stats_slot != slot_number && (info.in_frame_info.slot_number & 0x7FF) == 0x7FF)
+        {
+            last_stats_slot = slot_number;
+            print_stats();
+        }
+
         std::unique_lock<std::mutex> lg(tx_mutex);
         if (!is_tx_enabled)
         {
             return;
         }
 
-        check_retransmit(info.in_frame_info.slot_number);
+        check_retransmit(slot_number);
 
         // @note Setup tx_ring element for retransmit check
-        auto slot_number = info.in_frame_info.slot_number;
         auto ack_ck_idx = tx_ring_index(slot_number + tx_config.arq_window_size);
         auto tx_idx = tx_ring_index(slot_number);
         auto& ack_elem = tx_ring[ack_ck_idx];
@@ -201,7 +226,7 @@ public:
                     acks[n_acks].count = ack.second;
                     info.out_pdu.size -= sizeof(llc_payload_ack_t);
 
-                    Logless(*main_logger, Logger::TRACE2, "TR2 | LLC#   | ack sn=# cx=#",
+                    Logless(*main_logger, LLC_TRC, "TRC | LLC#   | ack sn=# cx=#",
                         int(lcid), ack.first, ack.second);
 
                     n_acks++;
@@ -267,8 +292,8 @@ public:
             auto& retx_pdu = to_retx_list.front();
             retx_count = retx_pdu.retry_count + 1;
 
-            Logless(*main_logger, Logger::TRACE2,
-                "TR2 | LLC#   | retx=#/# to_retx_list_sz=#",
+            Logless(*main_logger, LLC_TRC,
+                "TRC | LLC#   | retx=#/# to_retx_list_sz=#",
                 int(lcid),
                 retx_count,
                 tx_config.max_retx_count,
@@ -320,15 +345,20 @@ public:
             tx_elem.pdcp_pdu_size = llc.get_payload_size();
             sn_to_tx_ring[llc.get_SN()] = ack_ck_idx;
         }
+        else
+        {
+            stats.pkt_resent.fetch_add(1);
+            stats.bytes_resent.fetch_add(tx_elem.pdcp_pdu_size);
+        }
 
-        Logless(*main_logger, Logger::TRACE,
-            "TRC | LLC#   | pdu slot=# tx_idx=# ack_idx=# sn=# size=#",
+        Logless(*main_logger, LLC_TRC,
+            "TRC | LLC#   | pdu slot=# tx_idx=# ack_idx=# sn=# pdu_sz=#",
             (int) lcid,
-            info.in_frame_info.slot_number,
+            slot_number,
             tx_idx,
             ack_ck_idx,
             (int) llc.get_SN(),
-            info.out_allocated);
+            tx_elem.pdcp_pdu_size);
     }
 
     void on_rx(rx_info_t& info)
@@ -352,7 +382,7 @@ public:
             {
                 if (llc_header_size+i*sizeof(llc_payload_ack_t) > llc_size)
                 {
-                    Logless(*main_logger, Logger::ERROR, "ERR | LLC#   | ack overrun, llc_size=# ack_idx=#",
+                    Logless(*main_logger, LLC_ERR, "ERR | LLC#   | ack overrun, llc_size=# ack_idx=#",
                         int(lcid), llc_size, i);
                     break;
                 }
@@ -367,8 +397,12 @@ public:
                     auto sent_idx = tx_ring_index(ack_slot.sent_index);
                     auto& sent_slot = tx_ring[sent_idx];
                     sent_slot.acknowledged = true;
-                    Logless(*main_logger, Logger::TRACE2,
-                        "TR2 | LLC#   | acked idx=# sn=#",
+
+                    stats.pkt_sent.fetch_add(1);
+                    stats.bytes_sent.fetch_add(sent_slot.pdcp_pdu_size);
+
+                    Logless(*main_logger, LLC_TRC,
+                        "TRC | LLC#   | acked idx=# sn=#",
                         (int) lcid, ack_slot.sent_index,
                         (int) sn);
                     sn = llc_sn_mask & (sn+1);
@@ -386,9 +420,11 @@ public:
             info.in_pdu.base += llc.get_header_size();
             info.in_pdu.size -= llc.get_header_size();
 
-            Logless(*main_logger, Logger::TRACE, "TRC | LLC#   | data rx pdu_sz=#",
+            Logless(*main_logger, LLC_TRC, "TRC | LLC#   | data rx pdu_sz=#",
                 int(lcid), info.in_pdu.size);
  
+            stats.bytes_recv.fetch_add(info.in_pdu.size);
+            stats.pkt_recv.fetch_add(1);
             pdcp->on_rx(info);
         }
     }
@@ -408,7 +444,7 @@ private:
             return;
         }
 
-        Logless(*main_logger, Logger::TRACE,
+        Logless(*main_logger, LLC_TRC,
             "TRC | LLC#   | retxing current_slot=# sent_index=#",
             int(lcid),
             slot_number,
@@ -423,6 +459,8 @@ private:
         to_retx.pdcp_pdu_size = sent_slot.pdcp_pdu_size;
         to_retx.pdcp_pdu = allocate_buffer();
         sent_slot.pdcp_pdu.swap(to_retx.pdcp_pdu);
+        stats.pkt_resent.fetch_add(1);
+        stats.bytes_resent.fetch_add(sent_slot.pdcp_pdu_size);
     }
 
     void to_acknowledge(llc_sn_t sn)
@@ -473,6 +511,11 @@ private:
         buffer_pool.emplace_back(std::move(buffer));
     }
 
+    const stats_t& get_stats()
+    {
+        return stats;
+    }
+
     // @brief Used to indicated retransmit slot
     struct tx_ring_elem_t
     {
@@ -519,6 +562,9 @@ private:
     bool is_rx_enabled = false;
     std::mutex tx_mutex;
     std::mutex rx_mutex;
+
+    stats_t stats;
+    uint64_t last_stats_slot = -1;
 };
 
 #endif // __WINJECTUM_LLC_HPP__

@@ -29,7 +29,7 @@ public:
 
     void add_llc(lcid_t lcid, ILLC* llc)
     {
-        Logless(*main_logger, Logger::DEBUG, "DBG | TxSchd | Adding lcid=# to schedulables...", (int)lcid);
+        Logless(*main_logger, TXS_TRC, "TRC | TxSchd | Adding lcid=# to schedulables...", (int)lcid);
         std::unique_lock<std::mutex> lg(this_mutex);
         if (lcid>=llcs.size())
         {
@@ -42,7 +42,7 @@ public:
 
     void remove_llc(lcid_t lcid)
     {
-        Logless(*main_logger, Logger::DEBUG, "DBG | TxSchd | Removing lcid=# from schedulables...", (int)lcid);
+        Logless(*main_logger, TXS_TRC, "TRC | TxSchd | Removing lcid=# from schedulables...", (int)lcid);
         std::unique_lock<std::mutex> lg(this_mutex);
 
         llcs[lcid] = nullptr;
@@ -64,7 +64,7 @@ public:
         frame_info.fec_type = c.fec_type;
         frame_info.frame_payload_size = c.frame_payload_size;
 
-        Logless(*main_logger, Logger::DEBUG, "DBG | TxSchd | Scheduler tick will run in every #us", frame_info.slot_interval_us);
+        Logless(*main_logger, TXS_INF, "INF | TxSchd | Scheduler tick will run in every #us", frame_info.slot_interval_us);
         schedule_tick();
     }
 
@@ -171,8 +171,8 @@ private:
             if (schedule.has_schedulable)
             {
                 schedules_cache.emplace_back(&schedule);
-                Logless(*main_logger, Logger::TRACE2,
-                    "TR2 | TxSchd | has schedule slot=# lcid=# def=# n-dalloc=#",
+                Logless(*main_logger, TXS_TRC,
+                    "TRC | TxSchd | has schedule slot=# lcid=# def=# n-dalloc=#",
                     frame_info.slot_number,
                     (int) i,
                     schedule.deficit,
@@ -224,8 +224,8 @@ private:
 
                 schedule.has_data_allocated = tx_info.out_has_data_loaded;
 
-                Logless(*main_logger, Logger::TRACE2,
-                    "TR2 | TxSchd | has schedule slot=# lcid=# def=# alloc=# has_data=#",
+                Logless(*main_logger, TXS_TRC,
+                    "TRC | TxSchd | has schedule slot=# lcid=# def=# alloc=# has_data=#",
                     frame_info.slot_number,
                     (int) i->llc->get_lcid(),
                     schedule.deficit,

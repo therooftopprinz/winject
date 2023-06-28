@@ -43,8 +43,8 @@
           "quanta" : 1200
         },
         "tx_config": {
-          "arq_window_size" : 20,
-          "max_retx_count" : 10,
+          "arq_window_size" : 50,
+          "max_retx_count" : 50,
           "crc_type" : "NONE"
         }
       }
@@ -71,11 +71,17 @@
     ],
     "app_config" :
     {
+      "wifi_over_udp_" :
+      {
+        "tx_address" : "127.0.0.1:1324",
+        "rx_address" : "127.0.0.1:1323"
+      },
       "dual_wifi":
       {
         "tx" : "wlx24ec99ca8bd1",
         "rx" : "wlx24ec99cab775"
       },
+      "wifi_device_" : "wlx24ec999b30f3",
       "udp_console" : "127.0.0.1:9998",
       "hwsrc" : "7890ab",
       "hwdst" : "123456"

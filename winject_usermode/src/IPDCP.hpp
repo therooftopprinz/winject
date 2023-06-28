@@ -1,6 +1,8 @@
 #ifndef __WINJECTUM_IPDCP_HPP__
 #define __WINJECTUM_IPDCP_HPP__
 
+#include <atomic>
+
 #include "pdu.hpp"
 #include "info_defs.hpp"
 #include "frame_defs.hpp"
@@ -52,6 +54,18 @@ struct IPDCP
         bool allow_reordering = false;
     };
 
+    struct stats_t
+    {
+        std::atomic<uint64_t> tx_queue_size;
+        std::atomic<uint64_t> tx_ignored_pkt;
+        std::atomic<uint64_t> rx_reorder_size;
+        std::atomic<uint64_t> rx_invalid_pdu;
+        std::atomic<uint64_t> rx_ignored_pdu;
+        std::atomic<uint64_t> rx_invalid_segment;
+        std::atomic<uint64_t> rx_segment_rcvd;
+        
+    };
+
     virtual ~IPDCP(){} 
 
     virtual void on_tx(tx_info_t&) = 0;
@@ -61,11 +75,11 @@ struct IPDCP
 
     virtual lcid_t get_attached_lcid() = 0;
 
-    // virtual void set_tx_enabled(bool) = 0;
-    // virtual void set_rx_enabled(bool) = 0;
+    virtual void set_tx_enabled(bool) = 0;
+    virtual void set_rx_enabled(bool) = 0;
 
-    // virtual buffer_t to_rx(bool) = 0;
-    // virtual void to_tx(buffer_t) = 0;
+    virtual void reconfigure(const tx_config_t& config) = 0;
+    virtual void reconfigure(const rx_config_t& config) = 0;
 };
 
 #endif // __WINJECTUM_IPDCP_HPP__

@@ -22,7 +22,7 @@ public:
     {
         if (0 > sock.bind(bfc::toIp4Port(config.address1)))
         {
-            Logless(*main_logger, Logger::ERROR,
+            Logless(*main_logger, TEP_ERR,
                 "ERR | UDPEP# | Bind error(_)",
                 (int)config.lcid,
                 strerror(errno));

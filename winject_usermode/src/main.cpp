@@ -4,8 +4,9 @@
 #include "AppRRC.hpp"
 
 #include "Logger.hpp"
-const char* Logger::LoggerRef = "LoggerRefXD";
-std::unique_ptr<Logger> main_logger;
+template<> 
+const char* LoggerType::LoggerRef = "LoggerRefXD";
+std::unique_ptr<LoggerType> main_logger;
 
 fec_type_e to_fec_type_e(std::string s)
 {
@@ -33,11 +34,15 @@ ILLC::crc_type_e to_crc_type(std::string s)
 
 int main()
 {
-    main_logger = std::make_unique<Logger>("main.log");
-    main_logger->setLevel(Logger::TRACE2);
+    main_logger = std::make_unique<LoggerType>("main.log");
     main_logger->logful();
 
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | Reading from config.json");
+    for (auto i=0u; i<app_logbit_e::MAX; i++)
+    {
+        main_logger->set_logbit(true, i);
+    }
+
+    Logless(*main_logger, MAN_INF, "INF | main | Reading from config.json");
 
     std::ifstream f("config.json");
     auto croot = nlohmann::json::parse(f);
@@ -48,14 +53,14 @@ int main()
     auto& pdcps =  rrc.at("pdcp_configs");
     auto& app =  rrc.at("app_config");
 
-    Logless(*main_logger, Logger::TRACE, "DBG | main | --- FEC ---");
+    Logless(*main_logger, MAN_INF, "INF | main | --- FEC ---");
     for (auto& fec : frame["fec_configs"])
     {
         auto fec_config = IRRC::fec_config_t{
             to_fec_type_e(fec.at("fec_type")),
             fec.at("threshold")};
         rrc_config.fec_configs.emplace_back(fec_config);
-        Logless(*main_logger, Logger::TRACE, "DBG | main | fec_config(#,#)",
+        Logless(*main_logger, MAN_INF, "INF | main | fec_config(#,#)",
             (int) fec_config.threshold,
             (int) fec_config.type);
     }
@@ -63,11 +68,11 @@ int main()
     rrc_config.frame_config.frame_payload_size = frame.at("frame_payload_size");
     rrc_config.frame_config.slot_interval_us = frame.at("slot_interval_us");
 
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | --- FRAME ---");
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | frame_config.frame_payload_size: #", rrc_config.frame_config.frame_payload_size);
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | frame_config.slot_interval_us: #", rrc_config.frame_config.slot_interval_us);
+    Logless(*main_logger, MAN_INF, "INF | main | --- FRAME ---");
+    Logless(*main_logger, MAN_INF, "INF | main | frame_config.frame_payload_size: #", rrc_config.frame_config.frame_payload_size);
+    Logless(*main_logger, MAN_INF, "INF | main | frame_config.slot_interval_us: #", rrc_config.frame_config.slot_interval_us);
 
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | --- LLCs ---");
+    Logless(*main_logger, MAN_INF, "INF | main | --- LLCs ---");
     for (auto& llc : llcs)
     {
         uint8_t lcid = llc.at("lcid");
@@ -90,16 +95,16 @@ int main()
             llc_config.crc_type = to_crc_type(tx_config.at("crc_type"));
         }
 
-        Logless(*main_logger, Logger::DEBUG, "DBG | main | lcid: #", (int) lcid);
-        Logless(*main_logger, Logger::DEBUG, "DBG | main |   mode: #", (int) llc_config.mode);
-        Logless(*main_logger, Logger::DEBUG, "DBG | main |   arq_window_size: #", llc_config.arq_window_size);
-        Logless(*main_logger, Logger::DEBUG, "DBG | main |   max_retx_count: #", llc_config.max_retx_count);
-        Logless(*main_logger, Logger::DEBUG, "DBG | main |   crc_type: #", (int) llc_config.crc_type);
-        Logless(*main_logger, Logger::DEBUG, "DBG | main |   nd_gpdu_max_size: #", scheduling_config.nd_gpdu_max_size);
-        Logless(*main_logger, Logger::DEBUG, "DBG | main |   quanta: #", scheduling_config.quanta);
+        Logless(*main_logger, MAN_INF, "INF | main | lcid: #", (int) lcid);
+        Logless(*main_logger, MAN_INF, "INF | main |   mode: #", (int) llc_config.mode);
+        Logless(*main_logger, MAN_INF, "INF | main |   arq_window_size: #", llc_config.arq_window_size);
+        Logless(*main_logger, MAN_INF, "INF | main |   max_retx_count: #", llc_config.max_retx_count);
+        Logless(*main_logger, MAN_INF, "INF | main |   crc_type: #", (int) llc_config.crc_type);
+        Logless(*main_logger, MAN_INF, "INF | main |   nd_gpdu_max_size: #", scheduling_config.nd_gpdu_max_size);
+        Logless(*main_logger, MAN_INF, "INF | main |   quanta: #", scheduling_config.quanta);
     }
 
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | --- PDCPs ---");
+    Logless(*main_logger, MAN_INF, "INF | main | --- PDCPs ---");
     for (auto& pdcp : pdcps)
     {
         uint8_t lcid = pdcp.at("lcid");
@@ -119,19 +124,19 @@ int main()
         ep_config.lcid = lcid;
         ep_config.type = pdcp.at("type");
 
-        Logless(*main_logger, Logger::DEBUG, "DBG | main | lcid: #", (int) lcid);
-        Logless(*main_logger, Logger::DEBUG, "DBG | main |   allow_segmentation: #", (int) pdcp_config.allow_segmentation);
-        Logless(*main_logger, Logger::DEBUG, "DBG | main |   allow_reordering: #", (int) pdcp_config.allow_reordering);
-        Logless(*main_logger, Logger::DEBUG, "DBG | main |   min_commit_size: #", pdcp_config.min_commit_size);
+        Logless(*main_logger, MAN_INF, "INF | main | lcid: #", (int) lcid);
+        Logless(*main_logger, MAN_INF, "INF | main |   allow_segmentation: #", (int) pdcp_config.allow_segmentation);
+        Logless(*main_logger, MAN_INF, "INF | main |   allow_reordering: #", (int) pdcp_config.allow_reordering);
+        Logless(*main_logger, MAN_INF, "INF | main |   min_commit_size: #", pdcp_config.min_commit_size);
 
-        Logless(*main_logger, Logger::DEBUG, "DBG | main |   type: #", ep_config.type.c_str());
+        Logless(*main_logger, MAN_INF, "INF | main |   type: #", ep_config.type.c_str());
 
         if (ep_config.type == "udp")
         {
             ep_config.address1 = pdcp.at("tx_address");
             ep_config.address2 = pdcp.at("rx_address");
-            Logless(*main_logger, Logger::DEBUG, "DBG | main |   rx_address: #", ep_config.address1.c_str());
-            Logless(*main_logger, Logger::DEBUG, "DBG | main |   tx_address: #", ep_config.address2.c_str());
+            Logless(*main_logger, MAN_INF, "INF | main |   rx_address: #", ep_config.address1.c_str());
+            Logless(*main_logger, MAN_INF, "INF | main |   tx_address: #", ep_config.address2.c_str());
         }
     }
 
@@ -156,14 +161,14 @@ int main()
     rrc_config.app_config.hwsrc = app.at("hwsrc");
     rrc_config.app_config.hwdst = app.at("hwdst");
 
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | --- APP ---");
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | wifi_device: #", rrc_config.app_config.wifi_device.c_str());
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | wifi_device2: #", rrc_config.app_config.wifi_device2.c_str());
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | woudp_tx: #", rrc_config.app_config.woudp_tx.c_str());
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | woudp_rx: #", rrc_config.app_config.woudp_rx.c_str());
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | udp_console #", rrc_config.app_config.udp_console.c_str());
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | hwsrc: #", rrc_config.app_config.hwsrc.c_str());
-    Logless(*main_logger, Logger::DEBUG, "DBG | main | hwdst: #", rrc_config.app_config.hwdst.c_str());
+    Logless(*main_logger, MAN_INF, "INF | main | --- APP ---");
+    Logless(*main_logger, MAN_INF, "INF | main | wifi_device: #", rrc_config.app_config.wifi_device.c_str());
+    Logless(*main_logger, MAN_INF, "INF | main | wifi_device2: #", rrc_config.app_config.wifi_device2.c_str());
+    Logless(*main_logger, MAN_INF, "INF | main | woudp_tx: #", rrc_config.app_config.woudp_tx.c_str());
+    Logless(*main_logger, MAN_INF, "INF | main | woudp_rx: #", rrc_config.app_config.woudp_rx.c_str());
+    Logless(*main_logger, MAN_INF, "INF | main | udp_console #", rrc_config.app_config.udp_console.c_str());
+    Logless(*main_logger, MAN_INF, "INF | main | hwsrc: #", rrc_config.app_config.hwsrc.c_str());
+    Logless(*main_logger, MAN_INF, "INF | main | hwdst: #", rrc_config.app_config.hwdst.c_str());
 
     AppRRC app_rrc{rrc_config};
     app_rrc.run();

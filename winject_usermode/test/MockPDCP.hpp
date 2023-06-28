@@ -11,6 +11,11 @@ struct MockPDCP : public IPDCP
     MOCK_METHOD1(to_rx, buffer_t(uint64_t));
     MOCK_METHOD1(to_tx, void(buffer_t));
     MOCK_METHOD0(get_attached_lcid, lcid_t ());
+    MOCK_METHOD1(set_tx_enabled, void(bool));
+    MOCK_METHOD1(set_rx_enabled, void(bool));
+    MOCK_METHOD1(reconfigure, void(const rx_config_t& config));
+    MOCK_METHOD1(reconfigure, void(const tx_config_t& config));
+    
 };
 
 #endif // __WINJECTUMTST_MOCKPDCP_HPP__

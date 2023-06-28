@@ -71,7 +71,7 @@ public:
 
     ~AppRRC()
     {
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | AppRRC stopping...");
+        Logless(*main_logger, RRC_DBG, "DBG | AppRRC | AppRRC stopping...");
     }
 
     void stop()
@@ -110,7 +110,7 @@ public:
             std::string result = cmdman.executeCommand(std::string_view((char*)console_buff, rv));
             auto res_copy = result;
             res_copy.pop_back();
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | console: #", res_copy.c_str());
+            Logless(*main_logger, RRC_DBG, "DBG | AppRRC | console: #", res_copy.c_str());
 
             reactor.addWriteHandler(console_sock.handle(), [pFd, this, result, sender_addr]()
                 {
@@ -218,16 +218,23 @@ public:
 
     std::string on_cmd_log(bfc::ArgsMap&& args)
     {
-        // enum level_e{
-        //     FATAL,       0
-        //     ERROR,       1
-        //     WARNING,     2
-        //     DEBUG,       3
-        //     DEBUG2,      4
-        //     TRACE,       5
-        //     TRACE2};     6
-        auto level = args.argAs<int>("level").value_or(6);
-        main_logger->setLevel(Logger::level_e(level));
+        auto logbit_str = args.arg("logbit").value_or("");
+        if (!logbit_str.empty())
+        {
+            auto logbit = std::stoul(logbit_str, nullptr, 2);
+            size_t idx = 0;
+            while(logbit)
+            {
+                main_logger->set_logbit(logbit&1, idx);
+                logbit >>= 1;
+            }
+        }
+        else
+        {
+            auto idx = args.argAs<int>("index").value_or(0);
+            auto value = args.argAs<int>("set").value_or(0);
+            main_logger->set_logbit(value, idx);
+        }
         return "level set.\n";
     }
 
@@ -239,7 +246,7 @@ public:
     void on_rlf(lcid_t lcid)
     {
         std::unique_lock<std::shared_mutex> lg(this_mutex);
-        Logless(*main_logger, Logger::ERROR, "ERR | AppRRC | RLF lcid=#", (int) lcid);
+        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | RLF lcid=#", (int) lcid);
         auto llc = llcs.at(lcid);
         auto pdcp = pdcps.at(lcid);
         lg.unlock();
@@ -252,20 +259,28 @@ public:
         tx_frame.set_body_size(payload_size);
         size_t sz = radiotap.size() + tx_frame.size();
 
-        Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | wifi send buffer[#]:\n#", sz, buffer_str(tx_buff, sz).c_str());
-        Logless(*main_logger, Logger::TRACE, "TRC | AppRRC | send size #", sz);
-        Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
-        Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
-        Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC |   frame body size: #", payload_size);
-        Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | -----------------------");
-
+        if (main_logger->get_logbit(WTX_BUF))
+        {
+            Logless(*main_logger, RRC_TRC, "TRC | AppRRC | wifi send buffer[#]:\n#", sz, buffer_str(tx_buff, sz).c_str());
+            Logless(*main_logger, RRC_TRC, "TRC | AppRRC | send size #", sz);
+        }
+        if (main_logger->get_logbit(WTX_RAD))
+        {
+            Logless(*main_logger, RRC_TRC, "TRC | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
+        }
+        if (main_logger->get_logbit(WTX_802))
+        {
+            Logless(*main_logger, RRC_TRC, "TRC | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
+            Logless(*main_logger, RRC_TRC, "TRC | AppRRC |   frame body size: #", payload_size);
+            Logless(*main_logger, RRC_TRC, "TRC | AppRRC | -----------------------");
+        }
         wifi->send(tx_buff, sz);
     }
 
 private:
     void setup_80211_base_frame()
     {
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Generating base frame for TX...");
+        Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Generating base frame for TX...");
         radiotap = winject::radiotap::radiotap_t(tx_buff);
         radiotap.header->presence |= winject::radiotap::E_FIELD_PRESENCE_FLAGS;
         radiotap.header->presence |= winject::radiotap::E_FIELD_PRESENCE_RATE;
@@ -300,17 +315,17 @@ private:
         tx_frame.address3->set(0xDEADBEEFCAFE); // IBSS BSSID
         tx_frame.set_enable_fcs(false);
 
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | radiotap:\n#", winject::radiotap::to_string(radiotap).c_str());
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | 802.11:\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
+        Logless(*main_logger, RRC_DBG, "DBG | AppRRC | radiotap:\n#", winject::radiotap::to_string(radiotap).c_str());
+        Logless(*main_logger, RRC_DBG, "DBG | AppRRC | 802.11:\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
     }
 
     void setup_console()
     {
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Setting up console...");
+        Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Setting up console...");
         if (console_sock.bind(bfc::toIp4Port(
             config.app_config.udp_console)) < 0)
         {
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Bind error(_) console is now disabled!", strerror(errno));
+            Logless(*main_logger, RRC_ERR, "ERR | AppRRC | Bind error(_) console is now disabled!", strerror(errno));
             return;
         }
 
@@ -328,7 +343,7 @@ private:
 
     void setup_pdcps()
     {
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Setting up PDCPs...");
+        Logless(*main_logger, RRC_INF, "INF | AppRRC | Setting up PDCPs...");
         for (auto& pdcp_ : config.pdcp_configs)
         {
             auto id = pdcp_.first;
@@ -351,7 +366,7 @@ private:
 
     void setup_llcs()
     {
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Setting up LLCs...");
+        Logless(*main_logger, RRC_INF, "INF | AppRRC | Setting up LLCs...");
         for (auto& llc_ : config.llc_configs)
         {
             auto id = llc_.first;
@@ -376,7 +391,7 @@ private:
 
     void setup_eps()
     {
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Setting up EPs...");
+        Logless(*main_logger, RRC_INF, "INF | AppRRC | Setting up EPs...");
         for (auto& ep_ : config.ep_configs)
         {
             auto id = ep_.first;
@@ -401,7 +416,7 @@ private:
 
     void setup_scheduler()
     {
-        Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Setting up scheduler...");
+        Logless(*main_logger, RRC_INF, "INF | AppRRC | Setting up scheduler...");
         ITxScheduler::buffer_config_t buffer_config{};
         buffer_config.buffer = tx_buff;
         buffer_config.buffer_size = sizeof(tx_buff);
@@ -449,7 +464,7 @@ private:
             int rv = wifi->recv(rx_buff, sizeof(rx_buff));
             if (rv<0)
             {
-                Logless(*main_logger, Logger::ERROR, "ERR | AppRRC | wifi recv failed! errno=# error=#\n", errno, strerror(errno));
+                Logless(*main_logger, RRC_ERR, "ERR | AppRRC | wifi recv failed! errno=# error=#\n", errno, strerror(errno));
                 stop();
                 return;
             }
@@ -460,12 +475,21 @@ private:
             auto frame80211end = rx_buff+rv;
             size_t size =  frame80211end-frame80211.frame_body-4;
 
-            Logless(*main_logger, Logger::TRACE, "TR2 | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
-            Logless(*main_logger, Logger::TRACE2, "TRC | AppRRC | recv size #", rv);
-            Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
-            Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
-            Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC |   frame body size: #", size);
-            Logless(*main_logger, Logger::TRACE2, "TR2 | AppRRC | -----------------------");
+            if (main_logger->get_logbit(WRX_BUF))
+            {
+                Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
+            }
+            Logless(*main_logger, RRC_TRC, "TRC | AppRRC | recv size #", rv);
+            if (main_logger->get_logbit(WRX_RAD))
+            {
+                Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
+            }
+            if (main_logger->get_logbit(WRX_802))
+            {
+                Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
+                Logless(*main_logger, RRC_TRC, "TR2 | AppRRC |   frame body size: #", size);
+                Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | -----------------------");
+            }
 
             if (!frame80211.frame_body)
             {
@@ -504,7 +528,8 @@ private:
             auto llc_it = llcs.find(lcid);
             if (llcs.end() == llc_it)
             {
-                Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Couldnt find the llc for lcid=#, skipping...", (int)lcid);
+                Logless(*main_logger, RRC_WRN, "WRN | AppRRC | Couldnt find the llc for lcid=#, skipping...", (int)lcid);
+                advance_cursor(llc_pdu.get_SIZE());
                 continue;
             }
             auto llc = llc_it->second;
@@ -516,13 +541,12 @@ private:
 
             if (llc_pdu.get_SIZE() > frame_payload_remaining)
             {
-                Logless(*main_logger, Logger::ERROR, "ERR | AppRRC | LLC truncated (not enough data).", (int)lcid);
+                Logless(*main_logger, RRC_ERR, "ERR | AppRRC | LLC truncated (not enough data).", (int)lcid);
                 break;
             }
 
             llc->on_rx(info);
             advance_cursor(llc_pdu.get_SIZE());
-
         }
     }
 
@@ -552,11 +576,11 @@ private:
 
     void on_rrc(const RRC& rrc)
     {
-        if (main_logger->getLevel() >= Logger::DEBUG)
+        if (main_logger->get_logbit(RRC_DBG))
         {
             std::string rrc_str;
             str("rrc", rrc, rrc_str, true);
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | received rrc msg=#",
+            Logless(*main_logger, RRC_DBG, "DBG | AppRRC | received rrc msg=#",
                 rrc_str.c_str());
         }
 
@@ -668,7 +692,7 @@ private:
             sched_config.nd_gpdu_max_size = llcConfig->schedulingConfig.ndGpduMaxSize;
             sched_config.quanta = llcConfig->schedulingConfig.quanta;
 
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Reconfiguring LLC lcid=\"#\"", (int)msg.llcConfig->llcid);
+            Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Reconfiguring LLC lcid=\"#\"", (int)msg.llcConfig->llcid);
             ILLC::rx_config_t llc_config_rx{};
             llc_config_rx.crc_type = llc_config.crc_type;
             llc_config_rx.peer_mode = llc_config.mode;
@@ -688,7 +712,7 @@ private:
             tx_config.allow_reordering = pdcpConfig->allowReordering;
             tx_config.min_commit_size = pdcpConfig->minCommitSize;
 
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | Reconfiguring PDCP linked-lcid=\"#\"", (int)msg.llcConfig->llcid);
+            Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Reconfiguring PDCP linked-lcid=\"#\"", (int)msg.llcConfig->llcid);
             IPDCP::rx_config_t pdcp_config_rx{};
             pdcp_config_rx.allow_segmentation = tx_config.allow_segmentation;
             pdcp_config_rx.allow_reordering = tx_config.allow_reordering;
@@ -817,11 +841,11 @@ private:
         cum::per_codec_ctx context((std::byte*)b.data(), b.size());
         encode_per(rrc, context);
         size_t encode_size = b.size() - context.size();
-        if (main_logger->getLevel() >= Logger::DEBUG)
+        if (main_logger->get_logbit(RRC_DBG))
         {
             std::string rrc_str;
             str("rrc", rrc, rrc_str, true);
-            Logless(*main_logger, Logger::DEBUG, "DBG | AppRRC | sending rrc msg=#",
+            Logless(*main_logger, RRC_DBG, "DBG | AppRRC | sending rrc msg=#",
                 rrc_str.c_str());
         }
 
@@ -853,8 +877,8 @@ private:
     bfc::EpollReactor reactor;
     bfc::CommandManager cmdman;
 
-    std::map<uint8_t, std::shared_ptr<LLC>> llcs;
-    std::map<uint8_t, std::shared_ptr<PDCP>> pdcps;
+    std::map<uint8_t, std::shared_ptr<ILLC>> llcs;
+    std::map<uint8_t, std::shared_ptr<IPDCP>> pdcps;
     std::map<uint8_t, std::shared_ptr<IEndPoint>> ieps;
 
     std::thread rrc_rx_thread;

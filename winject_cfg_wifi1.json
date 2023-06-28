@@ -1,7 +1,7 @@
 {
   "rrc_config" :{
     "frame_config" : {
-      "slot_interval_us" : 1000,
+      "slot_interval_us" : 250,
       "frame_payload_size" : 1450,
       "fec_configs" : [
         {

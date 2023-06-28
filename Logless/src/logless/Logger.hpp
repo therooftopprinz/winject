@@ -9,6 +9,7 @@
 #include <utility>
 #include <thread>
 #include <chrono>
+#include <bitset>
 #include <shared_mutex>
 
 #include <unistd.h>
@@ -58,21 +59,15 @@ struct TotalSize<>
     static constexpr size_t value = 0;
 };
 
+template <size_t LOGBITSZ>
 class Logger
 {
 public:
     using HeaderType = int64_t;
     using TagType    = uint8_t;
     using TailType   = uint8_t;
-
-    enum level_e{
-        FATAL,
-        ERROR,
-        WARNING,
-        DEBUG,
-        DEBUG2,
-        TRACE,
-        TRACE2};
+    
+    using logbit_t = std::bitset<LOGBITSZ>;
 
     Logger(const char* pFilename)
         : mOutputFile(std::fopen(pFilename, "wb"))
@@ -84,16 +79,16 @@ public:
         std::fclose(mOutputFile);
     }
 
-    level_e getLevel()
+    void set_logbit(bool value, size_t index)
     {
-        std::shared_lock<std::shared_mutex> lg(this_mutex);
-        return level;
+        std::unique_lock<std::shared_mutex> lg(this_mutex);
+        logbits.set(index, value);
     }
 
-    void setLevel(level_e l)
+    bool get_logbit(size_t index)
     {
         std::shared_lock<std::shared_mutex> lg(this_mutex);
-        level = l;
+        return logbits.test(index);
     }
 
     template<typename... Ts>
@@ -107,6 +102,7 @@ public:
             logbuff[sz++] = '\n';
             [[maybe_unused]] auto rv = ::write(1, logbuff, sz);
         }
+        else
         {
             uint8_t buffer[2048];
             uint8_t* usedBuffer = buffer;
@@ -253,25 +249,39 @@ private:
     bool mLogful = false;
     static const char* LoggerRef;
 
-    level_e level = FATAL;
+    logbit_t logbits;
+
     std::shared_mutex this_mutex;
 };
-
-template <typename... Ts>
-void Logless(Logger& logger, Logger::level_e level, const char* id, Ts... ts)
+template <typename Logger, typename... Ts>
+void Logless_(Logger& logger, size_t logbit, bool flush, const char* id, Ts... ts)
 {
-    if (logger.getLevel() >= level)
+    if (logger.get_logbit(logbit))
     {
         uint64_t timeNow = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
         uint64_t threadId = 100000 + std::hash<std::thread::id>()(std::this_thread::get_id())%100000;
         logger.log(id, timeNow, threadId, ts...);
-        if (Logger::level_e::ERROR >= level)
+        if (flush)
         {
             logger.flush();
         }
     }
 }
 
+
+template <typename Logger, typename... Ts>
+void Logless(Logger& logger, size_t logbit, const char* id, Ts... ts)
+{
+    Logless_(logger, logbit, false, id, ts...);
+}
+
+template <typename Logger, typename... Ts>
+void LoglessF(Logger& logger, size_t logbit, const char* id, Ts... ts)
+{
+    Logless_(logger, logbit, true, id, ts...);
+}
+
+template <typename Logger>
 struct LoglessTrace
 {
     LoglessTrace(Logger& pLogger, char* pName)
@@ -293,6 +303,6 @@ struct LoglessTrace
     Logger& mLogger;
 };
 
-#define LOGLESS_TRACE(logger) LoglessTrace __trace(logger, __PRETTY_FUNCTION__)
+#define LOGLESS_TRACE(logger) LoglessTrace<std::remove_reference_t<decltype(logger)>> __trace(logger, __PRETTY_FUNCTION__)
 
 #endif // __LOGGER_HPP__
