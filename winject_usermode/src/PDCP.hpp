@@ -5,6 +5,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <cstring>
+#include <unordered_set>
 
 #include "IPDCP.hpp"
 #include "frame_defs.hpp"
@@ -50,7 +51,7 @@ public:
 
         for (auto& el : rx_buffer_ring)
         {
-            el.is_completed = false;
+            el.reset();
         }
 
         rx_sn_synced = false;
@@ -327,6 +328,8 @@ public:
             auto update_rx_sn = [this, sn](){
                     if (!rx_config.allow_reordering)
                     {
+                        auto& current_rx_buffer_el = rx_buffer_ring[0];
+                        current_rx_buffer_el.reset();
                         stats.rx_reorder_size.fetch_sub(1);
                         std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
                         to_rx_queue.emplace_back(std::move(rx_buffer_ring[0].buffer));
@@ -342,7 +345,7 @@ public:
 
                     auto segment_rx_buffer_idx = rx_buffer_ring_index(sn);
                     auto& segment_rx_buffer_el = rx_buffer_ring[segment_rx_buffer_idx];
-                    segment_rx_buffer_el.is_completed = true;
+                    // segment_rx_buffer_el.is_completed = true;
 
                     while (true)
                     {
@@ -350,9 +353,10 @@ public:
                         auto& current_rx_buffer_el = rx_buffer_ring[current_rx_buffer_idx];
                         auto& current_rx_buffer = current_rx_buffer_el.buffer;
 
-                        if (current_rx_buffer_el.is_completed)
+                        if (current_rx_buffer_el.expected_size &&
+                            current_rx_buffer_el.expected_size == current_rx_buffer_el.accumulated_size)
                         {
-                            current_rx_buffer_el.is_completed = false;
+                            current_rx_buffer_el.reset();
                             Logless(*main_logger, PDCP_TRC,
                                 "TRC | PDCP#  | transported packet sn=#",
                                 (int) lcid,
@@ -363,7 +367,6 @@ public:
                             std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
                             to_rx_queue.emplace_back(std::move(current_rx_buffer));
                             to_rx_queue_cv.notify_one();
-                            
                         }
                         else
                         {
@@ -387,17 +390,29 @@ public:
             // @todo : Implement PDCP encryption
             // @todo : Implement PDCP integrity
 
-            std::memcpy(current_rx_buffer.data() + offset, segment.payload, segment.get_payload_size());
+            std::memcpy(current_rx_buffer.data() + offset, segment.payload, size);
 
             Logless(*main_logger, PDCP_TRC,
-                "TRC | PDCP#  | received data sn=# seg_off=# seg_sz=#",
+                "TRC | PDCP#  | received data sn=# last=# seg_off=# seg_sz=#",
                 (int) lcid,
                 (int) sn,
+                (int) segment.is_LAST(),
                 offset,
-                segment.get_payload_size());
+                size);
 
-            // @todo determine completeness by accumated segments size
             if (segment.is_LAST())
+            {
+                current_rx_buffer_el.expected_size = offset+size;
+            }
+
+            if (!current_rx_buffer_el.recvd_offsets.count(offset))
+            {
+                current_rx_buffer_el.recvd_offsets.emplace(offset);
+                current_rx_buffer_el.accumulated_size += size;
+            }
+
+            if (current_rx_buffer_el.expected_size &&
+                current_rx_buffer_el.expected_size == current_rx_buffer_el.accumulated_size)
             {
                 stats.rx_reorder_size.fetch_add(1);
                 Logless(*main_logger, PDCP_TRC,
@@ -489,7 +504,16 @@ private:
     struct rx_buffer_info_t
     {
         buffer_t buffer;
-        bool is_completed = false;
+        size_t accumulated_size = 0;
+        size_t expected_size = 0;
+        std::unordered_set<size_t> recvd_offsets;
+
+        void reset()
+        {
+            accumulated_size = 0;
+            expected_size = 0;
+            recvd_offsets.clear();
+        }
     };
 
     std::vector<rx_buffer_info_t> rx_buffer_ring;

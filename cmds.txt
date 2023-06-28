@@ -5,6 +5,10 @@ push include_frame=1 include_llc=1 include_pdcp=1 lcid=1
 exchange include_frame=1 include_llc=1 include_pdcp=1 lcid=1
 activate lcid=1 tx=1 rx=1
 
+log set=1 index=16
+log set=1 index=22
+
+
 
 nc -u localhost 1234 -p 1235
 nc -u localhost 1244 -p 1245

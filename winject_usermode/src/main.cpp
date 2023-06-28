@@ -41,6 +41,8 @@ int main()
     {
         main_logger->set_logbit(true, i);
     }
+    main_logger->set_logbit(false, PDCP_STS);
+    main_logger->set_logbit(false, LLC_STS);
 
     Logless(*main_logger, MAN_INF, "INF | main | Reading from config.json");
 
