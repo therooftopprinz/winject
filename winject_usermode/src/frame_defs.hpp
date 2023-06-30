@@ -9,7 +9,7 @@
 using llc_sn_t = uint8_t;
 using lcid_t = uint8_t;
 using llc_sz_t = uint16_t;
-using pdcp_sn_t = uint8_t;
+using pdcp_sn_t = uint16_t;
 using pdcp_segment_offset_t = uint16_t;
 
 constexpr llc_sn_t llc_sn_mask = 0b00111111;
@@ -250,7 +250,7 @@ struct pdcp_segment_t
 
         if (has_sn)
         {
-            sn = ptr;
+            sn = (winject::BEU16UA*)ptr;
             ptr += sizeof(*sn);
         }
 
@@ -342,7 +342,7 @@ struct pdcp_segment_t
     size_t max_size = 0;
     winject::BEU16UA *size = nullptr;
     bool has_sn = false;
-    pdcp_sn_t *sn = nullptr;
+    winject::BEU16UA *sn = nullptr;
     bool has_offset = false;
     winject::BEU16UA *offset = nullptr;
     uint8_t *payload = nullptr;

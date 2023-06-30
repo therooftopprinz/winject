@@ -76,12 +76,12 @@
         "tx_address" : "127.0.0.1:1324",
         "rx_address" : "127.0.0.1:1323"
       },
-      "dual_wifi":
+      "dual_wifi_":
       {
         "tx" : "wlx24ec99ca8bd1",
         "rx" : "wlx24ec99cab775"
       },
-      "wifi_device_" : "wlx24ec999b30f3",
+      "wifi_device" : "wlx24ec999b30f3",
       "udp_console" : "127.0.0.1:9998",
       "hwsrc" : "7890ab",
       "hwdst" : "123456"

@@ -76,9 +76,12 @@ struct checker_frame_t
 
     void rescan()
     {
-        id = base;
-        expected_size = (uint16_t*)(id+sizeof(*id));
-        data          = (uint8_t*)expected_size+sizeof(*expected_size);
+        auto ptr = base;
+        id = (uint64_t*)ptr;
+        ptr += sizeof(*id);
+        expected_size = (uint16_t*)ptr;
+        ptr += sizeof(*expected_size);
+        data = ptr;
     }
 
     size_t frame_size()
@@ -93,7 +96,7 @@ struct checker_frame_t
 
     uint8_t* base;
 
-    uint8_t* id;
+    uint64_t* id;
     uint16_t* expected_size;
     uint8_t* data;
 
@@ -145,7 +148,7 @@ int main(int argc, char* argv[])
         }
 
         int sn = 0;
-        uint8_t last_id=0xFF;
+        uint64_t last_id=-1;
 
         int stats_pkt_rcv = 0;
         int stats_byt_rcv = 0;
@@ -184,21 +187,33 @@ int main(int argc, char* argv[])
             }
 
             checker_frame_t checker(buffer, rv);
+            auto& current_id = *(checker.id);
 
             int errors=0;
             for (size_t i=0; i<checker.payload_size(); i++)
             {
                 errors += (checker.data[i] != (i&0xFF)) ? 1 : 0;
             }
-            bool has_skipped = ((last_id+1)&0xFF) != *(checker.id);
 
-            if (has_skipped || errors)
+            uint64_t diff = 0;
+            if (last_id > current_id)
             {
-                auto diff =  *(checker.id) - last_id;
-                diff += (diff<0) ? 255 : 0;
-                stats_pkt_mis += diff;
+                diff = 0xFFFFFFFFFFFFFFFF;
+                diff -= last_id;
+                diff += current_id;
+            }
+            else
+            {
+                diff = current_id - last_id; 
+            }
+
+            if (diff>1 || errors)
+            {
+
+
+                stats_pkt_mis += (diff-1);
                 stats_ebt_rcv += errors;
-                // LOG("ERROR: prev=%3d curr=%3d has_skipped=%d errors=%3d", last_id, *(checker.id), has_skipped, errors);
+                LOG("ERROR: prev=%6lu curr=%6lu diff=%6lu errors=%3lu", last_id, current_id, diff, errors);
             }
 
             last_id = *(checker.id);   
@@ -206,7 +221,7 @@ int main(int argc, char* argv[])
     }
     else if (options.at("mode")=="send")
     {
-        int size = std::stol(options.at("size"));
+        size_t size = std::stoul(options.at("size"));
         // kbps rate
         double rate = std::stod(options.at("rate"));
 
@@ -224,7 +239,7 @@ int main(int argc, char* argv[])
         sendaddr.sin_port = htons(port);
         inet_pton(AF_INET, host.c_str(), &(sendaddr.sin_addr));
     
-        uint8_t id=0;
+        uint64_t id=0;
         while (true)
         {
             checker_frame_t checker(buffer, size);

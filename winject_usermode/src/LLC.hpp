@@ -166,7 +166,8 @@ public:
     void on_tx(tx_info_t& info)
     {
         auto slot_number = info.in_frame_info.slot_number;
-        if (last_stats_slot != slot_number && (info.in_frame_info.slot_number & 0x7FF) == 0x7FF)
+        if ((is_rx_enabled || is_tx_enabled) && last_stats_slot != slot_number &&
+            (info.in_frame_info.slot_number & 0x7FF) == 0x7FF)
         {
             last_stats_slot = slot_number;
             print_stats();

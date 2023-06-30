@@ -17,7 +17,7 @@ class PDCP : public IPDCP
 public:
     PDCP(lcid_t lcid, const tx_config_t& tx_config, const rx_config_t& rx_config)
         : lcid(lcid)
-        , rx_buffer_ring(256)
+        , rx_buffer_ring(32768)
         , tx_config(tx_config)
         , rx_config(rx_config)
     {}
@@ -140,7 +140,8 @@ public:
     void on_tx(tx_info_t& info) override
     {
         auto slot_number = info.in_frame_info.slot_number;
-        if (last_stats_slot != slot_number && (info.in_frame_info.slot_number & 0x7FF) == 0x7FF)
+        if ( (is_tx_enabled || is_rx_enabled) && last_stats_slot != slot_number &&
+            (info.in_frame_info.slot_number & 0x7FF) == 0x7FF)
         {
             last_stats_slot = slot_number;
             print_stats();
@@ -345,7 +346,6 @@ public:
 
                     auto segment_rx_buffer_idx = rx_buffer_ring_index(sn);
                     auto& segment_rx_buffer_el = rx_buffer_ring[segment_rx_buffer_idx];
-                    // segment_rx_buffer_el.is_completed = true;
 
                     while (true)
                     {
@@ -353,14 +353,14 @@ public:
                         auto& current_rx_buffer_el = rx_buffer_ring[current_rx_buffer_idx];
                         auto& current_rx_buffer = current_rx_buffer_el.buffer;
 
-                        if (current_rx_buffer_el.expected_size &&
-                            current_rx_buffer_el.expected_size == current_rx_buffer_el.accumulated_size)
+                        if (!current_rx_buffer_el.is_transported &&
+                            current_rx_buffer_el.is_complete())
                         {
-                            current_rx_buffer_el.reset();
+                            current_rx_buffer_el.is_transported = true;
                             Logless(*main_logger, PDCP_TRC,
                                 "TRC | PDCP#  | transported packet sn=#",
                                 (int) lcid,
-                                (int) rx_sn);
+                                rx_sn);
                             
                             rx_sn++;
                             stats.rx_reorder_size.fetch_sub(1);
@@ -393,16 +393,49 @@ public:
             std::memcpy(current_rx_buffer.data() + offset, segment.payload, size);
 
             Logless(*main_logger, PDCP_TRC,
-                "TRC | PDCP#  | received data sn=# last=# seg_off=# seg_sz=#",
+                "TRC | PDCP#  | received data sn=# is_last=# seg_off=# seg_sz=#",
                 (int) lcid,
-                (int) sn,
+                sn,
                 (int) segment.is_LAST(),
                 offset,
                 size);
 
+            // Ignore retransmitted previous SN 
+            if (current_rx_buffer_el.sn == sn && current_rx_buffer_el.is_complete())
+            {
+                Logless(*main_logger, PDCP_TRC,
+                    "TRC | PDCP#  | ignored retransmitted sn=# rx_slot=#",
+                    (int) lcid,
+                    sn,
+                    current_rx_buffer_idx);
+                continue;
+            }
+
+            // New SN but current slot is not transported
+            if (current_rx_buffer_el.sn != sn &&
+                !current_rx_buffer_el.is_transported &&
+                current_rx_buffer_el.has_data())
+            {
+                Logless(*main_logger, PDCP_ERR,
+                    "ERR | PDCP#  | received overlap sn=# for rx_slot=#, expected_sn=#",
+                    (int) lcid,
+                    sn,
+                    current_rx_buffer_idx,
+                    current_rx_buffer_el.sn);
+                current_rx_buffer_el.reset();
+                current_rx_buffer_el.sn = sn;
+            }
+            // New SN, replace slot
+            else if (current_rx_buffer_el.sn != sn)
+            {
+                current_rx_buffer_el.reset();
+                current_rx_buffer_el.sn = sn;
+            }
+
             if (segment.is_LAST())
             {
                 current_rx_buffer_el.expected_size = offset+size;
+                current_rx_buffer_el.has_expected_size = true;
             }
 
             if (!current_rx_buffer_el.recvd_offsets.count(offset))
@@ -411,14 +444,14 @@ public:
                 current_rx_buffer_el.accumulated_size += size;
             }
 
-            if (current_rx_buffer_el.expected_size &&
-                current_rx_buffer_el.expected_size == current_rx_buffer_el.accumulated_size)
+            if (current_rx_buffer_el.is_complete())
             {
                 stats.rx_reorder_size.fetch_add(1);
                 Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCP#  | received data complete sn=# pack_sz=#",
+                    "TRC | PDCP#  | received data complete sn=# rx_sn=# pack_sz=#",
                     (int) lcid,
-                    (int) rx_sn,
+                    sn,
+                    rx_sn,
                     current_rx_buffer.size());
                 update_rx_sn();
             }
@@ -503,13 +536,29 @@ private:
     size_t   current_tx_offset = 0;
     struct rx_buffer_info_t
     {
-        buffer_t buffer;
+        bool is_transported = false;
+        bool has_expected_size = false;
+        pdcp_sn_t sn;
         size_t accumulated_size = 0;
         size_t expected_size = 0;
         std::unordered_set<size_t> recvd_offsets;
+        buffer_t buffer;
+
+        bool is_complete()
+        {
+            return has_expected_size &&
+                expected_size == accumulated_size;
+        }
+
+        bool has_data()
+        {
+            return recvd_offsets.size();
+        }
 
         void reset()
         {
+            is_transported = false;
+            has_expected_size = false;
             accumulated_size = 0;
             expected_size = 0;
             recvd_offsets.clear();
