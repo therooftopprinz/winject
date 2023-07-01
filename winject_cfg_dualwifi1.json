@@ -43,8 +43,8 @@
           "quanta" : 1200
         },
         "tx_config": {
-          "arq_window_size" : 50,
-          "max_retx_count" : 50,
+          "arq_window_size" : 25,
+          "max_retx_count" : 100,
           "crc_type" : "NONE"
         }
       }
@@ -63,7 +63,7 @@
         "lcid" : 1,
         "allow_segmentation" : false,
         "allow_reordering" : true,
-        "max_sn_distance" : 256,
+        "max_sn_distance" : 2048,
         "min_commit_size" : 0,      
         "type" : "udp",
         "tx_address" : "127.0.0.1:1234",

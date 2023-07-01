@@ -19,7 +19,7 @@ public:
     PDCP(IRRC& rrc, lcid_t lcid, const tx_config_t& tx_config, const rx_config_t& rx_config)
         : rrc(rrc)
         , lcid(lcid)
-        , rx_buffer_ring(1024)
+        , rx_buffer_ring(8192)
         , tx_config(tx_config)
         , rx_config(rx_config)
     {}
@@ -390,8 +390,8 @@ public:
 
             if (sn_dist && (max_sn - sn_dist) <= rx_config.max_sn_distance)
             {
-                Logless(*main_logger, PDCP_ERR,
-                    "ERR | PDCP#  | Ignored completed sn=#",
+                Logless(*main_logger, PDCP_TRC,
+                    "TRC | PDCP#  | Ignored completed (before) sn=#",
                     (int) lcid,
                     sn);
                 continue;
@@ -411,6 +411,15 @@ public:
             auto current_rx_buffer_idx = rx_buffer_ring_index(sn);
             auto& current_rx_buffer_el = rx_buffer_ring[current_rx_buffer_idx];
             auto& current_rx_buffer = current_rx_buffer_el.buffer;
+
+            if (current_rx_buffer_el.is_complete())
+            {
+                Logless(*main_logger, PDCP_TRC,
+                    "TRC | PDCP#  | Ignored completed (after) sn=#",
+                    (int) lcid,
+                    sn);
+                continue;
+            }
 
             if (offset + size > current_rx_buffer.size())
             {
