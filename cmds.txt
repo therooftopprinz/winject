@@ -5,17 +5,18 @@ push include_frame=1 include_llc=1 include_pdcp=1 lcid=1
 exchange include_frame=1 include_llc=1 include_pdcp=1 lcid=1
 activate lcid=1 tx=1 rx=1
 
+log bit=11110000000111100111100111101111011110
+log bit=11111111111111110111110111111111111111
+log bit=11111000000111110111110111111111111111
 log set=1 index=16
 log set=1 index=22
-
-
+stats lcid=1
 
 nc -u localhost 1234 -p 1235
 nc -u localhost 1244 -p 1245
 
-./udp_checker --host=127.0.0.1 --port=1234 --mode=send --size=1250 --rate=3000
+./udp_checker --host=127.0.0.1 --port=1234 --mode=send --size=1250 --rate=10000
 ./udp_checker --host=127.0.0.1 --port=1245 --mode=recv --stats=1
-
 
 ./udp_checker --host=127.0.0.1 --port=1244 --mode=send --size=1250 --rate=3000
 ./udp_checker --host=127.0.0.1 --port=1235 --mode=recv --stats=1

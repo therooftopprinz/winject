@@ -38,6 +38,7 @@ struct IPDCP
 
         bool allow_segmentation = false;
         bool allow_reordering = false;
+        size_t max_sn_distance = 20;
         size_t min_commit_size = 1000;
     };
 
@@ -52,6 +53,7 @@ struct IPDCP
 
         bool allow_segmentation = false;
         bool allow_reordering = false;
+        size_t max_sn_distance = 20;
     };
 
     struct stats_t
@@ -80,6 +82,8 @@ struct IPDCP
 
     virtual void reconfigure(const tx_config_t& config) = 0;
     virtual void reconfigure(const rx_config_t& config) = 0;
+
+    virtual const stats_t& get_stats() = 0;
 };
 
 #endif // __WINJECTUM_IPDCP_HPP__

@@ -33,6 +33,11 @@ Type RRC_STR
     type(asciiz)
 };
 
+Type RRC_U16_OPTIONAL
+{
+    type(unsigned) width(16) optional()
+};
+
 Enumeration RRC_FECType
 {
     E_RRC_FECType_RS_NONE,
@@ -125,6 +130,7 @@ Sequence RRC_PDCPConfig
     RRC_U8 lcid,
     RRC_BOOL allowSegmentation,
     RRC_BOOL allowReordering,
+    RRC_U16_OPTIONAL maxSnDistance,
     RRC_U16 minCommitSize,
     RRC_U8A cipherKey,
     RRC_U8A integrityKey,

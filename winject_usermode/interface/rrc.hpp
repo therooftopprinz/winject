@@ -11,6 +11,9 @@
 // Type:  ('RRC_U64', {'type': 'unsigned'})
 // Type:  ('RRC_U64', {'width': '64'})
 // Type:  ('RRC_STR', {'type': 'asciiz'})
+// Type:  ('RRC_U16_OPTIONAL', {'type': 'unsigned'})
+// Type:  ('RRC_U16_OPTIONAL', {'width': '16'})
+// Type:  ('RRC_U16_OPTIONAL', {'optional': ''})
 // Enumeration:  ('RRC_FECType', ('E_RRC_FECType_RS_NONE', None))
 // Enumeration:  ('RRC_FECType', ('E_RRC_FECType_RS_255_247', None))
 // Enumeration:  ('RRC_FECType', ('E_RRC_FECType_RS_255_239', None))
@@ -50,6 +53,7 @@
 // Sequence:  RRC_PDCPConfig ('RRC_U8', 'lcid')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowSegmentation')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowReordering')
+// Sequence:  RRC_PDCPConfig ('RRC_U16_OPTIONAL', 'maxSnDistance')
 // Sequence:  RRC_PDCPConfig ('RRC_U16', 'minCommitSize')
 // Sequence:  RRC_PDCPConfig ('RRC_U8A', 'cipherKey')
 // Sequence:  RRC_PDCPConfig ('RRC_U8A', 'integrityKey')
@@ -116,6 +120,7 @@ using RRC_U16 = uint16_t;
 using RRC_U32 = uint64_t;
 using RRC_U64 = uint64_t;
 using RRC_STR = std::string;
+using RRC_U16_OPTIONAL = std::optional<uint16_t>;
 enum class RRC_FECType : uint8_t
 {
     E_RRC_FECType_RS_NONE,
@@ -204,6 +209,7 @@ struct RRC_PDCPConfig
     RRC_U8 lcid;
     RRC_BOOL allowSegmentation;
     RRC_BOOL allowReordering;
+    RRC_U16_OPTIONAL maxSnDistance;
     RRC_U16 minCommitSize;
     RRC_U8A cipherKey;
     RRC_U8A integrityKey;
@@ -591,9 +597,19 @@ inline void str(const char* pName, const RRC_CompressionAlgorithm& pIe, std::str
 inline void encode_per(const RRC_PDCPConfig& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
+    uint8_t optionalmask[1] = {};
+    if (pIe.maxSnDistance)
+    {
+        set_optional(optionalmask, 0);
+    }
+    encode_per(optionalmask, sizeof(optionalmask), pCtx);
     encode_per(pIe.lcid, pCtx);
     encode_per(pIe.allowSegmentation, pCtx);
     encode_per(pIe.allowReordering, pCtx);
+    if (pIe.maxSnDistance)
+    {
+        encode_per(*pIe.maxSnDistance, pCtx);
+    }
     encode_per(pIe.minCommitSize, pCtx);
     encode_per(pIe.cipherKey, pCtx);
     encode_per(pIe.integrityKey, pCtx);
@@ -608,9 +624,16 @@ inline void encode_per(const RRC_PDCPConfig& pIe, cum::per_codec_ctx& pCtx)
 inline void decode_per(RRC_PDCPConfig& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
+    uint8_t optionalmask[1] = {};
+    decode_per(optionalmask, sizeof(optionalmask), pCtx);
     decode_per(pIe.lcid, pCtx);
     decode_per(pIe.allowSegmentation, pCtx);
     decode_per(pIe.allowReordering, pCtx);
+    if (check_optional(optionalmask, 0))
+    {
+        pIe.maxSnDistance = decltype(pIe.maxSnDistance)::value_type{};
+        decode_per(*pIe.maxSnDistance, pCtx);
+    }
     decode_per(pIe.minCommitSize, pCtx);
     decode_per(pIe.cipherKey, pCtx);
     decode_per(pIe.integrityKey, pCtx);
@@ -634,10 +657,15 @@ inline void str(const char* pName, const RRC_PDCPConfig& pIe, std::string& pCtx,
         pCtx = pCtx + "\"" + pName + "\":{";
     }
     size_t nOptional = 0;
+    if (pIe.maxSnDistance) nOptional++;
     size_t nMandatory = 12;
     str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
     str("allowSegmentation", pIe.allowSegmentation, pCtx, !(--nMandatory+nOptional));
     str("allowReordering", pIe.allowReordering, pCtx, !(--nMandatory+nOptional));
+    if (pIe.maxSnDistance)
+    {
+        str("maxSnDistance", *pIe.maxSnDistance, pCtx, !(nMandatory+--nOptional));
+    }
     str("minCommitSize", pIe.minCommitSize, pCtx, !(--nMandatory+nOptional));
     str("cipherKey", pIe.cipherKey, pCtx, !(--nMandatory+nOptional));
     str("integrityKey", pIe.integrityKey, pCtx, !(--nMandatory+nOptional));

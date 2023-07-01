@@ -2,10 +2,12 @@
 #include "PDCP.hpp"
 #include "info_defs_matcher.hpp"
 #include "buffer_utils.hpp"
+#include "MockRRC.hpp"
 
 struct Test_PDCP : public testing::Test
 {
     Test_PDCP()
+        : mock_rrc(std::make_shared<MockRRC>())
     {
 
     }
@@ -18,7 +20,7 @@ struct Test_PDCP : public testing::Test
         tx_config.allow_reordering = true;
         IPDCP::rx_config_t rx_config{};
 
-        sut = std::make_shared<PDCP>(0, tx_config, rx_config);
+        sut = std::make_shared<PDCP>(*mock_rrc, 0, tx_config, rx_config);
         sut->set_tx_enabled(true);
         sut->set_rx_enabled(true);
     }
@@ -31,11 +33,10 @@ struct Test_PDCP : public testing::Test
         tx_config.allow_reordering = true;
         IPDCP::rx_config_t rx_config{};
 
-        sut = std::make_shared<PDCP>(0, tx_config, rx_config);
+        sut = std::make_shared<PDCP>(*mock_rrc, 0, tx_config, rx_config);
         sut->set_tx_enabled(true);
         sut->set_rx_enabled(true);
     }
-
 
     tx_info_t trigger_tx(size_t slot_number, uint8_t* buffer, size_t size)
     {
@@ -54,6 +55,8 @@ struct Test_PDCP : public testing::Test
     uint8_t packet[1024];
     uint8_t buffer[1024];
     uint8_t cmp[1024];
+
+    std::shared_ptr<MockRRC> mock_rrc;
 };
 
 TEST_F(Test_PDCP, should_not_allocate_pdcp_when_pdu_size_is_zero)

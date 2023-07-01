@@ -263,7 +263,7 @@ TEST_F(Test_LLC, should_RLF_on_max_retry)
         .Times(9)
         .WillOnce(testing::Invoke(pdcp_writer))
         .WillRepeatedly(testing::Return());
-    EXPECT_CALL(*mock_rrc, on_rlf(0))
+    EXPECT_CALL(*mock_rrc, on_rlf_tx(0))
         .Times(1);
 
     trigger_tx(0, buffer, sizeof(buffer));

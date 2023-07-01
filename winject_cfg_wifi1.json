@@ -54,15 +54,16 @@
         "description" : "RRC",
         "lcid" : 0,
         "allow_segmentation" : false,
-        "allow_reordering" : true,
+        "allow_reordering" : false,
         "min_commit_size" : 0,
         "type" : "internal"
       },
       {
-        "description" : "video",
+        "description" : "generic",
         "lcid" : 1,
         "allow_segmentation" : false,
         "allow_reordering" : true,
+        "max_sn_distance" : 20,
         "min_commit_size" : 0,      
         "type" : "udp",
         "tx_address" : "127.0.0.1:1234",

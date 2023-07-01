@@ -115,6 +115,11 @@ int main()
         pdcp_config.allow_reordering = pdcp.at("allow_reordering");
         pdcp_config.min_commit_size = pdcp.at("min_commit_size");
 
+        if (pdcp.contains("max_sn_distance"))
+        {
+            pdcp_config.max_sn_distance = pdcp.at("max_sn_distance");
+        }
+
         // pdcp_config.tx_cipher_key;
         // pdcp_config.tx_integrity_key;
         // pdcp_config.tx_cipher_algorigthm;
@@ -129,8 +134,8 @@ int main()
         Logless(*main_logger, MAN_INF, "INF | main | lcid: #", (int) lcid);
         Logless(*main_logger, MAN_INF, "INF | main |   allow_segmentation: #", (int) pdcp_config.allow_segmentation);
         Logless(*main_logger, MAN_INF, "INF | main |   allow_reordering: #", (int) pdcp_config.allow_reordering);
+        Logless(*main_logger, MAN_INF, "INF | main |   max_sn_distance: #", pdcp_config.max_sn_distance);
         Logless(*main_logger, MAN_INF, "INF | main |   min_commit_size: #", pdcp_config.min_commit_size);
-
         Logless(*main_logger, MAN_INF, "INF | main |   type: #", ep_config.type.c_str());
 
         if (ep_config.type == "udp")

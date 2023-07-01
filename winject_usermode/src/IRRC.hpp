@@ -62,7 +62,8 @@ struct IRRC
 
 
     virtual ~IRRC(){};
-    virtual void on_rlf(lcid_t) = 0;
+    virtual void on_rlf_tx(lcid_t) = 0;
+    virtual void on_rlf_rx(lcid_t) = 0;
     virtual void perform_tx(size_t) = 0;
 };
 

@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
             if (this_time > (stats_time+stats_int-1))
             {
                 stats_time = this_time;
-                LOG("STATS: rcvd_packets:%4lf tp_Mbits:%3.3lf, missd_packets:%.3lf err_Kbits:%3.3lf",
+                LOG("STATS: rcvd_packets:%4.3lf tp_Mbits:%3.3lf, missd_packets:%4.3lf err_Kbits:%6.3lf",
                     double(stats_pkt_rcv)/stats_int,
                     double(stats_byt_rcv)*8/(1000*1000*stats_int),
                     double(stats_pkt_mis)/stats_int,

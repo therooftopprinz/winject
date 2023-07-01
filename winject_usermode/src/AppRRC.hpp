@@ -76,6 +76,7 @@ public:
 
     void stop()
     {
+        stop_timer();
         stop_wifi_rx();
         reactor.stop();
     }
@@ -218,15 +219,14 @@ public:
 
     std::string on_cmd_log(bfc::ArgsMap&& args)
     {
-        auto logbit_str = args.arg("logbit").value_or("");
+        auto logbit_str = args.arg("bit").value_or("");
         if (!logbit_str.empty())
         {
             auto logbit = std::stoul(logbit_str, nullptr, 2);
             size_t idx = 0;
-            while(logbit)
+            for (auto c : logbit_str)
             {
-                main_logger->set_logbit(logbit&1, idx);
-                logbit >>= 1;
+                main_logger->set_logbit(c=='1', idx++);
             }
         }
         else
@@ -238,20 +238,80 @@ public:
         return "level set.\n";
     }
 
+    std::string on_cmd_stats(bfc::ArgsMap&& args)
+    {
+        auto lcid = args.argAs<int>("lcid").value_or(0);
+        std::stringstream ss;
+        ss << "stats: \n";
+        std::unique_lock<std::shared_mutex> lg(this_mutex);
+        auto llc_it = llcs.find(lcid);
+        if (llcs.end() != llc_it)
+        {
+            auto& llc = llc_it->second;
+            auto& stats = llc->get_stats();
+            ss << "LLC STATS:";
+            ss << "\n  bytes_recv:    " << stats.bytes_recv.load();
+            ss << "\n  bytes_sent:    " << stats.bytes_sent.load();
+            ss << "\n  bytes_resent:  " << stats.bytes_resent.load();
+            ss << "\n  pkt_recv:      " << stats.pkt_recv.load();
+            ss << "\n  pkt_sent:      " << stats.pkt_sent.load();
+            ss << "\n  pkt_resent:    " << stats.pkt_resent.load();
+            ss << "\n";
+        }
+        else
+        {
+            ss << "llc lcid not found\n";
+        }
+
+        auto pdcp_it = pdcps.find(lcid);
+        if (pdcps.end() != pdcp_it)
+        {
+            auto& pdcp = pdcp_it->second;
+            auto& stats = pdcp->get_stats();
+            ss << "PDCP STATS:";
+            ss << "\n  tx_queue_size:      " << stats.tx_queue_size.load();
+            ss << "\n  tx_ignored_pkt:     " << stats.tx_ignored_pkt.load();
+            ss << "\n  rx_reorder_size:    " << stats.rx_reorder_size.load();
+            ss << "\n  rx_invalid_pdu:     " << stats.rx_invalid_pdu.load();
+            ss << "\n  rx_ignored_pdu:     " << stats.rx_ignored_pdu.load();
+            ss << "\n  rx_invalid_segment: " << stats.rx_invalid_segment.load();
+            ss << "\n  rx_segment_rcvd:    " << stats.rx_segment_rcvd.load();
+            ss << "\n";
+        }
+        else
+        {
+            ss << "pdcp lcid not found\n";
+        }
+
+        lg.unlock();
+        return ss.str();
+    }
+
     void run()
     {
         reactor.run();
     }
 
-    void on_rlf(lcid_t lcid)
+    void on_rlf_tx(lcid_t lcid)
     {
         std::unique_lock<std::shared_mutex> lg(this_mutex);
-        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | RLF lcid=#", (int) lcid);
+        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | RLF TX lcid=#", (int) lcid);
         auto llc = llcs.at(lcid);
         auto pdcp = pdcps.at(lcid);
         lg.unlock();
         pdcp->set_tx_enabled(false);    
         llc->set_tx_enabled(false);
+    }
+
+    void on_rlf_rx(lcid_t lcid)
+    {
+        std::unique_lock<std::shared_mutex> lg(this_mutex);
+        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | RLF RX lcid=#", (int) lcid);
+        auto llc = llcs.at(lcid);
+        auto pdcp = pdcps.at(lcid);
+        lg.unlock();
+        pdcp->set_rx_enabled(false);    
+        llc->set_rx_enabled(false);
     }
 
     void perform_tx(size_t payload_size)
@@ -337,6 +397,7 @@ private:
         cmdman.addCommand("deactivate", [this](bfc::ArgsMap&& args){return on_cmd_deactivate(std::move(args));});
         cmdman.addCommand("stop", [this](bfc::ArgsMap&& args){return on_cmd_stop(std::move(args));});
         cmdman.addCommand("log", [this](bfc::ArgsMap&& args){return on_cmd_log(std::move(args));});
+        cmdman.addCommand("stats", [this](bfc::ArgsMap&& args){return on_cmd_stats(std::move(args));});
 
         reactor.addReadHandler(console_sock.handle(), [this](){on_console_read();});
     }
@@ -354,12 +415,13 @@ private:
 
             tx_config.allow_segmentation = pdcp_config.allow_segmentation;
             tx_config.allow_reordering = pdcp_config.allow_reordering;
+            tx_config.max_sn_distance = pdcp_config.max_sn_distance;
             tx_config.min_commit_size = pdcp_config.min_commit_size;
 
             rx_config.allow_segmentation = pdcp_config.allow_segmentation;
             rx_config.allow_reordering = pdcp_config.allow_reordering;
 
-            auto pdcp = std::make_shared<PDCP>(id, tx_config, rx_config);
+            auto pdcp = std::make_shared<PDCP>(*this, id, tx_config, rx_config);
             pdcps.emplace(id, pdcp);
         }
     }
@@ -631,9 +693,10 @@ private:
             pdcpConfig->lcid = lcid;
             // @todo : fill up correctly
             pdcpConfig->type = RRC_EPType::E_RRC_EPType_INTERNAL;
-            pdcpConfig->minCommitSize = pdcp_src.min_commit_size;
             pdcpConfig->allowSegmentation = pdcp_src.allow_segmentation;
             pdcpConfig->allowReordering = pdcp_src.allow_reordering;
+            pdcpConfig->maxSnDistance = pdcp_src.max_sn_distance;
+            pdcpConfig->minCommitSize = pdcp_src.min_commit_size;
         }
 
         if (include_frame)
@@ -710,12 +773,17 @@ private:
             auto& tx_config = peer_config.pdcp_configs[msg.pdcpConfig->lcid];
             tx_config.allow_segmentation = pdcpConfig->allowSegmentation;
             tx_config.allow_reordering = pdcpConfig->allowReordering;
+            if (pdcpConfig->maxSnDistance)
+            {
+                tx_config.max_sn_distance = *pdcpConfig->maxSnDistance;
+            }
             tx_config.min_commit_size = pdcpConfig->minCommitSize;
 
             Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Reconfiguring PDCP linked-lcid=\"#\"", (int)msg.llcConfig->llcid);
             IPDCP::rx_config_t pdcp_config_rx{};
             pdcp_config_rx.allow_segmentation = tx_config.allow_segmentation;
             pdcp_config_rx.allow_reordering = tx_config.allow_reordering;
+            pdcp_config_rx.max_sn_distance = tx_config.max_sn_distance;
             if (pdcps.count(msg.pdcpConfig->lcid))
             {
                 auto& pdcp = pdcps.at(msg.pdcpConfig->lcid);

@@ -304,7 +304,7 @@ public:
             {
                 info.out_allocated = 0;
                 lg.unlock();
-                rrc.on_rlf(lcid);
+                rrc.on_rlf_tx(lcid);
                 return;
             }
             else
