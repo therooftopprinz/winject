@@ -102,6 +102,7 @@ public:
             rx_config = config;
 
             Logless(*main_logger, PDCP_INF, "INF | PDCP#  | reconfigure rx:", (int) lcid);
+            Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_rlf: #", (int) lcid, (int) rx_config.allow_rlf);
             Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_segmentation: #", (int) lcid, (int) rx_config.allow_segmentation);
             Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_reordering: #", (int) lcid, (int) rx_config.allow_reordering);
 
@@ -219,16 +220,18 @@ public:
 
                 buffer_t pdu = std::move(to_tx_queue.front());
                 stats.tx_queue_size = to_tx_queue.size();
-                Logless(*main_logger, PDCP_TRC, "TRC | PDCP#  | allocated data sn=# to_tx_queue_sz=# data_sz=#",
+                Logless(*main_logger, PDCP_TRC, "TRC | PDCP#  | allocated data sn=# data_sz=# to_tx_queue_sz=#",
                     (int) lcid,
                     (int) tx_sn,
-                    to_tx_queue.size(),
-                    pdu.size());
+                    pdu.size(),
+                    to_tx_queue.size());
 
                 to_tx_queue.pop_front();
                 std::memcpy(segment.payload, pdu.data(), pdu.size());
                 segment.set_payload_size(pdu.size());
                 segment.set_LAST(true);
+
+                tx_sn++;
             }
             else
             {
@@ -249,28 +252,35 @@ public:
                 size_t remaining_size = current_tx_buffer.size() - current_tx_offset;
                 size_t alloc_size = std::min(remaining_size, available_for_data);
 
-                Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCP#  | allocated data sn=# cur=# cur_sz=# data_sz=#",
-                    (int)lcid,
-                    (int) tx_sn,
-                    current_tx_offset,
-                    current_tx_buffer.size(),
-                    alloc_size);
-
                 std::memcpy(segment.payload, current_tx_buffer.data() + current_tx_offset, alloc_size);
-                current_tx_offset += alloc_size;
-
-                segment.set_LAST(current_tx_offset >= current_tx_buffer.size());
 
                 segment.set_OFFSET(current_tx_offset);
                 segment.set_payload_size(alloc_size);
+
+                auto old_offset = current_tx_offset;
+                current_tx_offset += alloc_size;
+                bool is_last = current_tx_offset >= current_tx_buffer.size();
+
+                Logless(*main_logger, PDCP_TRC,
+                    "TRC | PDCP#  | allocated data sn=# seg_off=# seg_size=# is_last=# to_tx_queue_sz=#",
+                    (int)lcid,
+                    (int) tx_sn,
+                    old_offset,
+                    alloc_size,
+                    (int) is_last,
+                    to_tx_queue.size());
+
+                segment.set_LAST(is_last);
+                if (is_last)
+                {
+                    tx_sn++;
+                }
             }
 
             payload += segment.get_SIZE();
             available_for_data -= segment.get_payload_size();
             info.out_allocated += segment.get_SIZE();
             allocated_segments++;
-            tx_sn++;
 
             // @todo: Implement PDCP encryption
             // @todo: Implement PDCP integrity
@@ -332,7 +342,7 @@ public:
                 current_rx_buffer_el.reset();
 
                 Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCP#  | dropped packet sn=#",
+                    "TRC | PDCP#  | Dropped packet sn=#",
                     (int) lcid,
                     rx_sn);
 

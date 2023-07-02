@@ -302,6 +302,11 @@ public:
 
             if (retx_count >= tx_config.max_retx_count)
             {
+
+                Logless(*main_logger, LLC_ERR,
+                    "ERR | LLC#   | RLF",
+                    int(lcid));
+
                 to_retx_list.pop_front();
                 if (tx_config.allow_rlf)
                 {

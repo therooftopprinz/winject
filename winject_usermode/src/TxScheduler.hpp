@@ -160,6 +160,8 @@ private:
             tx_info.out_pdu.base = cursor;
             tx_info.out_pdu.size = std::min(frame_payload_remaining, schedule.nd_gpdu_max_size);
             tx_info.out_tx_available = false;
+            tx_info.out_has_data_loaded = false;
+            tx_info.out_allocated = 0;
 
             llc->on_tx(tx_info);
 

@@ -292,6 +292,7 @@ public:
         reactor.run();
     }
 
+    // @todo signal asynchronously to prevent deadlock in LLC
     void on_rlf_tx(lcid_t lcid)
     {
         std::unique_lock<std::shared_mutex> lg(this_mutex);
@@ -303,6 +304,7 @@ public:
         llc->set_tx_enabled(false);
     }
 
+    // @todo signal asynchronously to prevent deadlock in LLC
     void on_rlf_rx(lcid_t lcid)
     {
         std::unique_lock<std::shared_mutex> lg(this_mutex);
@@ -687,6 +689,7 @@ private:
             pdcpConfig->lcid = lcid;
             // @todo : fill up correctly
             pdcpConfig->type = RRC_EPType::E_RRC_EPType_INTERNAL;
+            pdcpConfig->allowRLF = pdcp_src.allow_rlf;
             pdcpConfig->allowSegmentation = pdcp_src.allow_segmentation;
             pdcpConfig->allowReordering = pdcp_src.allow_reordering;
             pdcpConfig->maxSnDistance = pdcp_src.max_sn_distance;
@@ -765,8 +768,11 @@ private:
         {
             auto& pdcpConfig = msg.pdcpConfig;
             auto& tx_config = peer_config.pdcp_configs[msg.pdcpConfig->lcid];
+
+            tx_config.allow_rlf = pdcpConfig->allowRLF;
             tx_config.allow_segmentation = pdcpConfig->allowSegmentation;
             tx_config.allow_reordering = pdcpConfig->allowReordering;
+
             if (pdcpConfig->maxSnDistance)
             {
                 tx_config.max_sn_distance = *pdcpConfig->maxSnDistance;

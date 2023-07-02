@@ -51,6 +51,7 @@
 // Enumeration:  ('RRC_CompressionAlgorithm', ('RRC_CompressionAlgorithm_NONE', None))
 // Enumeration:  ('RRC_CompressionAlgorithm', ('RRC_CompressionAlgorithm_ZLIB', None))
 // Sequence:  RRC_PDCPConfig ('RRC_U8', 'lcid')
+// Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowRLF')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowSegmentation')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowReordering')
 // Sequence:  RRC_PDCPConfig ('RRC_U16_OPTIONAL', 'maxSnDistance')
@@ -207,6 +208,7 @@ enum class RRC_CompressionAlgorithm : uint8_t
 struct RRC_PDCPConfig
 {
     RRC_U8 lcid;
+    RRC_BOOL allowRLF;
     RRC_BOOL allowSegmentation;
     RRC_BOOL allowReordering;
     RRC_U16_OPTIONAL maxSnDistance;
@@ -604,6 +606,7 @@ inline void encode_per(const RRC_PDCPConfig& pIe, cum::per_codec_ctx& pCtx)
     }
     encode_per(optionalmask, sizeof(optionalmask), pCtx);
     encode_per(pIe.lcid, pCtx);
+    encode_per(pIe.allowRLF, pCtx);
     encode_per(pIe.allowSegmentation, pCtx);
     encode_per(pIe.allowReordering, pCtx);
     if (pIe.maxSnDistance)
@@ -627,6 +630,7 @@ inline void decode_per(RRC_PDCPConfig& pIe, cum::per_codec_ctx& pCtx)
     uint8_t optionalmask[1] = {};
     decode_per(optionalmask, sizeof(optionalmask), pCtx);
     decode_per(pIe.lcid, pCtx);
+    decode_per(pIe.allowRLF, pCtx);
     decode_per(pIe.allowSegmentation, pCtx);
     decode_per(pIe.allowReordering, pCtx);
     if (check_optional(optionalmask, 0))
@@ -658,8 +662,9 @@ inline void str(const char* pName, const RRC_PDCPConfig& pIe, std::string& pCtx,
     }
     size_t nOptional = 0;
     if (pIe.maxSnDistance) nOptional++;
-    size_t nMandatory = 12;
+    size_t nMandatory = 13;
     str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
+    str("allowRLF", pIe.allowRLF, pCtx, !(--nMandatory+nOptional));
     str("allowSegmentation", pIe.allowSegmentation, pCtx, !(--nMandatory+nOptional));
     str("allowReordering", pIe.allowReordering, pCtx, !(--nMandatory+nOptional));
     if (pIe.maxSnDistance)

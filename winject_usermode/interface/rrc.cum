@@ -128,6 +128,7 @@ Enumeration RRC_CompressionAlgorithm
 Sequence RRC_PDCPConfig
 {
     RRC_U8 lcid,
+    RRC_BOOL allowRLF,
     RRC_BOOL allowSegmentation,
     RRC_BOOL allowReordering,
     RRC_U16_OPTIONAL maxSnDistance,

@@ -5,18 +5,18 @@
 
 #include "Logger.hpp"
 
-constexpr static unsigned DEFAULT_ND_PDU_SIZE = 64;
-constexpr static unsigned DEFAULT_QUANTA = 256;
-constexpr static unsigned DEFAULT_FRAME_PAYLOAD_SIZE = 1450;
-constexpr static unsigned DEFAULT_SLOT_INTERVAL_US = 500;
-constexpr static unsigned DEFAULT_ARQ_WINDOW_SIZE = 25;
-constexpr static unsigned DEFAULT_MAX_RETX_COUNT = 50;
+constexpr static size_t DEFAULT_ND_PDU_SIZE = 64;
+constexpr static size_t DEFAULT_QUANTA = 256;
+constexpr static size_t DEFAULT_FRAME_PAYLOAD_SIZE = 1450;
+constexpr static size_t DEFAULT_SLOT_INTERVAL_US = 500;
+constexpr static size_t DEFAULT_ARQ_WINDOW_SIZE = 25;
+constexpr static size_t DEFAULT_MAX_RETX_COUNT = 50;
 const static std::string DEFAULT_CRC_TYPE = "NONE";
-constexpr static unsigned DEFAULT_ALLOW_RLF = true;
+constexpr static bool DEFAULT_ALLOW_RLF = true;
 constexpr static bool DEFAULT_ALLOW_SEGMENTATION = false;
 constexpr static bool DEFAULT_ALLOW_REORDERING = false;
-constexpr static unsigned DEFAULT_MIN_COMMIT_SIZE = 0;
-constexpr static unsigned DEFAULT_MAX_SN_DISTANCE = 1000;
+constexpr static size_t DEFAULT_MIN_COMMIT_SIZE = 0;
+constexpr static size_t DEFAULT_MAX_SN_DISTANCE = 1000;
 
 
 template<> 
