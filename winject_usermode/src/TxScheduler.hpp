@@ -225,7 +225,7 @@ private:
                 schedule.has_data_allocated = tx_info.out_has_data_loaded;
 
                 Logless(*main_logger, TXS_TRC,
-                    "TRC | TxSchd | has schedule slot=# lcid=# def=# alloc=# has_data=#",
+                    "TRC | TxSchd | has schedule slot=# lcid=# deficit=# alloc=# has_data=#",
                     frame_info.slot_number,
                     (int) i->llc->get_lcid(),
                     schedule.deficit,

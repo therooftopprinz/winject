@@ -404,7 +404,9 @@ public:
                     (int) lcid,
                     sn,
                     rx_sn);
+                lg.unlock();
                 rrc.on_rlf_rx(lcid);
+                lg.lock();
                 break;
             }
 
