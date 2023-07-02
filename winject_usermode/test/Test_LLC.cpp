@@ -14,7 +14,7 @@ struct Test_LLC : public testing::Test
         tx_config.arq_window_size = 3;
         tx_config.max_retx_count = 3;
         tx_config.mode = ILLC::E_TX_MODE_AM;
-        rx_config.peer_mode = ILLC::E_TX_MODE_AM;
+        rx_config.mode = ILLC::E_TX_MODE_AM;
         tx_config.crc_type = ILLC::E_CRC_TYPE_NONE;
         rx_config.crc_type = ILLC::E_CRC_TYPE_NONE;
 

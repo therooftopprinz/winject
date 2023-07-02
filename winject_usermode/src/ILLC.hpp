@@ -27,12 +27,13 @@ struct ILLC
         size_t arq_window_size = 0;
         size_t max_retx_count = 0;
         crc_type_e crc_type = E_CRC_TYPE_NONE;
+        bool allow_rlf = false;
     };
 
     struct rx_config_t
     {
         crc_type_e crc_type = E_CRC_TYPE_NONE;
-        tx_mode_e peer_mode = E_TX_MODE_TM;
+        tx_mode_e mode = E_TX_MODE_TM;
     };
 
     struct stats_t

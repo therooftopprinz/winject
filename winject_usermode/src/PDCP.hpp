@@ -284,7 +284,7 @@ public:
         info.out_tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
     }
 
-    void update_rx_sn(pdcp_sn_t sn)
+    void update_rx_sn(pdcp_sn_t sn, bool fast_forward)
     {
         if (!rx_config.allow_reordering)
         {
@@ -299,6 +299,11 @@ public:
 
         while (true)
         {
+
+            pdcp_sn_t max_sn = std::numeric_limits<pdcp_sn_t>::max();
+            size_t sn_dist = sn >= rx_sn ? (sn - rx_sn) :
+                (max_sn - rx_sn + sn + 1);
+
             auto current_rx_buffer_idx = rx_buffer_ring_index(rx_sn);
             auto& current_rx_buffer_el = rx_buffer_ring[current_rx_buffer_idx];
             auto& current_rx_buffer = current_rx_buffer_el.buffer;
@@ -306,16 +311,36 @@ public:
             if (current_rx_buffer_el.is_complete())
             {
                 current_rx_buffer_el.reset();
+                stats.rx_reorder_size.fetch_sub(1);
                 Logless(*main_logger, PDCP_TRC,
                     "TRC | PDCP#  | transported packet sn=#",
                     (int) lcid,
                     rx_sn);
                 
                 rx_sn++;
-                stats.rx_reorder_size.fetch_sub(1);
                 std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
                 to_rx_queue.emplace_back(std::move(current_rx_buffer));
                 to_rx_queue_cv.notify_one();
+            }
+            else if (fast_forward)
+            {
+                if (current_rx_buffer_el.recvd_offsets.size())
+                {
+                    stats.rx_reorder_size.fetch_sub(1);
+                }
+
+                current_rx_buffer_el.reset();
+
+                Logless(*main_logger, PDCP_TRC,
+                    "TRC | PDCP#  | dropped packet sn=#",
+                    (int) lcid,
+                    rx_sn);
+
+                rx_sn++;
+                if (rx_sn == sn || rx_config.max_sn_distance > sn_dist)
+                {
+                    break;
+                }
             }
             else
             {
@@ -377,16 +402,9 @@ public:
                 rx_sn = sn;
             }
 
-            size_t sn_dist = 0;
             pdcp_sn_t max_sn = std::numeric_limits<pdcp_sn_t>::max();
-            if (sn >= rx_sn)
-            {
-                sn_dist = sn - rx_sn;
-            }
-            else
-            {
-                sn_dist = max_sn - rx_sn + sn + 1;
-            }
+            size_t sn_dist = sn >= rx_sn ? (sn - rx_sn) :
+                (max_sn - rx_sn + sn + 1);
 
             if (sn_dist && (max_sn - sn_dist) <= rx_config.max_sn_distance)
             {
@@ -397,17 +415,24 @@ public:
                 continue;
             }
 
+            bool fast_forward = false;
             if (sn_dist > rx_config.max_sn_distance)
             {
                 Logless(*main_logger, PDCP_ERR,
-                    "ERR | PDCP#  | sn out of range! sn=# rx_sn=#",
+                    "ERR | PDCP#  | sn out of range! sn=# rx_sn=# distance=#",
                     (int) lcid,
                     sn,
-                    rx_sn);
-                lg.unlock();
-                rrc.on_rlf_rx(lcid);
-                lg.lock();
-                break;
+                    rx_sn,
+                    sn_dist);
+
+                if (rx_config.allow_rlf)
+                {
+                    lg.unlock();
+                    rrc.on_rlf_rx(lcid);
+                    break;
+                }
+
+                fast_forward = true;
             }
 
             auto current_rx_buffer_idx = rx_buffer_ring_index(sn);
@@ -458,7 +483,7 @@ public:
             if (current_rx_buffer_el.is_complete())
             {
                 stats.rx_reorder_size.fetch_add(1);
-                update_rx_sn(sn);
+                update_rx_sn(sn, fast_forward);
             }
         }
     }

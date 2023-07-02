@@ -14,7 +14,7 @@ Configures the ppWIFI 802.11 frame structure and timing
 |------|--------------------------------|
 | path | rrc_config/frame_config/slot_interval_us |
 | type | unsigned |
-| default | 500 |
+| default | 1000 |
 
 Frame transmission interval in microseconds.
 
@@ -111,7 +111,6 @@ Logical Channel ID
 |------|--------------------------------|
 | path | rrc_config/llc_configs/tx_mode |
 | type | enum {AM,TM} |
-| default | TM |
 
 Transmission Mode
 * AM - Akcnowledge Mode

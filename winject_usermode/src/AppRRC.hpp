@@ -36,7 +36,7 @@ public:
     {        
         std::stringstream srcss;
         uint32_t srcraw;
-        srcss << std::hex << config.app_config.hwdst;
+        srcss << std::hex << config.frame_config.hwdst;
         srcss >> srcraw;
         winject::ieee_802_11::filters::winject_src src_filter(srcraw);
 
@@ -366,8 +366,8 @@ private:
         std::stringstream dstss;
         uint64_t srcraw;
         uint64_t dstraw;
-        srcss << std::hex << config.app_config.hwsrc;
-        dstss << std::hex << config.app_config.hwdst;
+        srcss << std::hex << config.frame_config.hwsrc;
+        dstss << std::hex << config.frame_config.hwdst;
         srcss >> srcraw;
         dstss >> dstraw;
         uint64_t address2 = (srcraw << 24) | (dstraw);
@@ -408,18 +408,15 @@ private:
         for (auto& pdcp_ : config.pdcp_configs)
         {
             auto id = pdcp_.first;
-            auto& pdcp_config = pdcp_.second;
+            auto& tx_config = pdcp_.second;
 
-            IPDCP::tx_config_t tx_config{};
             IPDCP::rx_config_t rx_config{};
 
-            tx_config.allow_segmentation = pdcp_config.allow_segmentation;
-            tx_config.allow_reordering = pdcp_config.allow_reordering;
-            tx_config.max_sn_distance = pdcp_config.max_sn_distance;
-            tx_config.min_commit_size = pdcp_config.min_commit_size;
-
-            rx_config.allow_segmentation = pdcp_config.allow_segmentation;
-            rx_config.allow_reordering = pdcp_config.allow_reordering;
+            // Copy tx_config initially
+            rx_config.allow_segmentation = tx_config.allow_segmentation;
+            rx_config.allow_reordering = tx_config.allow_reordering;
+            rx_config.allow_rlf = tx_config.allow_rlf;
+            rx_config.max_sn_distance = tx_config.max_sn_distance;
 
             auto pdcp = std::make_shared<PDCP>(*this, id, tx_config, rx_config);
             pdcps.emplace(id, pdcp);
@@ -432,16 +429,13 @@ private:
         for (auto& llc_ : config.llc_configs)
         {
             auto id = llc_.first;
-            auto& llc_config = llc_.second;
+            auto& tx_config = llc_.second;
 
-            ILLC::tx_config_t tx_config{};
             ILLC::rx_config_t rx_config{};
 
-            tx_config.mode = llc_config.mode;
-            tx_config.arq_window_size = llc_config.arq_window_size;
-            tx_config.max_retx_count =  llc_config.max_retx_count;
-            tx_config.crc_type = tx_config.crc_type;
+            // Copy tx_config initially
             rx_config.crc_type = tx_config.crc_type;
+            rx_config.mode = tx_config.mode;
 
             auto pdcp = pdcps[id];
             auto llc = std::make_shared<LLC>(pdcp, *this, id,
@@ -459,7 +453,7 @@ private:
             auto id = ep_.first;
             auto& ep_config = ep_.second;
 
-           if (ep_config.type == "udp")
+           if (ep_config.type == "UDP")
            {
                 auto pdcp_it = pdcps.find(id);
                 if (pdcp_it == pdcps.end())
@@ -758,7 +752,7 @@ private:
             Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Reconfiguring LLC lcid=\"#\"", (int)msg.llcConfig->llcid);
             ILLC::rx_config_t llc_config_rx{};
             llc_config_rx.crc_type = llc_config.crc_type;
-            llc_config_rx.peer_mode = llc_config.mode;
+            llc_config_rx.mode = llc_config.mode;
             if (llcs.count(msg.llcConfig->llcid))
             {
                 auto& llc = llcs.at(msg.llcConfig->llcid);
@@ -781,6 +775,7 @@ private:
 
             Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Reconfiguring PDCP linked-lcid=\"#\"", (int)msg.llcConfig->llcid);
             IPDCP::rx_config_t pdcp_config_rx{};
+            pdcp_config_rx.allow_rlf = tx_config.allow_rlf;
             pdcp_config_rx.allow_segmentation = tx_config.allow_segmentation;
             pdcp_config_rx.allow_reordering = tx_config.allow_reordering;
             pdcp_config_rx.max_sn_distance = tx_config.max_sn_distance;

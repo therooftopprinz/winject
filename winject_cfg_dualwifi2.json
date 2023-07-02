@@ -20,54 +20,57 @@
           "fec_type" : "RS(255,127)",
           "threshold" : 80
         }
-      ]
+      ],
+      "hwsrc" : "7890ab",
+      "hwdst" : "123456"
     },
     "llc_configs": [
       {
         "lcid" : 0,
         "tx_mode" : "TM",
-        "scheduling_config" : {
-          "nd_pdu_size" : -1,
-          "quanta" : 5000
-        },
-        "tx_config" :
-        {
-          "crc_type" : "NONE"
-        }
+        "scheduling_config" : {},
+        "common_tx_config" : {}
       },
       {
+        "description:" : "video",
         "lcid" : 1,
         "tx_mode" : "AM",
         "scheduling_config" : {
           "nd_pdu_size" : 50,
           "quanta" : 1200
         },
-        "tx_config": {
+        "am_tx_config": {
+          "allow_rlf" : false,
           "arq_window_size" : 25,
-          "max_retx_count" : 100,
+          "max_retx_count" : 10
+        },
+        "common_tx_config": {
           "crc_type" : "NONE"
         }
       }
     ],
     "pdcp_configs": [
       {
-        "description" : "RRC",
         "lcid" : 0,
-        "type" : "internal",
-        "allow_segmentation" : false,
-        "allow_reordering" : false,
-        "min_commit_size" : 0
+        "tx_config" : {},
+        "endpoint_config" : {
+          "type" : "RRC0"
+        }
       },
       {
-        "description" : "video",
         "lcid" : 1,
-        "allow_segmentation" : false,
-        "allow_reordering" : true,
-        "max_sn_distance" : 4000,
-        "min_commit_size" : 0,
-        "type" : "udp",
-        "tx_address" : "127.0.0.1:1244",
-        "rx_address" : "127.0.0.1:1245"
+        "tx_config" : {
+          "allow_rlf" : false,
+          "allow_segmentation" : false,
+          "allow_reordering" : true,
+          "max_sn_distance" : 250,
+          "min_commit_size" : 0
+        },
+        "endpoint_config" : {
+          "type" : "UDP",
+          "udp_tx_address" : "127.0.0.1:1244",
+          "udp_rx_address" : "127.0.0.1:1245"
+        }
       }
     ],
     "app_config" :
@@ -77,15 +80,10 @@
         "tx_address" : "127.0.0.1:1324",
         "rx_address" : "127.0.0.1:1323"
       },
-      "dual_wifi_":
-      {
-        "tx" : "wlx24ec99ca8bd1",
-        "rx" : "wlx24ec99cab775"
-      },
-      "wifi_device" : "wlx24ec999b30f3",
-      "udp_console" : "127.0.0.1:9998",
-      "hwsrc" : "7890ab",
-      "hwdst" : "123456"
+      "tx_device_" : "wlx24ec99ca8bd1",
+      "rx_device_" : "wlx24ec99cab775",
+      "txrx_device" : "wlx24ec999b30f3",
+      "udp_console" : "127.0.0.1:9998"
     }
   }
 }

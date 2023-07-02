@@ -131,7 +131,7 @@ public:
             }
 
             Logless(*main_logger, LLC_INF, "INF | LLC#   | reconfigure rx:", (int) lcid);
-            Logless(*main_logger, LLC_INF, "INF | LLC#   |   mode: #", (int) lcid, (int) rx_config.peer_mode);
+            Logless(*main_logger, LLC_INF, "INF | LLC#   |   mode: #", (int) lcid, (int) rx_config.mode);
             Logless(*main_logger, LLC_INF, "INF | LLC#   |   crc_type: #", (int) lcid, (int) rx_config.crc_type);
             Logless(*main_logger, LLC_INF, "INF | LLC#   |   crc_size: #", (int) lcid, rx_crc_size);
         }
@@ -302,10 +302,21 @@ public:
 
             if (retx_count >= tx_config.max_retx_count)
             {
-                info.out_allocated = 0;
-                lg.unlock();
-                rrc.on_rlf_tx(lcid);
-                return;
+                to_retx_list.pop_front();
+                if (tx_config.allow_rlf)
+                {
+                    info.out_allocated = 0;
+                    lg.unlock();
+                    rrc.on_rlf_tx(lcid);
+                    return;
+                }
+
+                // RETX dropped, aquire new PDCP PDU
+
+                pdcp->on_tx(info);
+                size_t pdcp_allocation_size = info.out_allocated - init_alloc;
+                llc.set_payload_size(pdcp_allocation_size);
+                info.out_has_data_loaded = true;
             }
             else
             {
@@ -413,8 +424,8 @@ public:
         // @note Handle data
         else
         {
-            if (rx_config.peer_mode == ILLC::E_TX_MODE_AM)
-            {
+            if (rx_config.mode == ILLC::E_TX_MODE_AM)
+            { 
                 to_acknowledge(llc.get_SN());
             }
 

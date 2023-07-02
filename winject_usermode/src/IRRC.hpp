@@ -39,14 +39,14 @@ struct IRRC
         std::string wifi_device2;
         std::string woudp_tx;
         std::string woudp_rx;
-        std::string hwsrc;
-        std::string hwdst;
     };
 
     struct frame_config_t
     {
         uint64_t slot_interval_us = 0;
         size_t frame_payload_size = 0;
+        std::string hwsrc;
+        std::string hwdst;
     };
 
     struct config_t

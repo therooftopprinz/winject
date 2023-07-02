@@ -36,6 +36,7 @@ struct IPDCP
         compressiom_alg_e tx_compression_algorigthm = E_COMPRESSION_ALGO_NONE;
         uint8_t rx_compression_level = 0;
 
+        bool allow_rlf = false;
         bool allow_segmentation = false;
         bool allow_reordering = false;
         size_t max_sn_distance = 20;
@@ -51,6 +52,7 @@ struct IPDCP
         compressiom_alg_e rx_compression_algorigthm = E_COMPRESSION_ALGO_NONE;
         uint8_t tx_compression_level = 0;
 
+        bool allow_rlf = false;
         bool allow_segmentation = false;
         bool allow_reordering = false;
         size_t max_sn_distance = 20;
