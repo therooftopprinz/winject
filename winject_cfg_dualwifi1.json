@@ -66,7 +66,24 @@
         "common_tx_config" : {}
       },
       {
-        "description:" : "video",
+        "description:" : "video7",
+        "lcid" : 7,
+        "tx_mode" : "AM",
+        "scheduling_config" : {
+          "nd_pdu_size" : 50,
+          "quanta" : 1450
+        },
+        "am_tx_config": {
+          "allow_rlf" : false,
+          "arq_window_size" : 30,
+          "max_retx_count" : 50
+        },
+        "common_tx_config": {
+          "crc_type" : "NONE"
+        }
+      },
+      {
+        "description:" : "video8s",
         "lcid" : 8,
         "tx_mode" : "AM",
         "scheduling_config" : {
@@ -125,11 +142,27 @@
         }
       },
       {
-        "description:" : "video",
-        "lcid" : 8,
+        "description:" : "video7",
+        "lcid" : 7,
         "tx_config" : {
           "allow_rlf" : false,
           "allow_segmentation" : false,
+          "allow_reordering" : true,
+          "max_sn_distance" : 1000,
+          "min_commit_size" : 0
+        },
+        "endpoint_config" : {
+          "type" : "UDP",
+          "udp_tx_address" : "127.0.0.1:21071",
+          "udp_rx_address" : "127.0.0.1:21072"
+        }
+      },
+      {
+        "description:" : "video8",
+        "lcid" : 8,
+        "tx_config" : {
+          "allow_rlf" : false,
+          "allow_segmentation" : true,
           "allow_reordering" : true,
           "max_sn_distance" : 1000,
           "min_commit_size" : 0
@@ -148,9 +181,9 @@
         "tx_address" : "127.0.0.1:21001",
         "rx_address" : "127.0.0.1:21002"
       },
+      "txrx_device" : "wlx24ec998bee93",
       "tx_device_"   : "wlx24ec998bee93",
       "rx_device_"   : "wlx24ec999b30f3",
-      "txrx_device" : "wlx24ec998bee93",
       "udp_console" : "127.0.0.1:21000"
     }
   }

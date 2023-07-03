@@ -1,8 +1,10 @@
 nc -u localhost 9999
 
 exchange include_frame=1 include_llc=1 include_pdcp=1 lcid=2
+exchange include_frame=1 include_llc=1 include_pdcp=1 lcid=7
 exchange include_frame=1 include_llc=1 include_pdcp=1 lcid=8
 activate lcid=2 tx=1 rx=1
+activate lcid=7 tx=1 rx=1
 activate lcid=8 tx=1 rx=1
 
 log bit=11110000000111100111100111101111011110
@@ -16,12 +18,13 @@ Console
 nc -u localhost 21000
 nc -u localhost 22000
 
-
 nc -u localhost 21021 -p 21022
 nc -u localhost 22021 -p 22022
 
+WIFI1 > WIFI2
 ./udp_checker --host=127.0.0.1 --port=21021 --mode=send --size=1250 --rate=1000
 ./udp_checker --host=127.0.0.1 --port=22022 --mode=recv --stats=1
 
-./udp_checker --host=127.0.0.1 --port=1244 --mode=send --size=1250 --rate=3000
-./udp_checker --host=127.0.0.1 --port=1235 --mode=recv --stats=1
+WIFI2 > WIFI1
+./udp_checker --host=127.0.0.1 --port=22021 --mode=send --size=1250 --rate=1000
+./udp_checker --host=127.0.0.1 --port=21022 --mode=recv --stats=1

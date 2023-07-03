@@ -11,7 +11,7 @@ set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_STANDARD 17)
 
 ExternalProject_Add(googletest
-  SOURCE_DIR ../googletest
+  SOURCE_DIR ../cpp_dependencies/googletest
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/googletest
   CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=googletest_install
 )
@@ -46,7 +46,14 @@ add_dependencies(gmock_main gtest)
 
 file(GLOB_RECURSE test_src test/*.cpp)
 add_executable(test ${test_src})
-target_include_directories(test PRIVATE src test . .. ../Logless/src ../cum/src)
+target_include_directories(test PRIVATE
+    src
+    test
+    .
+    ..
+    ../cpp_dependencies
+    ../cpp_dependencies/Logless/src
+    ../cpp_dependencies/cum/src)
 target_link_libraries(test PRIVATE pthread gtest gtest_main gmock gmock_main)
 
 if(BUILD_COVERAGE)
@@ -62,6 +69,12 @@ endif()
 
 file(GLOB_RECURSE winject_usermode_src src/*.cpp)
 add_executable(winject_usermode ${winject_usermode_src})
-target_include_directories(winject_usermode PRIVATE src . .. ../Logless/src ../cum/src)
+target_include_directories(winject_usermode PRIVATE
+    src
+    .
+    ..
+    ../cpp_dependencies
+    ../cpp_dependencies/Logless/src
+    ../cpp_dependencies/cum/src)
 target_link_libraries(test PRIVATE pthread)
 
