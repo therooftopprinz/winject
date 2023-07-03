@@ -40,9 +40,9 @@ public:
 
     ~UDPEndPoint()
     {
+        udp_sender_running = false;
         if (udp_sender_thread.joinable())
         {
-            udp_sender_running = false;
             udp_sender_thread.join();
         }
 
@@ -56,7 +56,7 @@ private:
         udp_sender_running = true;
         while (udp_sender_running)
         {
-            auto b = pdcp.to_rx(1000*1000);
+            auto b = pdcp.to_rx(1000*100);
             if (b.size())
             {
                 int pFd = sock.handle();

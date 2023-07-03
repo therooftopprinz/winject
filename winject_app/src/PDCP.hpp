@@ -437,7 +437,6 @@ public:
 
                 if (rx_config.allow_rlf)
                 {
-                    lg.unlock();
                     rrc.on_rlf_rx(lcid);
                     break;
                 }

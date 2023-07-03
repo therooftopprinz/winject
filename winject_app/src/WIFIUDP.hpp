@@ -19,6 +19,12 @@ public:
             Logless(*main_logger, TEP_ERR, "ERR | WIFIUDP | Bind error(_) can't setup WIFIUDP", strerror(errno));
             throw std::runtime_error("Can't setup WIFIUDP");
         }
+
+        struct timeval tv;
+        tv.tv_sec = 0;
+        tv.tv_usec = 1000*100;
+        setsockopt(sock.handle(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+
     }
     
     ssize_t send(const uint8_t* buff, size_t sz)

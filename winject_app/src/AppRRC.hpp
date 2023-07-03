@@ -33,7 +33,7 @@ public:
     AppRRC(const config_t& config)
         : config(config)
         , tx_scheduler(timer, *this)
-    {        
+    {
         std::stringstream srcss;
         uint32_t srcraw;
         srcss << std::hex << config.frame_config.hwdst;
@@ -71,32 +71,40 @@ public:
 
     ~AppRRC()
     {
+        stop();
+
         Logless(*main_logger, RRC_DBG, "DBG | AppRRC | AppRRC stopping...");
+
+        if (wifi_rx_thread.joinable())
+        {
+            wifi_rx_thread.join();
+        }
+
+        if (rrc_rx_thread.joinable())
+        {
+            rrc_rx_thread.join();
+        }
+
+        if (timer_thread.joinable())
+        {
+            timer_thread.join();
+        }
+
+        if (rrc_event_thread.joinable())
+        {
+            rrc_event_thread.join();
+        }
+
+        ieps.clear();
     }
 
     void stop()
     {
-        stop_timer();
-        stop_wifi_rx();
+        wifi_rx_running = false;
+        rrc_rx_running = false;
+        rrc_event_running = false;
+        timer.stop();
         reactor.stop();
-    }
-
-    void stop_timer()
-    {
-        if (timer_thread.joinable())
-        {
-            timer.stop();
-            timer_thread.join();
-        }
-    }
-
-    void stop_wifi_rx()
-    {
-        if (wifi_rx_thread.joinable())
-        {
-            wifi_rx_running = false;
-            wifi_rx_thread.join();
-        }
     }
 
     void on_console_read()
@@ -213,7 +221,7 @@ public:
 
     std::string on_cmd_stop(bfc::ArgsMap&& args)
     {
-        stop();
+        push_rrc_event(rrc_event_stop_t{});
         return "stop:\n";
     }
 
@@ -292,28 +300,15 @@ public:
         reactor.run();
     }
 
-    // @todo signal asynchronously to prevent deadlock in LLC
     void on_rlf_tx(lcid_t lcid)
     {
-        std::unique_lock<std::shared_mutex> lg(this_mutex);
-        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | RLF TX lcid=#", (int) lcid);
-        auto llc = llcs.at(lcid);
-        auto pdcp = pdcps.at(lcid);
-        lg.unlock();
-        pdcp->set_tx_enabled(false);    
-        llc->set_tx_enabled(false);
+        push_rrc_event(rrc_event_rlf_t{lcid, rrc_event_rlf_t::TX});
     }
 
     // @todo signal asynchronously to prevent deadlock in LLC
     void on_rlf_rx(lcid_t lcid)
     {
-        std::unique_lock<std::shared_mutex> lg(this_mutex);
-        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | RLF RX lcid=#", (int) lcid);
-        auto llc = llcs.at(lcid);
-        auto pdcp = pdcps.at(lcid);
-        lg.unlock();
-        pdcp->set_rx_enabled(false);    
-        llc->set_rx_enabled(false);
+        push_rrc_event(rrc_event_rlf_t{lcid, rrc_event_rlf_t::RX});
     }
 
     void perform_tx(size_t payload_size)
@@ -440,7 +435,7 @@ private:
             rx_config.mode = tx_config.mode;
 
             auto pdcp = pdcps[id];
-            auto llc = std::make_shared<LLC>(pdcp, *this, id,
+            auto llc = std::make_shared<LLC>(*pdcp, *this, id,
                 tx_config, rx_config);
 
             llcs.emplace(id, llc);
@@ -510,6 +505,7 @@ private:
 
     void setup_rrc()
     {
+        rrc_event_thread = std::thread([this](){run_rrc_event();});
         rrc_rx_thread =  std::thread([this](){run_rrc_rx();});
         wifi_rx_thread = std::thread([this](){run_wifi_rx();});
     }
@@ -520,11 +516,15 @@ private:
         while (wifi_rx_running)
         {
             int rv = wifi->recv(rx_buff, sizeof(rx_buff));
+
+            if (EAGAIN == errno || EWOULDBLOCK == errno)
+            {
+                continue;
+            }
             if (rv<0)
             {
-                Logless(*main_logger, RRC_ERR, "ERR | AppRRC | wifi recv failed! errno=# error=#\n", errno, strerror(errno));
-                stop();
-                return;
+                Logless(*main_logger, RRC_ERR, "ERR | AppRRC | wifi recv failed! errno=# error=#", errno, strerror(errno));
+                continue;
             }
 
             winject::radiotap::radiotap_t radiotap(rx_buff);
@@ -621,7 +621,7 @@ private:
         rrc_rx_running = true;
         while (rrc_rx_running)
         {
-            auto b = pdcp0->to_rx(1000*1000);
+            auto b = pdcp0->to_rx(1000*100);
             if (b.size())
             {
                 RRC rrc;
@@ -629,6 +629,24 @@ private:
                 decode_per(rrc, context);
                 on_rrc(rrc);
             }
+        }
+    }
+
+    void run_rrc_event()
+    {
+        rrc_event_running = true;
+        std::unique_lock<std::mutex> lg(rrc_event_mutex);
+        while (rrc_event_running)
+        {
+            rrc_event_cv.wait_for(lg, std::chrono::milliseconds(100),
+                [this](){return rrc_events.size();});
+
+            for (auto& event : rrc_events)
+            {
+                std::visit([this](auto&& event){on_rrc_event(event);},
+                    event);
+            }
+            rrc_events.clear();
         }
     }
 
@@ -922,6 +940,46 @@ private:
         pdcp0->to_tx(std::move(b));
     }
 
+    void on_rrc_event(const rrc_event_stop_t&)
+    {
+        stop();
+    }
+
+    void on_rrc_event(const rrc_event_rlf_t& rlf)
+    {
+        auto lcid = rlf.lcid;
+        if (rrc_event_rlf_t::TX == rlf.mode)
+        {
+            std::unique_lock<std::shared_mutex> lg(this_mutex);
+            Logless(*main_logger, RRC_ERR, "ERR | AppRRC | RLF TX lcid=#", (int) lcid);
+            auto llc = llcs.at(lcid);
+            auto pdcp = pdcps.at(lcid);
+            lg.unlock();
+            pdcp->set_tx_enabled(false);    
+            llc->set_tx_enabled(false);
+        }
+        else
+        {
+            std::unique_lock<std::shared_mutex> lg(this_mutex);
+            Logless(*main_logger, RRC_ERR, "ERR | AppRRC | RLF RX lcid=#", (int) lcid);
+            auto llc = llcs.at(lcid);
+            auto pdcp = pdcps.at(lcid);
+            lg.unlock();
+            pdcp->set_rx_enabled(false);    
+            llc->set_rx_enabled(false);
+        }
+    }
+
+    template<typename T>
+    void push_rrc_event(T&& event)
+    {
+        std::unique_lock<std::mutex> lg(rrc_event_mutex);
+        rrc_events.emplace_back(std::forward<T&&>(event));
+        rrc_event_cv.notify_one();
+    }
+
+    using rrc_event_t = std::variant<rrc_event_stop_t, rrc_event_rlf_t>;
+
     config_t config;
     config_t peer_config;
 
@@ -953,11 +1011,18 @@ private:
     std::thread rrc_rx_thread;
     std::atomic_bool rrc_rx_running = false;
 
+    std::deque<rrc_event_t> rrc_events;
+    std::mutex rrc_event_mutex;
+    std::condition_variable rrc_event_cv;
+    std::thread rrc_event_thread;
+    bool rrc_event_running;
+
     // RRC Procedure states
     bool proc_activate_ongoing = false;
     bool proc_activate_should_activate_tx = false;
     bool proc_activate_should_activate_rx = false;
     lcid_t proc_activate_lcid = -1;
+
 
     std::shared_mutex this_mutex;
 };

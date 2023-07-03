@@ -18,7 +18,7 @@ struct Test_LLC : public testing::Test
         tx_config.crc_type = ILLC::E_CRC_TYPE_NONE;
         rx_config.crc_type = ILLC::E_CRC_TYPE_NONE;
 
-        sut = std::make_shared<LLC>(mock_pdcp, *mock_rrc, 0, tx_config, rx_config);
+        sut = std::make_shared<LLC>(*mock_pdcp, *mock_rrc, 0, tx_config, rx_config);
         sut->set_tx_enabled(true);
         sut->set_rx_enabled(true);
     }

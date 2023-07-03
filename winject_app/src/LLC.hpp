@@ -18,7 +18,7 @@ class LLC : public ILLC
 {
 public:
     LLC(
-        std::shared_ptr<IPDCP> pdcp,
+        IPDCP& pdcp,
         IRRC& rrc,
         uint8_t lcid,
         tx_config_t tx_config,
@@ -27,9 +27,9 @@ public:
         , rrc(rrc)
         , lcid(lcid)
         , tx_config(tx_config)
-        , rx_config(rx_config)
         , tx_ring(1024)
         , sn_to_tx_ring(llc_sn_size, -1)
+        , rx_config(rx_config)
     {
     }
 
@@ -45,26 +45,28 @@ public:
 
         if (tx_config.mode == E_TX_MODE_AM)
         {
+            std::unique_lock<std::mutex> lg(tx_ring_mutex);
             for (auto& tx_ring_elem : tx_ring)
             {
                 if(tx_ring_elem.pdcp_pdu.empty())
                 {
-                    tx_ring_elem.pdcp_pdu = allocate_buffer();
+                    tx_ring_elem.pdcp_pdu = allocate_tx_buffer();
                 }
                 tx_ring_elem.acknowledged = true;
                 tx_ring_elem.sent_index = -1;
             }
         }
 
-        for (auto& i : to_retx_list)
         {
-            if (i.pdcp_pdu.size())
+            for (auto& i : to_retx_list)
             {
-                free_buffer(std::move(i.pdcp_pdu));
+                if (i.pdcp_pdu.size())
+                {
+                    free_tx_buffer(std::move(i.pdcp_pdu));
+                }
             }
+            to_retx_list.clear();
         }
-
-        to_retx_list.clear();
 
         Logless(*main_logger, LLC_INF,
             "INF | LLC#   | tx_enable=#",
@@ -165,6 +167,8 @@ public:
     */
     void on_tx(tx_info_t& info)
     {
+        std::unique_lock<std::mutex> tx_lg(tx_mutex);
+
         auto slot_number = info.in_frame_info.slot_number;
         if ((is_rx_enabled || is_tx_enabled) && last_stats_slot != slot_number &&
             (info.in_frame_info.slot_number & 0x7FF) == 0x7FF)
@@ -173,19 +177,7 @@ public:
             print_stats();
         }
 
-        std::unique_lock<std::mutex> lg(tx_mutex);
-        if (!is_tx_enabled)
-        {
-            return;
-        }
-
         check_retransmit(slot_number);
-
-        // @note Setup tx_ring element for retransmit check
-        auto ack_ck_idx = tx_ring_index(slot_number + tx_config.arq_window_size);
-        auto tx_idx = tx_ring_index(slot_number);
-        auto& ack_elem = tx_ring[ack_ck_idx];
-        auto& tx_elem = tx_ring[tx_idx];
 
         llc_t llc(info.out_pdu.base, info.out_pdu.size);
         llc.crc_size = tx_crc_size;
@@ -195,15 +187,15 @@ public:
         {
             info.out_pdu.size = 0;
             // @note No allocation just inform PDCP for slot update;
-            pdcp->on_tx(info);
+            pdcp.on_tx(info);
             return;
         }
 
         info.out_pdu.base = llc.payload();
         info.out_pdu.size -= llc.get_header_size();
 
+        // @note Allocate LLC-DATA-ACKs first
         {
-            // @note Allocate LLC-DATA-ACKs first
             std::unique_lock<std::mutex> lg(to_ack_list_mutex);
             llc_payload_ack_t* acks = (llc_payload_ack_t*) llc.payload();
 
@@ -246,11 +238,16 @@ public:
             }
         }
 
+        if (!is_tx_enabled)
+        {
+            return;
+        }
+
         // @note No allocation just inform PDCP for slot update;
         if (info.out_pdu.size < llc.get_header_size() || !info.in_allow_data)
         {
             info.out_pdu.size = 0;
-            pdcp->on_tx(info);
+            pdcp.on_tx(info);
             return;
         }
 
@@ -271,7 +268,7 @@ public:
             {
                 info.out_pdu.size = 0;
                 // @note No allocation just inform PDCP for slot update;
-                pdcp->on_tx(info);
+                pdcp.on_tx(info);
                 info.out_tx_available = true;
                 return;
             }
@@ -282,7 +279,7 @@ public:
         // @note Get PDCP from PDCP layer
         if (!has_retransmit)
         {
-            pdcp->on_tx(info);
+            pdcp.on_tx(info);
             size_t pdcp_allocation_size = info.out_allocated - init_alloc;
             llc.set_payload_size(pdcp_allocation_size);
             info.out_has_data_loaded = true;
@@ -311,14 +308,13 @@ public:
                 if (tx_config.allow_rlf)
                 {
                     info.out_allocated = 0;
-                    lg.unlock();
                     rrc.on_rlf_tx(lcid);
                     return;
                 }
 
                 // RETX dropped, aquire new PDCP PDU
 
-                pdcp->on_tx(info);
+                pdcp.on_tx(info);
                 size_t pdcp_allocation_size = info.out_allocated - init_alloc;
                 llc.set_payload_size(pdcp_allocation_size);
                 info.out_has_data_loaded = true;
@@ -326,13 +322,13 @@ public:
             else
             {
                 std::memcpy(llc.payload(), retx_pdu.pdcp_pdu.data(), retx_pdu.pdcp_pdu_size);
-                free_buffer(std::move(retx_pdu.pdcp_pdu));
+                free_tx_buffer(std::move(retx_pdu.pdcp_pdu));
                 llc.set_payload_size(retx_pdu.pdcp_pdu_size);
                 info.out_allocated += retx_pdu.pdcp_pdu_size;
                 to_retx_list.pop_front();
 
                 info.out_pdu.size = 0;
-                pdcp->on_tx(info);
+                pdcp.on_tx(info);
                 info.out_has_data_loaded = true;
             }
         }
@@ -352,6 +348,14 @@ public:
         }
         increment_sn();
 
+        std::unique_lock<std::mutex> tx_ring_lg(tx_ring_mutex);
+
+        // @note Setup tx_ring element index for retransmit check
+        auto ack_ck_idx = tx_ring_index(slot_number + tx_config.arq_window_size);
+        auto tx_idx = tx_ring_index(slot_number);
+        auto& ack_elem = tx_ring[ack_ck_idx];
+        auto& tx_elem = tx_ring[tx_idx];
+
         if (E_TX_MODE_AM == tx_config.mode)
         {
             tx_elem.retry_count = retx_count;
@@ -368,6 +372,9 @@ public:
             stats.bytes_resent.fetch_add(tx_elem.pdcp_pdu_size);
         }
 
+        tx_ring_lg.unlock();
+        tx_lg.unlock();
+
         Logless(*main_logger, LLC_TRC,
             "TRC | LLC#   | pdu slot=# tx_idx=# ack_idx=# sn=# pdu_sz=#",
             (int) lcid,
@@ -381,6 +388,7 @@ public:
     void on_rx(rx_info_t& info)
     {
         std::unique_lock<std::mutex> lg(rx_mutex);
+
         if (!is_rx_enabled)
         {
             return;
@@ -408,6 +416,7 @@ public:
                 llc_sn_t sn = ack.sn & llc_sn_mask;
                 for (size_t i=0; i<ack.count; i++)
                 {
+                    std::unique_lock<std::mutex> lg(tx_ring_mutex);
                     size_t idx_ = sn_to_tx_ring[sn];
                     auto idx = tx_ring_index(idx_);
                     auto& ack_slot = tx_ring[idx];
@@ -422,6 +431,7 @@ public:
                         "TRC | LLC#   | acked idx=# sn=#",
                         (int) lcid, ack_slot.sent_index,
                         (int) sn);
+
                     sn = llc_sn_mask & (sn+1);
                 }
             }
@@ -442,7 +452,7 @@ public:
  
             stats.bytes_recv.fetch_add(info.in_pdu.size);
             stats.pkt_recv.fetch_add(1);
-            pdcp->on_rx(info);
+            pdcp.on_rx(info);
         }
     }
 
@@ -474,7 +484,7 @@ private:
         auto& to_retx = to_retx_list.back();
         to_retx.retry_count = sent_slot.retry_count;
         to_retx.pdcp_pdu_size = sent_slot.pdcp_pdu_size;
-        to_retx.pdcp_pdu = allocate_buffer();
+        to_retx.pdcp_pdu = allocate_tx_buffer();
         sent_slot.pdcp_pdu.swap(to_retx.pdcp_pdu);
         stats.pkt_resent.fetch_add(1);
         stats.bytes_resent.fetch_add(sent_slot.pdcp_pdu_size);
@@ -511,21 +521,21 @@ private:
         return slot % tx_ring.size();
     }
 
-    buffer_t allocate_buffer()
+    buffer_t allocate_tx_buffer()
     {
-        if (buffer_pool.size())
+        if (tx_buffer_pool.size())
         {
-            auto rv = std::move(buffer_pool.back());
-            buffer_pool.pop_back();
+            auto rv = std::move(tx_buffer_pool.back());
+            tx_buffer_pool.pop_back();
             return std::move(rv);
         }
 
         return buffer_t(llc_max_size);
     }
 
-    void free_buffer(buffer_t&& buffer)
+    void free_tx_buffer(buffer_t&& buffer)
     {
-        buffer_pool.emplace_back(std::move(buffer));
+        tx_buffer_pool.emplace_back(std::move(buffer));
     }
 
     const stats_t& get_stats()
@@ -550,38 +560,40 @@ private:
         buffer_t pdcp_pdu;
     };
 
-    std::shared_ptr<IPDCP> pdcp;
+    IPDCP& pdcp;
     IRRC& rrc;
-
-    // @brief Used for pdpc cache and retx cache
-    std::list<buffer_t> buffer_pool;
     // @brief Logical Channel Identifier
     lcid_t lcid;
-    tx_config_t tx_config;
-    rx_config_t rx_config;
 
+    // TX Data Structures ------------------------------------------------------
+    std::mutex tx_mutex;
+    bool is_tx_enabled = false;
+    tx_config_t tx_config;
     size_t tx_crc_size = 0;
+
+    std::list<buffer_t> tx_buffer_pool;
+    llc_sn_t  sn_counter = 0;
+    std::list<retx_elem_t> to_retx_list;
+
+    // Common Data Structures --------------------------------------------------
+    std::vector<tx_ring_elem_t> tx_ring;
+    std::vector<size_t> sn_to_tx_ring;
+    std::mutex tx_ring_mutex;
+    
+    std::list<std::pair<size_t,size_t>> to_ack_list;
+    std::mutex to_ack_list_mutex;
+
+    // RX Data Structures ------------------------------------------------------
+    std::mutex rx_mutex;
+    bool is_rx_enabled = false;
+    rx_config_t rx_config;
     size_t rx_crc_size = 0;
 
-    // @brief Context for the checking of acknowledgments and PDCP cache
-    std::vector<tx_ring_elem_t> tx_ring;
-    // @brief Mapping for sn to tx_ring index
-    std::vector<size_t> sn_to_tx_ring;
-    // @brief LLC sequence number list pending for acknowledgement
-    std::list<std::pair<size_t,size_t>> to_ack_list;
-    // @brief PDCP frames that needs retransmission (multithreaded)
-    std::list<retx_elem_t> to_retx_list;
-    std::mutex to_ack_list_mutex;
-    llc_sn_t  sn_counter = 0;
-    static constexpr size_t llc_max_size = 1500;
-
-    bool is_tx_enabled = false;
-    bool is_rx_enabled = false;
-    std::mutex tx_mutex;
-    std::mutex rx_mutex;
-
+    // Statistics --------------------------------------------------------------
     stats_t stats;
     uint64_t last_stats_slot = -1;
+
+    static constexpr size_t llc_max_size = 1500;
 };
 
 #endif // __WINJECTUM_LLC_HPP__
