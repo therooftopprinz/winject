@@ -580,12 +580,15 @@ void AppRRC::run_rrc_rx()
 void AppRRC::on_rrc_event()
 {
     std::unique_lock<std::mutex> lg(rrc_event_mutex);
-    for (auto& event : rrc_events)
+    auto events = std::move(rrc_events);
+    rrc_events.clear();
+    lg.unlock();
+
+    for (auto& event : events)
     {
         std::visit([this](auto&& event){on_rrc_event(event);},
             event);
     }
-    rrc_events.clear();
 }
 
 void AppRRC::notify_rrc_event()
@@ -897,13 +900,14 @@ void AppRRC::on_rrc_event(const rrc_event_setup_t& setup)
     std::unique_lock<std::mutex> lg(channel_rrc_contexts_mutex);
     auto& channel_ctx = channel_rrc_contexts[setup.lcid];
 
-    Logless(*main_logger, RRC_ERR, "ERR | AppRRC | Setting up lcid=# for TX",
-        (int) lcid);
-
     if (lc_rrc_context_t::E_CFG_STATE_PENDING == channel_ctx.tx_config_state)
     {
         return;
     }
+
+    Logless(*main_logger, RRC_ERR, "ERR | AppRRC | Setting up lcid=# for TX",
+        (int) lcid);
+
     
     channel_ctx.tx_config_state = lc_rrc_context_t::E_CFG_STATE_PENDING;
     lg.unlock();
