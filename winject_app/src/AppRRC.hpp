@@ -55,8 +55,8 @@ private:
 
     void setup_80211_base_frame();
     void setup_console();
-    void setup_pdcps();
     void setup_llcs();
+    void setup_pdcps();
     void setup_eps();
     void setup_scheduler();
     void setup_rrc();
@@ -133,6 +133,7 @@ private:
 
     config_t config;
     config_t peer_config;
+    std::mutex peer_config_mutex;
 
     bfc::Timer<> timer;
     bfc::Timer<> timer2;
@@ -140,7 +141,7 @@ private:
     std::thread timer2_thread;
     std::thread wifi_rx_thread;
     std::atomic_bool wifi_rx_running = false;
-    uint8_t rrc_req_id = 0;
+    std::atomic_uint8_t rrc_req_id = 0;
     std::shared_ptr<IWIFI> wifi;
     TxScheduler tx_scheduler;
 
@@ -177,10 +178,21 @@ private:
     };
 
     std::map<uint8_t, rrc_request_context_t> rrc_requests;
+    std::mutex rrc_requests_mutex;
 
+    struct lc_rrc_context_t
+    {
+        enum config_state_e {
+            E_CFG_STATE_NULL,
+            E_CFG_STATE_PENDING,
+            E_CFG_STATE_CONFIGURED
+        };
 
+        config_state_e tx_config_state = E_CFG_STATE_NULL;
+    };
 
-    std::shared_mutex this_mutex;
+    std::map<lcid_t, lc_rrc_context_t> channel_rrc_contexts;
+    std::mutex channel_rrc_contexts_mutex;
 };
 
 #endif // __WINJECTUM_APPRRC_HPP__

@@ -26,12 +26,22 @@
     },
     "llc_configs": [
       {
-        "description:" : "RRC0",
+        "description:" : "rrc0",
         "lcid" : 0,
         "tx_mode" : "TM",
         "scheduling_config" : {
           "nd_pdu_size" : 0,
           "quanta" : 4294967295
+        },
+        "common_tx_config" : {}
+      },
+      {
+        "description:" : "data1",
+        "lcid" : 1,
+        "tx_mode" : "TM",
+        "scheduling_config" : {
+          "nd_pdu_size" : 0,
+          "quanta" : 500
         },
         "common_tx_config" : {}
       },
@@ -68,7 +78,7 @@
         }
       },
       {
-        "description:" : "video8s",
+        "description:" : "video8",
         "lcid" : 8,
         "tx_mode" : "AM",
         "scheduling_config" : {
@@ -87,13 +97,28 @@
     ],
     "pdcp_configs": [
       {
-        "description:" : "RRC0",
+        "description:" : "rrc0",
         "lcid" : 0,
         "tx_config": {
           "allow_rlf" : false
         },
         "endpoint_config": {
           "type" : "RRC0"
+        }
+      },
+      {
+        "description:" : "data1",
+        "lcid" : 1,
+        "tx_config" : {
+          "allow_rlf" : false,
+          "allow_segmentation" : false,
+          "allow_reordering" : false,
+          "min_commit_size" : 0
+        },
+        "endpoint_config" : {
+          "type" : "UDP",
+          "udp_tx_address" : "127.0.0.1:21011",
+          "udp_rx_address" : "127.0.0.1:21012"
         }
       },
       {

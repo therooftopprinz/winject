@@ -123,48 +123,24 @@ void LLC::reconfigure(const rx_config_t& config)
     set_rx_enabled(status);
 }
 
-void LLC::print_stats()
-{
-    LoglessF(*main_logger, LLC_STS, "STS | LLC#   | RAW #,#,#,#,#,#", (int) lcid,
-        stats.bytes_recv.load(),
-        stats.bytes_sent.load(),
-        stats.bytes_resent.load(),
-        stats.pkt_recv.load(),
-        stats.pkt_sent.load(),
-        stats.pkt_resent.load());
-
-    Logless(*main_logger, LLC_STS, "STS | LLC#   | STATS:", (int) lcid);
-    Logless(*main_logger, LLC_STS, "STS | LLC#   |   bytes_recv:    #", (int) lcid, stats.bytes_recv.load());
-    Logless(*main_logger, LLC_STS, "STS | LLC#   |   bytes_sent:    #", (int) lcid, stats.bytes_sent.load());
-    Logless(*main_logger, LLC_STS, "STS | LLC#   |   bytes_resent:  #", (int) lcid, stats.bytes_resent.load());
-    Logless(*main_logger, LLC_STS, "STS | LLC#   |   pkt_recv:      #", (int) lcid, stats.pkt_recv.load());
-    Logless(*main_logger, LLC_STS, "STS | LLC#   |   pkt_sent:      #", (int) lcid, stats.pkt_sent.load());
-    Logless(*main_logger, LLC_STS, "STS | LLC#   |   pkt_resent:    #", (int) lcid, stats.pkt_resent.load());
-}
-
 void LLC::on_tx(tx_info_t& info)
 {
     std::unique_lock<std::mutex> tx_lg(tx_mutex);
 
     auto slot_number = info.in_frame_info.slot_number;
-    if ((is_rx_enabled || is_tx_enabled) && last_stats_slot != slot_number &&
-        (info.in_frame_info.slot_number & 0x7FF) == 0x7FF)
-    {
-        last_stats_slot = slot_number;
-        print_stats();
-    }
 
     check_retransmit(slot_number);
 
     llc_t llc(info.out_pdu.base, info.out_pdu.size);
     llc.crc_size = tx_crc_size;
 
-    // @note tx_info for slot synchronization only
+    // tx_info for slot synchronization and data detection
     if (info.out_pdu.size <= llc.get_header_size())
     {
         info.out_pdu.size = 0;
-        // @note No allocation just inform PDCP for slot update;
+        // No allocation just inform PDCP for slot update to identify pending tx
         pdcp.on_tx(info);
+        info.out_tx_available = info.out_tx_available || to_retx_list.size();
         return;
     }
 
@@ -220,11 +196,13 @@ void LLC::on_tx(tx_info_t& info)
         return;
     }
 
-    // @note No allocation just inform PDCP for slot update;
+    // No allocation just inform PDCP for slot update;
     if (info.out_pdu.size < llc.get_header_size() || !info.in_allow_data)
     {
         info.out_pdu.size = 0;
+        // No allocation just inform PDCP for slot update to identify pending tx
         pdcp.on_tx(info);
+        info.out_tx_available = info.out_tx_available || to_retx_list.size();
         return;
     }
 
@@ -372,6 +350,8 @@ void LLC::on_rx(rx_info_t& info)
     }
 
     llc_t llc(info.in_pdu.base, info.in_pdu.size);
+    llc.crc_size = rx_crc_size;
+
     // @note Handle ack
     if (llc.get_A())
     {
@@ -453,9 +433,9 @@ void LLC::check_retransmit(size_t slot_number)
         slot_number,
         this_slot.sent_index);
 
-    // @note Reset state to default
+    // Reset state to default
     sent_slot.acknowledged = true;
-    // @note Queue back retx PDCP
+    // Queue back retx PDCP
     to_retx_list.emplace_back();
     auto& to_retx = to_retx_list.back();
     to_retx.retry_count = sent_slot.retry_count;

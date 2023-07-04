@@ -37,8 +37,6 @@ public:
 
     virtual void reconfigure(const rx_config_t& config) override;
 
-    void print_stats();
-
     void on_tx(tx_info_t& info) override;
     void on_rx(rx_info_t& info) override;
  
@@ -54,11 +52,11 @@ private:
     // @brief Used to indicated retransmit slot
     struct tx_ring_elem_t
     {
-        size_t sent_index;
-        size_t retry_count;
-        size_t pdcp_pdu_size;
+        size_t sent_index = -1;
+        size_t retry_count = 0;
+        size_t pdcp_pdu_size = 0;
         buffer_t pdcp_pdu;
-        bool acknowledged;
+        bool acknowledged = true;
     };
 
     struct retx_elem_t
@@ -99,7 +97,6 @@ private:
 
     // Statistics --------------------------------------------------------------
     stats_t stats;
-    uint64_t last_stats_slot = -1;
 
     static constexpr size_t llc_max_size = 1500;
 };
