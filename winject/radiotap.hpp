@@ -570,7 +570,7 @@ public:
     }
 };
 
-std::string to_string(const radiotap_t& rt)
+inline std::string to_string(const radiotap_t& rt)
 {
     if (!rt.header)
         return {};

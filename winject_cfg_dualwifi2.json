@@ -36,21 +36,6 @@
         "common_tx_config" : {}
       },
       {
-        "description:" : "RRC1",
-        "lcid" : 1,
-        "tx_mode" : "AM",
-        "scheduling_config" : {
-          "nd_pdu_size" : 1024,
-          "quanta" : 4294967294
-        },
-        "am_tx_config": {
-          "allow_rlf" : true,
-          "arq_window_size" : 30,
-          "max_retx_count" : 100
-        },
-        "common_tx_config" : {}
-      },
-      {
         "description:" : "data2",
         "lcid" : 2,
         "tx_mode" : "AM",
@@ -109,20 +94,6 @@
         },
         "endpoint_config" : {
           "type" : "RRC0"
-        }
-      },
-      {
-        "description:" : "RRC1",
-        "lcid" : 1,
-        "tx_config" : {
-          "allow_rlf" : true,
-          "allow_segmentation" : false,
-          "allow_reordering" : true,
-          "max_sn_distance" : 1500,
-          "min_commit_size" : 0
-        },
-        "endpoint_config" : {
-          "type" : "RRC1"
         }
       },
       {

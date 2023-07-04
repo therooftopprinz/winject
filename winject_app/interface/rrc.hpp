@@ -83,23 +83,16 @@
 // Sequence:  RRC_ExchangeRequest ('RRC_FrameConfigOptional', 'frameConfig')
 // Sequence:  RRC_ExchangeRequest ('RRC_LLCConfigOptional', 'llcConfig')
 // Sequence:  RRC_ExchangeRequest ('RRC_PDCPConfigOptional', 'pdcpConfig')
-// Sequence:  RRC_ExchangeRequest ('RRC_U8', 'lcid')
 // Sequence:  RRC_ExchangeResponse ('RRC_FrameConfigOptional', 'frameConfig')
 // Sequence:  RRC_ExchangeResponse ('RRC_LLCConfigOptional', 'llcConfig')
 // Sequence:  RRC_ExchangeResponse ('RRC_PDCPConfigOptional', 'pdcpConfig')
 // Sequence:  RRC_PushResponse ('RRC_U8', 'spare')
-// Sequence:  RRC_ActivateRequest ('RRC_U8', 'llcid')
-// Sequence:  RRC_ActivateRequest ('RRC_BOOL', 'activateTx')
-// Sequence:  RRC_ActivateRequest ('RRC_BOOL', 'activateRx')
-// Sequence:  RRC_ActivateResponse ('RRC_U8', 'spare')
 // Choice:  ('RRC_Message', 'RRC_PullRequest')
 // Choice:  ('RRC_Message', 'RRC_PullResponse')
 // Choice:  ('RRC_Message', 'RRC_PushRequest')
 // Choice:  ('RRC_Message', 'RRC_PushResponse')
 // Choice:  ('RRC_Message', 'RRC_ExchangeRequest')
 // Choice:  ('RRC_Message', 'RRC_ExchangeResponse')
-// Choice:  ('RRC_Message', 'RRC_ActivateRequest')
-// Choice:  ('RRC_Message', 'RRC_ActivateResponse')
 // Sequence:  RRC ('RRC_U8', 'requestID')
 // Sequence:  RRC ('RRC_Message', 'message')
 // Generating for C++
@@ -253,7 +246,6 @@ struct RRC_ExchangeRequest
     RRC_FrameConfigOptional frameConfig;
     RRC_LLCConfigOptional llcConfig;
     RRC_PDCPConfigOptional pdcpConfig;
-    RRC_U8 lcid;
 };
 
 struct RRC_ExchangeResponse
@@ -268,19 +260,7 @@ struct RRC_PushResponse
     RRC_U8 spare;
 };
 
-struct RRC_ActivateRequest
-{
-    RRC_U8 llcid;
-    RRC_BOOL activateTx;
-    RRC_BOOL activateRx;
-};
-
-struct RRC_ActivateResponse
-{
-    RRC_U8 spare;
-};
-
-using RRC_Message = std::variant<RRC_PullRequest,RRC_PullResponse,RRC_PushRequest,RRC_PushResponse,RRC_ExchangeRequest,RRC_ExchangeResponse,RRC_ActivateRequest,RRC_ActivateResponse>;
+using RRC_Message = std::variant<RRC_PullRequest,RRC_PullResponse,RRC_PushRequest,RRC_PushResponse,RRC_ExchangeRequest,RRC_ExchangeResponse>;
 struct RRC
 {
     RRC_U8 requestID;
@@ -934,7 +914,6 @@ inline void encode_per(const RRC_ExchangeRequest& pIe, cum::per_codec_ctx& pCtx)
     {
         encode_per(*pIe.pdcpConfig, pCtx);
     }
-    encode_per(pIe.lcid, pCtx);
 }
 
 inline void decode_per(RRC_ExchangeRequest& pIe, cum::per_codec_ctx& pCtx)
@@ -957,7 +936,6 @@ inline void decode_per(RRC_ExchangeRequest& pIe, cum::per_codec_ctx& pCtx)
         pIe.pdcpConfig = decltype(pIe.pdcpConfig)::value_type{};
         decode_per(*pIe.pdcpConfig, pCtx);
     }
-    decode_per(pIe.lcid, pCtx);
 }
 
 inline void str(const char* pName, const RRC_ExchangeRequest& pIe, std::string& pCtx, bool pIsLast)
@@ -975,7 +953,7 @@ inline void str(const char* pName, const RRC_ExchangeRequest& pIe, std::string& 
     if (pIe.frameConfig) nOptional++;
     if (pIe.llcConfig) nOptional++;
     if (pIe.pdcpConfig) nOptional++;
-    size_t nMandatory = 1;
+    size_t nMandatory = 0;
     if (pIe.frameConfig)
     {
         str("frameConfig", *pIe.frameConfig, pCtx, !(nMandatory+--nOptional));
@@ -988,7 +966,6 @@ inline void str(const char* pName, const RRC_ExchangeRequest& pIe, std::string& 
     {
         str("pdcpConfig", *pIe.pdcpConfig, pCtx, !(nMandatory+--nOptional));
     }
-    str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
     pCtx = pCtx + "}";
     if (!pIsLast)
     {
@@ -1117,78 +1094,6 @@ inline void str(const char* pName, const RRC_PushResponse& pIe, std::string& pCt
     }
 }
 
-inline void encode_per(const RRC_ActivateRequest& pIe, cum::per_codec_ctx& pCtx)
-{
-    using namespace cum;
-    encode_per(pIe.llcid, pCtx);
-    encode_per(pIe.activateTx, pCtx);
-    encode_per(pIe.activateRx, pCtx);
-}
-
-inline void decode_per(RRC_ActivateRequest& pIe, cum::per_codec_ctx& pCtx)
-{
-    using namespace cum;
-    decode_per(pIe.llcid, pCtx);
-    decode_per(pIe.activateTx, pCtx);
-    decode_per(pIe.activateRx, pCtx);
-}
-
-inline void str(const char* pName, const RRC_ActivateRequest& pIe, std::string& pCtx, bool pIsLast)
-{
-    using namespace cum;
-    if (!pName)
-    {
-        pCtx = pCtx + "{";
-    }
-    else
-    {
-        pCtx = pCtx + "\"" + pName + "\":{";
-    }
-    size_t nOptional = 0;
-    size_t nMandatory = 3;
-    str("llcid", pIe.llcid, pCtx, !(--nMandatory+nOptional));
-    str("activateTx", pIe.activateTx, pCtx, !(--nMandatory+nOptional));
-    str("activateRx", pIe.activateRx, pCtx, !(--nMandatory+nOptional));
-    pCtx = pCtx + "}";
-    if (!pIsLast)
-    {
-        pCtx += ",";
-    }
-}
-
-inline void encode_per(const RRC_ActivateResponse& pIe, cum::per_codec_ctx& pCtx)
-{
-    using namespace cum;
-    encode_per(pIe.spare, pCtx);
-}
-
-inline void decode_per(RRC_ActivateResponse& pIe, cum::per_codec_ctx& pCtx)
-{
-    using namespace cum;
-    decode_per(pIe.spare, pCtx);
-}
-
-inline void str(const char* pName, const RRC_ActivateResponse& pIe, std::string& pCtx, bool pIsLast)
-{
-    using namespace cum;
-    if (!pName)
-    {
-        pCtx = pCtx + "{";
-    }
-    else
-    {
-        pCtx = pCtx + "\"" + pName + "\":{";
-    }
-    size_t nOptional = 0;
-    size_t nMandatory = 1;
-    str("spare", pIe.spare, pCtx, !(--nMandatory+nOptional));
-    pCtx = pCtx + "}";
-    if (!pIsLast)
-    {
-        pCtx += ",";
-    }
-}
-
 inline void encode_per(const RRC_Message& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
@@ -1218,14 +1123,6 @@ inline void encode_per(const RRC_Message& pIe, cum::per_codec_ctx& pCtx)
     else if (5 == type)
     {
         encode_per(std::get<5>(pIe), pCtx);
-    }
-    else if (6 == type)
-    {
-        encode_per(std::get<6>(pIe), pCtx);
-    }
-    else if (7 == type)
-    {
-        encode_per(std::get<7>(pIe), pCtx);
     }
 }
 
@@ -1264,16 +1161,6 @@ inline void decode_per(RRC_Message& pIe, cum::per_codec_ctx& pCtx)
     {
         pIe = RRC_ExchangeResponse();
         decode_per(std::get<5>(pIe), pCtx);
-    }
-    else if (6 == type)
-    {
-        pIe = RRC_ActivateRequest();
-        decode_per(std::get<6>(pIe), pCtx);
-    }
-    else if (7 == type)
-    {
-        pIe = RRC_ActivateResponse();
-        decode_per(std::get<7>(pIe), pCtx);
     }
 }
 
@@ -1340,26 +1227,6 @@ inline void str(const char* pName, const RRC_Message& pIe, std::string& pCtx, bo
             pCtx += "{";
         std::string name = "RRC_ExchangeResponse";
         str(name.c_str(), std::get<5>(pIe), pCtx, true);
-        pCtx += "}";
-    }
-    else if (6 == type)
-    {
-        if (pName)
-            pCtx += "\"" + std::string(pName) + "\":{";
-        else
-            pCtx += "{";
-        std::string name = "RRC_ActivateRequest";
-        str(name.c_str(), std::get<6>(pIe), pCtx, true);
-        pCtx += "}";
-    }
-    else if (7 == type)
-    {
-        if (pName)
-            pCtx += "\"" + std::string(pName) + "\":{";
-        else
-            pCtx += "{";
-        std::string name = "RRC_ActivateResponse";
-        str(name.c_str(), std::get<7>(pIe), pCtx, true);
         pCtx += "}";
     }
     if (!pIsLast)

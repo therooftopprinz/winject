@@ -45,7 +45,11 @@ set_target_properties(gmock_main PROPERTIES
 add_dependencies(gmock_main gtest)
 
 file(GLOB_RECURSE test_src test/*.cpp)
-add_executable(test ${test_src})
+add_executable(test
+    ${test_src}
+    src/LLC.cpp
+    src/PDCP.cpp
+    )
 target_include_directories(test PRIVATE
     src
     test
@@ -67,9 +71,9 @@ if(BUILD_COVERAGE)
     )
 endif()
 
-file(GLOB_RECURSE winject_usermode_src src/*.cpp)
-add_executable(winject_usermode ${winject_usermode_src})
-target_include_directories(winject_usermode PRIVATE
+file(GLOB_RECURSE winject_app_src src/*.cpp)
+add_executable(winject_app ${winject_app_src})
+target_include_directories(winject_app PRIVATE
     src
     .
     ..

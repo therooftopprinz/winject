@@ -60,19 +60,10 @@ struct IRRC
         app_config_t app_config;
     };
 
-    struct rrc_event_stop_t
-    {};
-
-    struct rrc_event_rlf_t
-    {
-        lcid_t lcid;
-        enum mode_e {TX,RX};
-        mode_e mode;
-    };
-
     virtual ~IRRC(){};
     virtual void on_rlf_tx(lcid_t) = 0;
     virtual void on_rlf_rx(lcid_t) = 0;
+    virtual void initialize_tx(lcid_t) = 0;
     virtual void perform_tx(size_t) = 0;
 };
 

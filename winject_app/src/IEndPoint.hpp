@@ -11,6 +11,9 @@ struct IEndPoint
         std::string address2;
     };
 
+    virtual void set_tx_enabled(bool) = 0;
+    virtual void set_rx_enabled(bool) = 0;
+
     virtual ~IEndPoint() {}
 };
 

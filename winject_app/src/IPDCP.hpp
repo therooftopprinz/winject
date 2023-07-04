@@ -41,6 +41,7 @@ struct IPDCP
         bool allow_reordering = false;
         size_t max_sn_distance = 20;
         size_t min_commit_size = 1000;
+        size_t max_tx_queue_size = 512;
     };
 
     struct rx_config_t
@@ -61,7 +62,6 @@ struct IPDCP
     struct stats_t
     {
         std::atomic<uint64_t> tx_queue_size;
-        std::atomic<uint64_t> tx_ignored_pkt;
         std::atomic<uint64_t> rx_reorder_size;
         std::atomic<uint64_t> rx_invalid_pdu;
         std::atomic<uint64_t> rx_ignored_pdu;
@@ -75,7 +75,7 @@ struct IPDCP
     virtual void on_tx(tx_info_t&) = 0;
     virtual void on_rx(rx_info_t&) = 0;
     virtual buffer_t to_rx(uint64_t=-1) = 0;
-    virtual void to_tx(buffer_t) = 0;
+    virtual bool to_tx(buffer_t) = 0;
 
     virtual lcid_t get_attached_lcid() = 0;
 

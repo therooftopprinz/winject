@@ -23,7 +23,7 @@ public:
         mStartRef = std::chrono::high_resolution_clock::now();
     }
 
-    int schedule(std::chrono::nanoseconds pDiff, FunctorType pCb)
+    uint64_t schedule(std::chrono::nanoseconds pDiff, FunctorType pCb)
     {
         auto tp = std::chrono::high_resolution_clock::now();
         std::unique_lock<std::mutex> lg(mSchedulesMutex);
@@ -43,7 +43,7 @@ public:
         return id;
     }
 
-    void cancel(int pId)
+    void cancel(uint64_t pId)
     {
         std::unique_lock<std::mutex> lg(mSchedulesMutex);
 
@@ -155,14 +155,14 @@ public:
     }
 
 private:
-    using ScheduleIdFn = std::pair<int, FunctorType>;
+    using ScheduleIdFn = std::pair<uint64_t, FunctorType>;
     using ScheduleMap = std::multimap<TimePoint, ScheduleIdFn>;
     ScheduleMap mSchedules;
-    std::unordered_map<int, typename ScheduleMap::iterator> mScheduleIds;
-    int mIdCtr = 0;
+    std::unordered_map<uint64_t, typename ScheduleMap::iterator> mScheduleIds;
+    uint64_t mIdCtr = 0;
 
     FunctorType mToRun;
-    int mToRunId;
+    uint64_t mToRunId;
     TimePoint mToRunTime;
     
     std::condition_variable mSchedulesCv;
