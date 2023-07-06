@@ -15,7 +15,6 @@ TEST(Test_RRC_msgs, should_encode_decode_PullRequest)
         rrc.requestID = 4;
         rrc.message = RRC_PullRequest{};
         auto& msg = std::get<RRC_PullRequest>(rrc.message);
-        msg.includeFrameConfig = true;
         msg.includeLLCConfig = true;
         msg.includePDCPConfig = false;
         msg.lcid = 5;
@@ -33,7 +32,6 @@ TEST(Test_RRC_msgs, should_encode_decode_PullRequest)
         EXPECT_EQ(rrc.requestID, 4);
         ASSERT_EQ(rrc.message.index(), 0);
         auto& msg = std::get<RRC_PullRequest>(rrc.message);
-        EXPECT_EQ(msg.includeFrameConfig, true);
         EXPECT_EQ(msg.includeLLCConfig, true);
         EXPECT_EQ(msg.includePDCPConfig, false);
         EXPECT_EQ(msg.lcid, 5);

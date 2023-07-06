@@ -127,6 +127,11 @@ void LLC::on_tx(tx_info_t& info)
 {
     std::unique_lock<std::mutex> tx_lg(tx_mutex);
 
+    if (!is_tx_enabled)
+    {
+        return;
+    }
+
     auto slot_number = info.in_frame_info.slot_number;
 
     check_retransmit(slot_number);
@@ -189,11 +194,6 @@ void LLC::on_tx(tx_info_t& info)
             info.out_allocated += llc.get_SIZE();
             llc.base = llc.base + llc.get_SIZE();
         }
-    }
-
-    if (!is_tx_enabled)
-    {
-        return;
     }
 
     // No allocation just inform PDCP for slot update;
@@ -263,7 +263,7 @@ void LLC::on_tx(tx_info_t& info)
             if (tx_config.allow_rlf)
             {
                 info.out_allocated = 0;
-                rrc.on_rlf_tx(lcid);
+                rrc.on_rlf(lcid);
                 return;
             }
 

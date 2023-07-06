@@ -85,6 +85,9 @@ struct IPDCP
     virtual void reconfigure(const tx_config_t& config) = 0;
     virtual void reconfigure(const rx_config_t& config) = 0;
 
+    virtual tx_config_t get_tx_config() = 0;
+    virtual rx_config_t get_rx_config() = 0;
+
     virtual const stats_t& get_stats() = 0;
 };
 

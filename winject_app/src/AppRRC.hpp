@@ -24,6 +24,7 @@
 #include "LLC.hpp"
 #include "PDCP.hpp"
 #include "UDPEndPoint.hpp"
+#include "LCRRC.hpp"
 
 #include "rrc_utils.hpp"
 
@@ -37,16 +38,17 @@ public:
 
     void run();
 
-    void on_rlf_tx(lcid_t lcid) override;
-    void on_rlf_rx(lcid_t lcid) override;
+    void on_rlf(lcid_t lcid) override;
+    void on_init(lcid_t) override;
 
-    void initialize_tx(lcid_t) override;
+    uint8_t allocate_req_id() override;
+    void send_rrc(const RRC& rrc) override;
+
     void perform_tx(size_t payload_size) override;
 
 private:
     void on_console_read();
 
-    std::string on_cmd_exchange(bfc::ArgsMap&& args);
     std::string on_cmd_push(bfc::ArgsMap&& args);
     std::string on_cmd_pull(bfc::ArgsMap&& args);
     std::string on_cmd_stop(bfc::ArgsMap&& args);
@@ -59,6 +61,7 @@ private:
     void setup_pdcps();
     void setup_eps();
     void setup_scheduler();
+    void setup_lcrrc();
     void setup_rrc();
 
     void run_wifi_rx();
@@ -70,27 +73,26 @@ private:
     void notify_rrc_event();
     void on_rrc(const RRC& rrc);
 
-    template<typename T>
-    void fill_from_config(
-        int lcid,
-        bool include_frame,
-        bool include_llc,
-        bool include_pdcp,
-        T& message);
+    // template<typename T>
+    // void fill_from_config(
+    //     int lcid,
+    //     bool include_llc,
+    //     bool include_pdcp,
+    //     T& message);
 
-    template<typename T>
-    void update_peer_config_and_reconfigure_rx(const T& msg);
+    // template<typename T>
+    // void update_peer_config_and_reconfigure_rx(const T& msg);
 
-    template<typename T>
-    void notify_resp_handler(uint8_t request_id, const T& msg);
+    // template<typename T>
+    // void notify_resp_handler(uint8_t request_id, const T& msg);
+
+    template <typename T>
+    void on_rrc_message_lcrrc(int req_id, const T& req);
 
     void on_rrc_message(int req_id, const RRC_PullRequest& req);
     void on_rrc_message(int req_id, const RRC_PullResponse& rsp);
     void on_rrc_message(int req_id, const RRC_PushRequest& req);
-    void on_rrc_message(int req_id, const RRC_ExchangeRequest& req);
-    void on_rrc_message(int req_id, const RRC_ExchangeResponse& rsp);
     void on_rrc_message(int req_id, const RRC_PushResponse& msg);
-    void send_rrc(const RRC& rrc);
 
     struct rrc_event_stop_t
     {};
@@ -107,29 +109,23 @@ private:
         lcid_t lcid;
     };
 
-    enum response_index_e {
-        E_RRC_PULL_RSP,
-        E_RRC_PUSH_RSP,
-        E_RRC_EXCH_RSP};
-    using response_t = std::variant<RRC_PullResponse,
-            RRC_PushResponse, RRC_ExchangeResponse>;
+    struct rrc_event_msg_t
+    {
+        RRC msg;
+    };
+    using rrc_event_t = std::variant<
+        rrc_event_stop_t,
+        rrc_event_rlf_t,
+        rrc_event_setup_t,
+        rrc_event_msg_t>;
 
     void on_rrc_event(const rrc_event_stop_t&);
     void on_rrc_event(const rrc_event_rlf_t& rlf);
     void on_rrc_event(const rrc_event_setup_t& setup);
+    void on_rrc_event(const rrc_event_msg_t& msg);
 
     template<typename T>
     void push_rrc_event(T&& event);
-
-    template <typename T>
-    void auto_send_rrc(size_t max_retry, const T& msg,
-        std::function<void(uint8_t, const response_t&)> cb_ok = nullptr,
-        std::function<void()> cb_fail = nullptr);
-
-    using rrc_event_t = std::variant<
-        rrc_event_stop_t,
-        rrc_event_rlf_t,
-        rrc_event_setup_t>;
 
     config_t config;
     config_t peer_config;
@@ -169,30 +165,7 @@ private:
     std::mutex rrc_event_mutex;
     int rrc_event_fd;
 
-    struct rrc_request_context_t
-    {
-        uint64_t exp_timer;
-        RRC request;
-        std::function<void(uint8_t req_id, const response_t&)>
-            handler = nullptr;
-    };
-
-    std::map<uint8_t, rrc_request_context_t> rrc_requests;
-    std::mutex rrc_requests_mutex;
-
-    struct lc_rrc_context_t
-    {
-        enum config_state_e {
-            E_CFG_STATE_NULL,
-            E_CFG_STATE_PENDING,
-            E_CFG_STATE_CONFIGURED
-        };
-
-        config_state_e tx_config_state = E_CFG_STATE_NULL;
-    };
-
-    std::map<lcid_t, lc_rrc_context_t> channel_rrc_contexts;
-    std::mutex channel_rrc_contexts_mutex;
+    std::map<lcid_t, std::shared_ptr<LCRRC>> channel_rrc_contexts;
 };
 
 #endif // __WINJECTUM_APPRRC_HPP__

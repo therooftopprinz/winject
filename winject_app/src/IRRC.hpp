@@ -1,7 +1,8 @@
 #ifndef __WINJECTUM_IRRC_HPP__
 #define __WINJECTUM_IRRC_HPP__
 
-#include<map>
+#include <map>
+#include <string>
 
 #include "frame_defs.hpp"
 
@@ -9,6 +10,8 @@
 #include "ILLC.hpp"
 #include "IEndPoint.hpp"
 #include "ITxScheduler.hpp"
+
+#include "interface/rrc.hpp"
 
 struct IRRC
 {
@@ -61,9 +64,11 @@ struct IRRC
     };
 
     virtual ~IRRC(){};
-    virtual void on_rlf_tx(lcid_t) = 0;
-    virtual void on_rlf_rx(lcid_t) = 0;
-    virtual void initialize_tx(lcid_t) = 0;
+    virtual void on_rlf(lcid_t) = 0;
+    virtual void on_init(lcid_t) = 0;
+    virtual uint8_t allocate_req_id() = 0;
+    virtual void send_rrc(const RRC& rrc) = 0;
+
     virtual void perform_tx(size_t) = 0;
 };
 

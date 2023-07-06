@@ -1,12 +1,11 @@
 nc -u localhost 9999
 
+exchange lcid=1
 exchange lcid=2
 exchange lcid=7
 exchange lcid=8
 pull lcid=8
-activate lcid=2 tx=1 rx=1
-activate lcid=7 tx=1 rx=1
-activate lcid=8 tx=1 rx=1
+
 
 log bit=11110000000111100111100111101111011110
 log bit=11111111111111110111110111111111111111
@@ -23,7 +22,7 @@ nc -u localhost 21021 -p 21022
 nc -u localhost 22021 -p 22022
 
 WIFI1 > WIFI2
-./udp_checker --host=127.0.0.1 --port=21021 --mode=send --size=1250 --rate=1000
+./udp_checker --host=127.0.0.1 --port=21021 --mode=send --size=1250 --rate=5000
 ./udp_checker --host=127.0.0.1 --port=22022 --mode=recv --stats=1
 
 WIFI2 > WIFI1

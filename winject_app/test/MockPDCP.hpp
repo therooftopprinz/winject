@@ -15,6 +15,8 @@ struct MockPDCP : public IPDCP
     MOCK_METHOD1(set_rx_enabled, void(bool));
     MOCK_METHOD1(reconfigure, void(const rx_config_t& config));
     MOCK_METHOD1(reconfigure, void(const tx_config_t& config));
+    MOCK_METHOD0(get_rx_config, rx_config_t());
+    MOCK_METHOD0(get_tx_config, tx_config_t());
     MOCK_METHOD0(get_stats, const stats_t&());
     
 };

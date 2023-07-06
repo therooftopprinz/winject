@@ -83,6 +83,18 @@ void PDCP::reconfigure(const rx_config_t& config)
     set_rx_enabled(status);
 }
 
+IPDCP::tx_config_t PDCP::get_tx_config()
+{
+    std::shared_lock<std::shared_mutex> lg(tx_mutex);
+    return tx_config;
+}
+
+IPDCP::rx_config_t PDCP::get_rx_config()
+{
+    std::shared_lock<std::shared_mutex> lg(rx_mutex);
+    return rx_config;
+}
+
 void PDCP::print_stats()
 {
     LoglessF(*main_logger, LLC_STS, "STS | LLC#   | RAW #,#,#,#,#,#", (int) lcid,
@@ -407,7 +419,7 @@ void PDCP::on_rx(rx_info_t& info)
 
                 if (rx_config.allow_rlf)
                 {
-                    rrc.on_rlf_rx(lcid);
+                    rrc.on_rlf(lcid);
                     break;
                 }
 
@@ -510,7 +522,7 @@ bool PDCP::to_tx(buffer_t buffer)
 
         if (!is_tx_enabled)
         {
-            rrc.initialize_tx(lcid);
+            rrc.on_init(lcid);
         }
 
         to_tx_queue_cv.wait_for(lg, std::chrono::milliseconds(100),

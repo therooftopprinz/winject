@@ -6,9 +6,10 @@
 
 struct MockRRC : public IRRC
 {
-    MOCK_METHOD1(on_rlf_tx, void(lcid_t));
-    MOCK_METHOD1(on_rlf_rx, void(lcid_t));
-    MOCK_METHOD1(initialize_tx, void(lcid_t));
+    MOCK_METHOD1(on_rlf, void(lcid_t));
+    MOCK_METHOD1(on_init, void(lcid_t));
+    MOCK_METHOD0(allocate_req_id, uint8_t());
+    MOCK_METHOD1(send_rrc, void(const RRC& rrc));
     MOCK_METHOD1(perform_tx, void(size_t));
 };
 

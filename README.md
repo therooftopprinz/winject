@@ -10,21 +10,19 @@ Dependencies:
 * [schifra](https://github.com/ArashPartow/schifra)
 
 Folder structure:
-* bfc - BFC classes
-* bin_tests - simple packet injection (WInject, fixed pattern) send / receive
 * bpf - ppWiFi paclet filter scratch pad
-* cum - Common Utility Messenging for RRC
-* googletest - GTest & GMock
-* json - JSON C++
-* Logless - Logger
-* schifra - Reed-Solomon FEC C++ 
+* cpp_dependencies
+  * bfc - BFC classes
+  * cum - Common Utility Messenging for RRC
+  * googletest - GTest & GMock
+  * json - JSON C++
+  * Logless - Logger
+  * schifra - Reed-Solomon FEC C++ 
 * SimpleFEC - WInject with RS Error Correction
 * udp_channeler - UDP channel simulation and limiter
 * udp_checker - create patterns and send over channel and verify
 * winject - 802.11 headers and filters, radiotap, and wifi injector
-* winject_udp - simple packet injection (WInject, udp - small packets) send / receive
-* winject_udp_defrag - simple packet injection (WInject, udp - splitted) send / receive
-* winject_udp_usermode - complete WInject ppWiFi implementation
+* winject_app - complete WInject ppWiFi implementation
 
 ## Abstract
 ppWiFi is an extension to the 802.xx protocols to support robust 
@@ -33,7 +31,6 @@ transmission of multiple logical channels over a shared physical
 channel. It supports the acknowledged transmission mode, as well as 
 forward error correction codes. It supports packet disassembly and 
 reassembly. And it supports message authentication and encryption.
-
 
 ## Problem
 SDR devices are expensive; if the application is just to be able to 
@@ -54,7 +51,7 @@ All of these shortcomings are solved by ppWiFi. ppWiFi allows frame
 check errors to pass through the MAC layer, allowing erroneous frames 
 to be handled. The erroneous frames can be corrected in the ppWiFi LLC 
 layer, this is extremely useful in a radio-edge scenario where the 
-signal drops and packets are dropped in traditional WiFi. 
+signal drops and packets are dropped in traditional WiFi. 
 
 ## Protocol Roles
 ppWIFI MAC:
@@ -67,20 +64,20 @@ ppWIFI LLC:
 - Automatic Repeat Request
 
 ppWIFI PDCP:
-- User Packet Framing
-- Application Endpoint
+- Packet Segmentation and Reassembly
 - Compression
 - Integrity Protection
 - Ciphering
+- Application Endpoint
 
 ppWIFI RRC:
-- Radio Link Configuration management
+- Radio Resource Configuration Management
 
 ## ppWiFi 802.11 Frame structure
-```
 
+```
       +----------------------+----------------------+
-   00 | FRAME CTL (DATA)     | DURATION             |
+   00 | FRAME_CTL (DATA)     | DURATION             |
       +----------------------+----------------------+
    02 | ADDRESS1: 0xFFFFFFFFFFFF                    |
       +----------------------+----------------------+
@@ -88,56 +85,59 @@ ppWIFI RRC:
       +----------------------+----------------------+
    0C | ADDRESS3: 0xB16B00B5B4B3                    |
       +---------------------------------------------+
-   12 | SEQ CTL                                     |
+   12 | SEQ_CTL                                     |
       +---------------------------------------------+
-   14 | FRAME TYPE                                  |
+   14 | FRAME_TYPE                                  |
       +---------------------------------------------+
    15 | ppWiFi LLC PDUs                             | SZ
       +---------------------------------------------+
    SZ | FCS                                         | EOF
       +---------------------------------------------+
-
-      SRC: 24-bit Sender Identifier
-      DST: 24-bit Receiver Identifier
-      FRAME TYPE:
-         0: None
-         1-255: RRC Specified mapping
 ```
+
+* SRC : 24-bit Sender Identifier
+* DST : 24-bit Receiver Identifier
+* FRAME_TYPE:
+  * 0: None
+  * 1-255: RRC Specified Mapping
+ 
 ## ppWiFi LLC
 ```
-      +---+---+-----------------------+
-   00 | # | R | LLC SN                |
-      +---+---+-------+---+-----------+
+      +-------------------------------+
+   00 | LLC_SN                        |
+      +---------------+---+-----------+
    01 | LCID          | A | SIZEH     |
       +---------------+---+-----------+
    02 | SIZEL                         |
       +-------------------------------+
    03 | CRC                           | CRCSZ
       +-------------------------------+
-      | Payload                       | EOP
+      | LLC_DATA/LLC_ACKs             | SIZE
       +-------------------------------+
-
-      R: Retransmit Indicator 
-      LLC SN: 6-bit LLC sequence number
-      LCID: 5-bit Logical Channel Identifier
-      A: Acknowledgement
-      SIZEH: Upper 3-bit of the LLC size
-      SIZEL: Lower 8-bit of the LLC size
-      CRC: Cyclic Redundancy Check
 ```
-## LLC-ACK Payload:
+
+* LLC_SN : LLC sequence number
+* LCID : 5-bit Logical Channel Identifier
+* A : Acknowledgement
+	* If set the payload will be one or repeated **LLC_ACK**
+	* If not set the payload will be an **LLC_DATA**
+* SIZEH : Upper 3-bit of the LLC size
+* SIZEL : Lower 8-bit of the LLC size
+* CRC : Cyclic Redundancy Check
+	* Determined by `RRC_LLCConfig/crcType` 
+
+## LLC_ACK Payload:
 ```
       +-------------------------------+
    00 | START SN                      |
       +-------------------------------+
-   01 | COUNT                         | EOS
+   01 | COUNT                         |
       +-------------------------------+
-
-      LLC SN: Start LLC SN
-      COUNT: Number of LLC PDU acknowledged
 ```
+* START_SN : Start LLC SN to acknowledge
+* COUNT : Number of LLC PDU acknowledged
 
-## LLC-DATA Payload:
+## LLC_DATA Payload:
 ```
       +-------------------------------+
    00 | PDCP PDU                      | EOS
@@ -149,35 +149,43 @@ ppWIFI RRC:
       +-------------------------------+
    00 | IV (OPTIONAL)                 | IVSZ
       +-------------------------------|
-      | HMAC (OPTIONAL)               |
+      | HMAC (OPTIONAL)               | HMACSZ
       +-------------------------------+
-      | PDCP-SEGMENTs                 | EOP
+      | PDCP_SEGMENTs                 | EOP
       +-------------------------------+
-
-      IV: Initialization Vector
-      MAC: Message Authentication Code
 ```
 
-## PDCP-SEGMENT Payload
+* IV : Initialization Vector
+	* Randomized for each PDU
+	* Determined by `RRC_PDCPConfig/ivType`
+* HMAC : Message Authentication Code
+	* Determined by `RRC_PDCPConfig/hmacType`
+
+## PDCP_SEGMENT Payload
 ```
       +---+---------------------------+
    00 | L | SIZE                      | 02
       +---+---------------------------+
-      | PACKET SN (OPTIONAL)          | 02
+      | PACKET_SN (OPTIONAL)          | 02
       +-------------------------------+
       | OFFSET (OPTIONAL)             | 02
       +-------------------------------+
       | PAYLOAD                       | EOS
       +-------------------------------+
-
-      L: Segment completed
 ```
+* L : Segment completed
+* SIZE : Size of whole PDCP_SEGMENT entry
+* PACKET_SN
+  * Present when `RRC_PDCPConfig/allowReordering` 
+* OFFSET
+  *  Present when `RRC_PDCPConfig/allowSegmentation`
+* PAYLOAD : Packet Data
 
 # Architecture
 ```
-               +--------------+
-               | WiFi Device  |
-               +--------------+
+              +----------------+
+              | WiFi Device(s) |
+              +----------------+
                    ^      |
                    |      |
 +------------------------------------------+
@@ -185,9 +193,9 @@ ppWIFI RRC:
 |          +-------+      +-------+        |
 |          |                      |        |
 |          |                      v        |
-| conf  +-----+               +-------+    |
-|   +-->| MUX |               | DEMUX |    |
-|   |   +-----+               +-------+    |
+| conf  +-------+               +------+   |
+|   +-->| SCHED |               |  RX  |   |
+|   |   +-------+               +------+   |
 |   |    ^                         |       |
 |   |    |                         |       |
 |   |    |  +--------+-------------+       |
@@ -222,16 +230,11 @@ ppWIFI RRC:
 AL3                AL0                    BL0                BL3
  |                  |                      |                  |
  |                  | PullReq(LC3)         |                  |
- |                  +--------------------->|                  |
+ |                  +--------------------->| - - > disable tx |
  |                  |                      |                  |
  | reconfig_rx      | PullResp(LC3)        |                  |
  |<- - - - - - - - -+<---------------------+                  |
  | enable_rx        |                      |                  |
- |                  | ActivateReq(RX,LC3)  | enable_tx        |
- |                  +--------------------->+- - - - - - - - ->|
- |                  |                      |                  |
- | enable_rx        | ActivateResp         |                  |
- |<- - - - - - - - -|<---------------------+                  |
  |                  |                      |                  |
  |                    << LLC ACTIVATED <<                     |
  |< - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
@@ -242,16 +245,10 @@ AL3                AL0                    BL0                BL3
 AL3                AL0                    BL0                BL3
  |                  |                      |                  |
  |                  | PushReq(LC3)         | reconfig_rx      |
- |                  +--------------------->+- - - - - - - - ->|
+ | disable tx       +--------------------->+- - - - - - - - ->|
  |                  |                      | enable_rx        |
  |                  | PushResp(LC3)        |                  |
- |                  |<---------------------+                  |
- |                  |                      |                  |
- |                  | ActivateReq(TX,LC3)  |                  |
- |                  +--------------------->+ - - - - - - - - >|
- |                  |                      | enable_rx        |
- | enable_tx        | ActivateResp         |                  |
- |<- - - - - - - - -+<---------------------+                  |
+ | enabled tx       |<---------------------+                  |
  |                  |                      |                  |
  |                     >> LLC ACTIVATED >>                    |
  +- - - - - - - - - - - - - - - - - - - - - - - - - - - - - ->|
@@ -261,21 +258,13 @@ AL3                AL0                    BL0                BL3
 ```
 AL3                AL0                    BL0                BL3
  |                  |                      |                  |
- |                  | PullReq(LC3)         |                  |
- |                  +--------------------->|                  |
- |                  |                      |                  |
- | reconfig_rx      | PullResp(LC3)        |                  |
+ |                  | ExchangeRequest(LC3) | reconfig_rx      |
+ |                  +--------------------->|- - - - - - - - ->|
+ |                  |                      | enable_rx        |
+ | reconfig_rx      | ExchangeResponse(LC3)|                  |
  |<- - - - - - - - -+<---------------------+                  |
  | enable_rx        |                      |                  |
  |                  |                      |                  |
- |                  | PushReq(LC3)         | reconfig_rx      |
- |                  +--------------------->+- - - - - - - - ->|
- |                  |                      | enable_rx        |
- |                  | PushResp(LC3)        |                  |
- |                  |<---------------------+                  |
- |                  |                      |                  |
- |                  | ActivateReq(AB,LC3)  | enable_tx        |
- |                  +--------------------->+- - - - - - - - ->|
  |                  |                      |                  |
  |                    << LLC ACTIVATED  <<                    |
  |< - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
@@ -325,3 +314,4 @@ AL3                AL0                    BL0                BL3
  |                   >> LLC FAULT >>                   |
  +- - - - - - - - - - - - - - -> X  |                  |
  ```
+ 

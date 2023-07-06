@@ -25,11 +25,15 @@ public:
     void reconfigure(const tx_config_t& config) override;
     void reconfigure(const rx_config_t& config) override;
 
+    tx_config_t get_tx_config() override;
+    rx_config_t get_rx_config() override;
+
     void on_tx(tx_info_t& info) override;
     void on_rx(rx_info_t& info) override;
 
     buffer_t to_rx(uint64_t timeout_us=-1) override;
     bool to_tx(buffer_t buffer) override;
+    
 
     const stats_t& get_stats() override;
 

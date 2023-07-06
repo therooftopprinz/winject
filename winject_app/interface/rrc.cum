@@ -28,42 +28,9 @@ Type RRC_U64
     type(unsigned) width(64)
 };
 
-Type RRC_STR
-{
-    type(asciiz)
-};
-
 Type RRC_U16_OPTIONAL
 {
     type(unsigned) width(16) optional()
-};
-
-Enumeration RRC_FECType
-{
-    E_RRC_FECType_RS_NONE,
-    E_RRC_FECType_RS_255_247,
-    E_RRC_FECType_RS_255_239,
-    E_RRC_FECType_RS_255_223,
-    E_RRC_FECType_RS_255_191,
-    E_RRC_FECType_RS_255_127
-};
-
-Sequence RRC_FECConfig
-{
-    RRC_FECType type,
-    RRC_U32 threshold
-};
-
-Type RRC_FECConfigList
-{
-    type(RRC_FECConfig) dynamic_array(256)
-};
-
-Sequence RRC_FrameConfig
-{
-    RRC_U64 slotInterval,
-    RRC_FECConfigList fecConfig,
-    RRC_U16 framePayloadSize
 };
 
 Enumeration RRC_LLCTxMode
@@ -81,30 +48,12 @@ Enumeration RRC_LLCCRCType
 Sequence RRC_LLCTxConfig
 {
     RRC_LLCTxMode mode,
-    RRC_U16 arqWindowSize,
-    RRC_U16 maxRetxCount,
     RRC_LLCCRCType crcType
-};
-
-Sequence RRC_SchedulingConfig
-{
-    RRC_U16 ndGpduMaxSize,
-    RRC_U16 quanta
 };
 
 Sequence RRC_LLCConfig
 {
-    RRC_U8 llcid,
-    RRC_LLCTxConfig txConfig,
-    RRC_SchedulingConfig schedulingConfig
-};
-
-Enumeration RRC_EPType
-{
-    E_RRC_EPType_INTERNAL,
-    E_RRC_EPType_UDP,
-    E_RRC_EPType_UART,
-    E_RRC_EPType_TUN
+    RRC_LLCTxConfig txConfig
 };
 
 Enumeration RRC_CipherAlgorithm
@@ -127,33 +76,14 @@ Enumeration RRC_CompressionAlgorithm
 
 Sequence RRC_PDCPConfig
 {
-    RRC_U8 lcid,
     RRC_BOOL allowRLF,
     RRC_BOOL allowSegmentation,
     RRC_BOOL allowReordering,
     RRC_U16_OPTIONAL maxSnDistance,
-    RRC_U16 minCommitSize,
-    RRC_U8A cipherKey,
-    RRC_U8A integrityKey,
     RRC_CipherAlgorithm cipherAlgorithm,
     RRC_IntegrityAlgorithm integrityAlgorithm,
     RRC_CompressionAlgorithm compressionAlgorithm,
-    RRC_U8 compressionLevel,
-    RRC_EPType type,
-    RRC_STR address
-};
-
-Sequence RRC_PullRequest
-{
-    RRC_BOOL includeFrameConfig,
-    RRC_BOOL includeLLCConfig,
-    RRC_BOOL includePDCPConfig,
-    RRC_U8 lcid
-};
-
-Type RRC_FrameConfigOptional
-{
-    type(RRC_FrameConfig) optional()
+    RRC_U8 compressionLevel
 };
 
 Type RRC_LLCConfigOptional
@@ -166,38 +96,30 @@ Type RRC_PDCPConfigOptional
     type(RRC_PDCPConfig) optional()
 };
 
+Sequence RRC_PullRequest
+{
+    RRC_U8 lcid,
+    RRC_BOOL includeLLCConfig,
+    RRC_BOOL includePDCPConfig
+};
+
 Sequence RRC_PullResponse
 {
-    RRC_FrameConfigOptional frameConfig,
+    RRC_U8 lcid,
     RRC_LLCConfigOptional llcConfig,
     RRC_PDCPConfigOptional pdcpConfig
 };
 
 Sequence RRC_PushRequest
 {
-    RRC_FrameConfigOptional frameConfig,
+    RRC_U8 lcid,
     RRC_LLCConfigOptional llcConfig,
     RRC_PDCPConfigOptional pdcpConfig
 };
-
-Sequence RRC_ExchangeRequest
-{
-    RRC_FrameConfigOptional frameConfig,
-    RRC_LLCConfigOptional llcConfig,
-    RRC_PDCPConfigOptional pdcpConfig
-};
-
-Sequence RRC_ExchangeResponse
-{
-    RRC_FrameConfigOptional frameConfig,
-    RRC_LLCConfigOptional llcConfig,
-    RRC_PDCPConfigOptional pdcpConfig
-};
-
 
 Sequence RRC_PushResponse
 {
-    RRC_U8 spare
+    RRC_U8 lcid
 };
 
 Choice RRC_Message
@@ -205,9 +127,7 @@ Choice RRC_Message
     RRC_PullRequest,
     RRC_PullResponse,
     RRC_PushRequest,
-    RRC_PushResponse,
-    RRC_ExchangeRequest,
-    RRC_ExchangeResponse
+    RRC_PushResponse
 };
 
 Sequence RRC

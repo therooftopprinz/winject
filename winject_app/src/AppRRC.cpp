@@ -43,6 +43,7 @@ AppRRC::AppRRC(const config_t& config)
     setup_llcs();
     setup_eps();
     setup_scheduler();
+    setup_lcrrc();
     setup_rrc();
 }
 
@@ -108,46 +109,31 @@ void AppRRC::on_console_read()
     }
 }
 
-std::string AppRRC::on_cmd_exchange(bfc::ArgsMap&& args)
-{
-
-    RRC rrc;
-    rrc.requestID = rrc_req_id.fetch_add(1);
-    rrc.message = RRC_ExchangeRequest{};
-    auto& message = std::get<RRC_ExchangeRequest>(rrc.message);
-
-    fill_from_config(args.argAs<int>("lcid").value_or(0xF),
-        false, true, true, message);
-
-    auto_send_rrc(10, rrc);
-    return "exchanging...\n";
-}
-
 std::string AppRRC::on_cmd_push(bfc::ArgsMap&& args)
 {
-    RRC rrc;
-    rrc.requestID = rrc_req_id.fetch_add(1);
-    rrc.message = RRC_PushRequest{};
-    auto& message = std::get<RRC_PushRequest>(rrc.message);
+    // RRC rrc;
+    // rrc.requestID = rrc_req_id.fetch_add(1);
+    // rrc.message = RRC_PushRequest{};
+    // auto& message = std::get<RRC_PushRequest>(rrc.message);
 
-    fill_from_config(args.argAs<int>("lcid").value_or(0xF),
-        false, true, true, message);
+    // fill_from_config(args.argAs<int>("lcid").value_or(0xF),
+    //     true, true, message);
 
-    auto_send_rrc(10, rrc);
+    // auto_send_rrc(10, rrc);
     return "pushing...\n";
 }
 
 std::string AppRRC::on_cmd_pull(bfc::ArgsMap&& args)
 {
-    RRC rrc;
-    rrc.requestID = rrc_req_id.fetch_add(1);
-    rrc.message = RRC_PullRequest{};
-    auto& pull_request = std::get<RRC_PullRequest>(rrc.message);
-    pull_request.lcid = args.argAs<int>("lcid").value_or(0);
-    pull_request.includeLLCConfig = true;
-    pull_request.includePDCPConfig = true;
+    // RRC rrc;
+    // rrc.requestID = rrc_req_id.fetch_add(1);
+    // rrc.message = RRC_PullRequest{};
+    // auto& pull_request = std::get<RRC_PullRequest>(rrc.message);
+    // pull_request.lcid = args.argAs<int>("lcid").value_or(0);
+    // pull_request.includeLLCConfig = true;
+    // pull_request.includePDCPConfig = true;
 
-    auto_send_rrc(10, rrc);
+    // auto_send_rrc(10, rrc);
     return "pulling...\n";
 }
 
@@ -231,17 +217,12 @@ void AppRRC::run()
     reactor.run();
 }
 
-void AppRRC::on_rlf_tx(lcid_t lcid)
+void AppRRC::on_rlf(lcid_t lcid)
 {
-    push_rrc_event(rrc_event_rlf_t{lcid, rrc_event_rlf_t::TX});
+    push_rrc_event(rrc_event_rlf_t{lcid});
 }
 
-void AppRRC::on_rlf_rx(lcid_t lcid)
-{
-    push_rrc_event(rrc_event_rlf_t{lcid, rrc_event_rlf_t::RX});
-}
-
-void AppRRC::initialize_tx(lcid_t lcid)
+void AppRRC::on_init(lcid_t lcid)
 {
     push_rrc_event(rrc_event_setup_t{lcid});   
 }
@@ -320,7 +301,6 @@ void AppRRC::setup_console()
         return;
     }
 
-    cmdman.addCommand("exchange", [this](bfc::ArgsMap&& args){return on_cmd_exchange(std::move(args));});
     cmdman.addCommand("push", [this](bfc::ArgsMap&& args){return on_cmd_push(std::move(args));});
     cmdman.addCommand("pull", [this](bfc::ArgsMap&& args){return on_cmd_pull(std::move(args));});
     cmdman.addCommand("stop", [this](bfc::ArgsMap&& args){return on_cmd_stop(std::move(args));});
@@ -359,8 +339,6 @@ void AppRRC::setup_llcs()
 
         auto id = llc_.first;
         auto& tx_config = llc_.second;
-
-        channel_rrc_contexts.emplace(id, lc_rrc_context_t{});
 
         ILLC::rx_config_t rx_config{};
 
@@ -436,6 +414,23 @@ void AppRRC::setup_scheduler()
     timer_thread = std::thread([this](){
         pthread_setname_np(pthread_self(), "RRC_TIMER1");
         timer.run();});
+}
+
+void AppRRC::setup_lcrrc()
+{
+    auto size = llcs.size();
+
+    for (auto& [lcid, llc] : llcs)
+    {
+        if (eps.count(lcid))
+        {
+            auto ep = eps.at(lcid);
+            auto pdcp = pdcps.at(lcid);
+            auto llc = llcs.at(lcid);
+            channel_rrc_contexts.emplace(lcid,
+                std::make_shared<LCRRC>(*llc, *pdcp, *this, *ep, timer2));
+        }
+    }
 }
 
 void AppRRC::setup_rrc()
@@ -599,6 +594,13 @@ void AppRRC::notify_rrc_event()
 
 void AppRRC::on_rrc(const RRC& rrc)
 {
+    push_rrc_event(rrc_event_msg_t{rrc});
+}
+
+void AppRRC::on_rrc_event(const rrc_event_msg_t& msg)
+{
+    auto& rrc = msg.msg;
+
     if (main_logger->get_logbit(RRC_DBG))
     {
         std::string rrc_str;
@@ -612,223 +614,35 @@ void AppRRC::on_rrc(const RRC& rrc)
         }, rrc.message);
 }
 
-template<typename T>
-void AppRRC::fill_from_config(
-    int lcid,
-    bool include_frame,
-    bool include_llc,
-    bool include_pdcp,
-    T& message)
+template <typename T>
+void AppRRC::on_rrc_message_lcrrc(int req_id, const T& msg)
 {
-    bool has_llc = config.llc_configs.count(lcid);
-    bool has_sched = config.scheduling_configs.count(lcid);
-    bool has_pdcp = config.pdcp_configs.count(lcid);
-
-    if (include_llc && has_llc)
+    auto lcid = msg.lcid;
+    if (channel_rrc_contexts.count(msg.lcid))
     {
-        auto& llc_src = config.llc_configs.at(lcid);
-        message.llcConfig = RRC_LLCConfig{};
-        auto& llcConfig = message.llcConfig;
-        llcConfig->llcid = lcid;
-        llcConfig->txConfig.mode = to_rrc(llc_src.mode);
-        llcConfig->txConfig.arqWindowSize = llc_src.arq_window_size;
-        llcConfig->txConfig.maxRetxCount = llc_src.max_retx_count;
-        llcConfig->txConfig.crcType = to_rrc(llc_src.crc_type);
-
-        llcConfig->schedulingConfig.ndGpduMaxSize = 0;
-        llcConfig->schedulingConfig.quanta = 0;
-        if (has_sched)
-        {
-            auto& sched_src = config.scheduling_configs.at(lcid);
-            llcConfig->schedulingConfig.ndGpduMaxSize = sched_src.nd_gpdu_max_size;
-            llcConfig->schedulingConfig.quanta = sched_src.quanta;
-        }
-    }
-
-    if (include_pdcp && has_pdcp)
-    {
-        auto& pdcp_src = config.pdcp_configs.at(lcid);
-        message.pdcpConfig = RRC_PDCPConfig{};
-        auto& pdcpConfig = message.pdcpConfig;
-        pdcpConfig->lcid = lcid;
-        // @todo : fill up correctly
-        pdcpConfig->type = RRC_EPType::E_RRC_EPType_INTERNAL;
-        pdcpConfig->allowRLF = pdcp_src.allow_rlf;
-        pdcpConfig->allowSegmentation = pdcp_src.allow_segmentation;
-        pdcpConfig->allowReordering = pdcp_src.allow_reordering;
-        pdcpConfig->maxSnDistance = pdcp_src.max_sn_distance;
-        pdcpConfig->minCommitSize = pdcp_src.min_commit_size;
-    }
-
-    if (include_frame)
-    {
-        message.frameConfig = RRC_FrameConfig{};
-        auto& frameConfig = message.frameConfig;
-        for (auto& fec_config_src : config.fec_configs)
-        {
-            frameConfig->fecConfig.emplace_back();
-            auto& fecConfig = frameConfig->fecConfig.back();
-            fecConfig.threshold = fec_config_src.threshold;
-            fecConfig.type = to_rrc(fec_config_src.type);
-        }
-        message.frameConfig->slotInterval = config.frame_config.slot_interval_us;
-        message.frameConfig->framePayloadSize = config.frame_config.frame_payload_size;
+        auto& lcrrc = channel_rrc_contexts.at(lcid);
+        lcrrc->on_rrc_message(req_id, msg);
     }
 }
 
-template<typename T>
-void AppRRC::update_peer_config_and_reconfigure_rx(const T& msg)
+void AppRRC::on_rrc_message(int req_id, const RRC_PullRequest& msg)
 {
-    if (msg.frameConfig)
-    {
-        std::unique_lock<std::mutex> lg(peer_config_mutex);
-        auto& frameConfig = msg.frameConfig;
-        peer_config.frame_config.slot_interval_us = frameConfig->slotInterval;
-        peer_config.frame_config.frame_payload_size = frameConfig->framePayloadSize;
-    }
-
-    if (msg.llcConfig)
-    {
-        std::unique_lock<std::mutex> lg(peer_config_mutex);
-        auto& llcConfig = msg.llcConfig;
-        auto& llc_config = peer_config.llc_configs[llcConfig->llcid];
-        auto& sched_config = peer_config.scheduling_configs[llcConfig->llcid];
-
-        llc_config.mode = to_config(llcConfig->txConfig.mode);
-        llc_config.arq_window_size = llcConfig->txConfig.arqWindowSize;
-        llc_config.crc_type = to_config(llcConfig->txConfig.crcType);
-        llc_config.max_retx_count = llcConfig->txConfig.maxRetxCount;
-        sched_config.nd_gpdu_max_size = llcConfig->schedulingConfig.ndGpduMaxSize;
-        sched_config.quanta = llcConfig->schedulingConfig.quanta;
-
-        Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Reconfiguring LLC lcid=\"#\"", (int)msg.llcConfig->llcid);
-        ILLC::rx_config_t llc_config_rx{};
-        llc_config_rx.crc_type = llc_config.crc_type;
-        llc_config_rx.mode = llc_config.mode;
-        if (llcs.count(msg.llcConfig->llcid))
-        {
-            auto& llc = llcs.at(msg.llcConfig->llcid);
-            llc->reconfigure(llc_config_rx);
-            llc->set_rx_enabled(true);
-        }
-    }
-
-    if (msg.pdcpConfig)
-    {
-        std::unique_lock<std::mutex> lg(peer_config_mutex);
-        auto& pdcpConfig = msg.pdcpConfig;
-        auto& tx_config = peer_config.pdcp_configs[msg.pdcpConfig->lcid];
-
-        tx_config.allow_rlf = pdcpConfig->allowRLF;
-        tx_config.allow_segmentation = pdcpConfig->allowSegmentation;
-        tx_config.allow_reordering = pdcpConfig->allowReordering;
-
-        if (pdcpConfig->maxSnDistance)
-        {
-            tx_config.max_sn_distance = *pdcpConfig->maxSnDistance;
-        }
-        tx_config.min_commit_size = pdcpConfig->minCommitSize;
-
-        Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Reconfiguring PDCP linked-lcid=\"#\"", (int)msg.llcConfig->llcid);
-        IPDCP::rx_config_t pdcp_config_rx{};
-        pdcp_config_rx.allow_rlf = tx_config.allow_rlf;
-        pdcp_config_rx.allow_segmentation = tx_config.allow_segmentation;
-        pdcp_config_rx.allow_reordering = tx_config.allow_reordering;
-        pdcp_config_rx.max_sn_distance = tx_config.max_sn_distance;
-        if (pdcps.count(msg.pdcpConfig->lcid))
-        {
-            auto& pdcp = pdcps.at(msg.pdcpConfig->lcid);
-            pdcp->reconfigure(pdcp_config_rx);
-            pdcp->set_rx_enabled(true);
-        }
-    }
+    on_rrc_message_lcrrc(req_id, msg);
 }
 
-template<typename T>
-void AppRRC::notify_resp_handler(uint8_t request_id, const T& msg)
+void AppRRC::on_rrc_message(int req_id, const RRC_PullResponse& msg)
 {
-    std::unique_lock<std::mutex> lg(rrc_requests_mutex);
-    auto rrc_requests_it = rrc_requests.find(request_id);
-
-    if (rrc_requests.end() == rrc_requests_it)
-    {
-        return;
-    }
-
-    auto rrc_request = std::move(rrc_requests_it->second);
-    rrc_requests.erase(request_id);
-    lg.unlock();
-
-    timer2.cancel(rrc_request.exp_timer);
-    Logless(*main_logger, RRC_TRC,
-        "TRC | AppRRC | auto send timer2 cancel id=#, req_id=#",
-        rrc_request.exp_timer,
-        (int) request_id);
-
-
-    if (rrc_request.handler)
-    {
-        rrc_request.handler(request_id, msg);
-    }
+    on_rrc_message_lcrrc(req_id, msg);
 }
 
-void AppRRC::on_rrc_message(int req_id, const RRC_PullRequest& req)
+void AppRRC::on_rrc_message(int req_id, const RRC_PushRequest& msg)
 {
-    RRC rrc;
-    rrc.requestID = req_id;
-    rrc.message = RRC_PullResponse{};
-    auto& message = std::get<RRC_PullResponse>(rrc.message);
-    fill_from_config(
-        req.lcid,
-        req.includeFrameConfig,
-        req.includeLLCConfig,
-        req.includePDCPConfig,
-        message);
-    send_rrc(rrc);
-}
-
-void AppRRC::on_rrc_message(int req_id, const RRC_PullResponse& rsp)
-{
-    update_peer_config_and_reconfigure_rx(rsp);
-    notify_resp_handler(req_id, rsp);
-}
-
-void AppRRC::on_rrc_message(int req_id, const RRC_PushRequest& req)
-{
-    update_peer_config_and_reconfigure_rx(req);
-    RRC rrc;
-    rrc.requestID = req_id;
-    rrc.message = RRC_PushResponse{};
-    send_rrc(rrc);
+    on_rrc_message_lcrrc(req_id, msg);
 }
 
 void AppRRC::on_rrc_message(int req_id, const RRC_PushResponse& msg)
 {
-    notify_resp_handler(req_id, msg);
-}
-
-void AppRRC::on_rrc_message(int req_id, const RRC_ExchangeRequest& req)
-{
-    update_peer_config_and_reconfigure_rx(req);
-    RRC rrc;
-    rrc.requestID = req_id;
-    rrc.message = RRC_ExchangeResponse{};
-    auto& message = std::get<RRC_ExchangeResponse>(rrc.message);
-
-    if (req.frameConfig.has_value())
-        fill_from_config(0, true, false, false, message);
-    if (req.pdcpConfig.has_value())
-        fill_from_config(req.pdcpConfig->lcid, false, false, true, message);
-    if (req.llcConfig.has_value())
-        fill_from_config(req.llcConfig->llcid, false, true, false, message);
-
-    send_rrc(rrc);
-}
-
-void AppRRC::on_rrc_message(int req_id, const RRC_ExchangeResponse& rsp)
-{
-    update_peer_config_and_reconfigure_rx(rsp);
-    notify_resp_handler(req_id, rsp);
+    on_rrc_message_lcrrc(req_id, msg);
 }
 
 void AppRRC::send_rrc(const RRC& rrc)
@@ -850,6 +664,11 @@ void AppRRC::send_rrc(const RRC& rrc)
     pdcp0->to_tx(std::move(b));
 }
 
+uint8_t AppRRC::allocate_req_id()
+{
+    return rrc_req_id.fetch_add(1);
+}
+
 void AppRRC::on_rrc_event(const rrc_event_stop_t&)
 {
     stop();
@@ -858,179 +677,21 @@ void AppRRC::on_rrc_event(const rrc_event_stop_t&)
 void AppRRC::on_rrc_event(const rrc_event_rlf_t& rlf)
 {
     auto lcid = rlf.lcid;
-    if (rrc_event_rlf_t::TX == rlf.mode)
+    if (channel_rrc_contexts.count(rlf.lcid))
     {
-        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | RLF TX lcid=#", (int) lcid);
-        auto llc = llcs.at(lcid);
-        auto pdcp = pdcps.at(lcid);
-        auto ep = eps.at(lcid);
-
-        ep->set_tx_enabled(false);
-        pdcp->set_tx_enabled(false);
-        llc->set_tx_enabled(false);
-    }
-    else
-    {
-        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | RLF RX lcid=#",
-            (int) lcid);
-        auto llc = llcs.at(lcid);
-        auto pdcp = pdcps.at(lcid);
-        auto ep = eps.at(lcid);
-
-        ep->set_rx_enabled(false);
-        pdcp->set_rx_enabled(false);
-        llc->set_rx_enabled(false);
+        auto& lcrrc = channel_rrc_contexts.at(lcid);
+        lcrrc->on_rlf();
     }
 }
 
 void AppRRC::on_rrc_event(const rrc_event_setup_t& setup)
 {
     auto lcid = setup.lcid;
-    if (!llcs.count(lcid))
+    if (channel_rrc_contexts.count(setup.lcid))
     {
-        Logless(*main_logger, RRC_ERR,
-            "ERR | AppRRC | can't setup lcid=# for TX, LLC not found",
-            (int) lcid);
-        return;
+        auto& lcrrc = channel_rrc_contexts.at(lcid);
+        lcrrc->on_init();
     }
-
-    auto& llc = llcs.at(lcid);
-    auto llc_tx_cfg = llc->get_tx_confg();
-
-    std::unique_lock<std::mutex> lg(channel_rrc_contexts_mutex);
-    auto& channel_ctx = channel_rrc_contexts[setup.lcid];
-
-    if (lc_rrc_context_t::E_CFG_STATE_PENDING == channel_ctx.tx_config_state)
-    {
-        return;
-    }
-
-    Logless(*main_logger, RRC_ERR, "ERR | AppRRC | Setting up lcid=# for TX",
-        (int) lcid);
-
-    
-    channel_ctx.tx_config_state = lc_rrc_context_t::E_CFG_STATE_PENDING;
-    lg.unlock();
-
-    RRC rrc;
-    rrc.requestID = rrc_req_id.fetch_add(1);
-
-    if (ILLC::E_TX_MODE_AM == llc_tx_cfg.mode)
-    {
-        rrc.message = RRC_ExchangeRequest{};
-        auto& message = std::get<RRC_ExchangeRequest>(rrc.message);
-        fill_from_config(lcid, false, true, true, message);
-    }
-    else
-    {
-        rrc.message = RRC_PushRequest{};
-        auto& message = std::get<RRC_PushRequest>(rrc.message);
-        fill_from_config(lcid, false, true, true, message);
-    }
-
-    auto on_success = [this, lcid](uint8_t req_id, const response_t& msg) {
-            if (!(E_RRC_PUSH_RSP == msg.index() ||
-                E_RRC_EXCH_RSP == msg.index()))
-            {
-                return;
-            }
-            auto llc = llcs.at(lcid);
-            auto pdcp = pdcps.at(lcid);
-            auto ep = eps.at(lcid);
-            llc->set_tx_enabled(true);
-            pdcp->set_tx_enabled(true);
-            ep->set_tx_enabled(true);
-
-            Logless(*main_logger, RRC_ERR, "ERR | AppRRC | lcid=# has been setup!",
-                (int) lcid);
-
-            std::unique_lock<std::mutex> lg(channel_rrc_contexts_mutex);
-            auto& channel_ctx = channel_rrc_contexts[lcid];
-            channel_ctx.tx_config_state = lc_rrc_context_t::E_CFG_STATE_CONFIGURED;
-        };
-
-    auto on_fail = [this, lcid]() {
-            Logless(*main_logger, RRC_ERR, "ERR | AppRRC | lcid=# has failed to setup!",
-                (int) lcid);
-            std::unique_lock<std::mutex> lg(channel_rrc_contexts_mutex);
-            auto& channel_ctx = channel_rrc_contexts[lcid];
-            channel_ctx.tx_config_state = lc_rrc_context_t::E_CFG_STATE_NULL;
-        };
-
-    auto_send_rrc(3, rrc, on_success, on_fail);
-}
-
-template <typename T>
-void AppRRC::auto_send_rrc(size_t max_retry, const T& rrc,
-        std::function<void(uint8_t, const response_t&)> cb_ok,
-        std::function<void()> cb_fail)
-{
-    Logless(*main_logger, RRC_ERR,
-        "ERR | AppRRC | auto send rrc req_id=# remain_retry=#",
-        (int) rrc.requestID,
-        max_retry);
-
-    if (!max_retry)
-    {
-        if (cb_fail)
-        {
-            cb_fail();
-        }
-        return;
-    }
-
-    auto expiry_handler = [this, max_retry, rrc, cb_ok, cb_fail]() {
-            Logless(*main_logger, RRC_ERR,
-                "ERR | AppRRC | auto send expired id=# remain_retry=#",
-                (int) rrc.requestID,
-                max_retry);
-
-            std::unique_lock<std::mutex> lg(rrc_requests_mutex);
-            auto rrc_requests_it = rrc_requests.find(rrc.requestID);
-            if (rrc_requests.end() == rrc_requests_it)
-            {
-                Logless(*main_logger, RRC_WRN,
-                    "WRN | AppRRC | auto send rrc req_id=# remain_retry=#",
-                    (int) rrc.requestID,
-                    max_retry);
-
-                return;
-            }
-
-            rrc_requests.erase(rrc.requestID);
-            lg.unlock();
-
-            auto new_rrc = rrc;
-            new_rrc.requestID = rrc_req_id.fetch_add(1);
-            auto_send_rrc(max_retry-1, new_rrc, cb_ok, cb_fail);
-        };
-
-    // @todo configurable rrc timeout
-    auto exp_id = timer2.schedule(std::chrono::nanoseconds(1000*1000*10),
-        expiry_handler);
-
-    Logless(*main_logger, RRC_TRC,
-        "TRC | AppRRC | auto send timer2 scheduled id=#, req_id=#",
-        exp_id,
-        (int) rrc.requestID);
-
-    std::unique_lock<std::mutex> lg(rrc_requests_mutex);
-    rrc_requests.erase(rrc.requestID);
-    auto res = rrc_requests.emplace(rrc.requestID, rrc_request_context_t{});
-    auto& rrc_request = res.first->second;
-
-    rrc_request.exp_timer = exp_id;
-    rrc_request.handler = [this, cb_ok](uint8_t req_id, const response_t& rsp) {
-            std::unique_lock<std::mutex> lg(rrc_requests_mutex);
-            rrc_requests.erase(req_id);
-            if (cb_ok)
-            {
-                cb_ok(req_id, rsp);
-            }
-        };
-    lg.unlock();
-
-    send_rrc(rrc);
 }
 
 template<typename T>

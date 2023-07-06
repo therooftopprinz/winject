@@ -63,21 +63,6 @@ inline RRC_LLCCRCType to_rrc(ILLC::crc_type_e crc_type)
     return RRC_LLCCRCType::E_RRC_LLCCRCType_NONE;
 }
 
-inline RRC_FECType to_rrc(fec_type_e fec_type)
-{
-    if (fec_type == E_FEC_TYPE_RS_255_239)
-        return  RRC_FECType::E_RRC_FECType_RS_255_247;
-    if (fec_type == E_FEC_TYPE_RS_255_223)
-        return  RRC_FECType::E_RRC_FECType_RS_255_239;
-    if (fec_type == E_FEC_TYPE_RS_255_191)
-        return  RRC_FECType::E_RRC_FECType_RS_255_223;
-    if (fec_type == E_FEC_TYPE_RS_255_127)
-        return  RRC_FECType::E_RRC_FECType_RS_255_191;
-    if (fec_type == E_FEC_TYPE_RS_255_127)
-        return  RRC_FECType::E_RRC_FECType_RS_255_127;
-    return RRC_FECType::E_RRC_FECType_RS_NONE;
-}
-
 inline ILLC::tx_mode_e to_config(RRC_LLCTxMode mode)
 {
     if (mode == RRC_LLCTxMode::E_RRC_LLCTxMode_AM)
@@ -90,21 +75,6 @@ inline ILLC::crc_type_e to_config(RRC_LLCCRCType crc_type)
     if (crc_type == RRC_LLCCRCType::E_RRC_LLCCRCType_CRC32_04C11DB7)
         return ILLC::E_CRC_TYPE_CRC32_04C11DB7;
     return ILLC::E_CRC_TYPE_NONE;
-}
-
-inline fec_type_e to_config(RRC_FECType fec_type)
-{
-    if (fec_type == RRC_FECType::E_RRC_FECType_RS_255_247)
-        return  E_FEC_TYPE_RS_255_239;
-    if (fec_type == RRC_FECType::E_RRC_FECType_RS_255_239)
-        return  E_FEC_TYPE_RS_255_223;
-    if (fec_type == RRC_FECType::E_RRC_FECType_RS_255_223)
-        return  E_FEC_TYPE_RS_255_191;
-    if (fec_type == RRC_FECType::E_RRC_FECType_RS_255_191)
-        return  E_FEC_TYPE_RS_255_127;
-    if (fec_type == RRC_FECType::E_RRC_FECType_RS_255_127)
-        return  E_FEC_TYPE_RS_255_127;
-    return E_FEC_TYPE_NONE;
 }
 
 #endif // __WINJECTUM_RRC_UTILS_HPP__
