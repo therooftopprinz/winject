@@ -17,14 +17,17 @@ void PDCP::set_tx_enabled(bool value)
 {
     std::unique_lock<std::shared_mutex> lg(tx_mutex);
     // std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
+    auto old_tx_enabled = is_tx_enabled;
     is_tx_enabled = value;
     // to_tx_queue.clear();
     current_tx_buffer.clear();
     current_tx_offset = 0;
     lg.unlock();
 
-    Logless(*main_logger, PDCP_INF, "INF | PDCP#  | tx_enabled=#",
+    Logless(*main_logger, PDCP_INF, 
+        "INF | PDCP#  | set_tx_enabled old# new=#",
         (int) lcid,
+        (int) old_tx_enabled,
         (int) is_tx_enabled);
 }
 
@@ -32,6 +35,7 @@ void PDCP::set_rx_enabled(bool value)
 {
     std::unique_lock<std::shared_mutex> lg(rx_mutex);
     // std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
+    auto old_rx_enabled = is_rx_enabled;
     is_rx_enabled = value;
     // to_rx_queue.clear();
 
@@ -44,8 +48,10 @@ void PDCP::set_rx_enabled(bool value)
 
     lg.unlock();
 
-    Logless(*main_logger, PDCP_INF, "INF | PDCP#  | rx_enabled=#",
+    Logless(*main_logger, PDCP_INF,
+        "INF | PDCP#  | set_rx_enabled old=# new=#",
         (int) lcid,
+        (int) old_rx_enabled,
         (int) is_rx_enabled);
 }
 

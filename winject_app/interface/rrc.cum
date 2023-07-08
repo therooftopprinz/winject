@@ -51,11 +51,6 @@ Sequence RRC_LLCTxConfig
     RRC_LLCCRCType crcType
 };
 
-Sequence RRC_LLCConfig
-{
-    RRC_LLCTxConfig txConfig
-};
-
 Enumeration RRC_CipherAlgorithm
 {
     E_RRC_CipherAlgorithm_NONE,
@@ -74,6 +69,11 @@ Enumeration RRC_CompressionAlgorithm
     RRC_CompressionAlgorithm_ZLIB
 };
 
+Sequence RRC_LLCConfig
+{
+    RRC_LLCTxConfig txConfig
+};
+
 Sequence RRC_PDCPConfig
 {
     RRC_BOOL allowRLF,
@@ -86,19 +86,10 @@ Sequence RRC_PDCPConfig
     RRC_U8 compressionLevel
 };
 
-Type RRC_LLCConfigOptional
-{
-    type(RRC_LLCConfig) optional()
-};
-
-Type RRC_PDCPConfigOptional
-{
-    type(RRC_PDCPConfig) optional()
-};
-
 Sequence RRC_PullRequest
 {
     RRC_U8 lcid,
+    RRC_BOOL forceApply,
     RRC_BOOL includeLLCConfig,
     RRC_BOOL includePDCPConfig
 };
@@ -106,15 +97,15 @@ Sequence RRC_PullRequest
 Sequence RRC_PullResponse
 {
     RRC_U8 lcid,
-    RRC_LLCConfigOptional llcConfig,
-    RRC_PDCPConfigOptional pdcpConfig
+    RRC_LLCConfig llcConfig,
+    RRC_PDCPConfig pdcpConfig
 };
 
 Sequence RRC_PushRequest
 {
     RRC_U8 lcid,
-    RRC_LLCConfigOptional llcConfig,
-    RRC_PDCPConfigOptional pdcpConfig
+    RRC_LLCConfig llcConfig,
+    RRC_PDCPConfig pdcpConfig
 };
 
 Sequence RRC_PushResponse

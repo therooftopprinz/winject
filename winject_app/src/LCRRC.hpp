@@ -1,10 +1,15 @@
 #ifndef __LCRRC_HPP__
 #define __LCRRC_HPP__
 
+#include <mutex>
+#include "Logger.hpp"
+
 #include "bfc/ITimer.hpp"
+
 
 #include "ILCRRC.hpp"
 #include "rrc_utils.hpp"
+
 
 class LCRRC : public ILCRRC
 {
@@ -40,6 +45,7 @@ public:
         timer.cancel(rrc_request.exp_timer);
         Logless(*main_logger, RRC_TRC,
             "TRC | LCRRC# | auto send timer cancel id=#, req_id=#",
+            (int) llc.get_lcid(),
             rrc_request.exp_timer,
             (int) req_id);
     }
@@ -67,56 +73,44 @@ public:
 
     void on_rrc_message(int req_id, const RRC_PushRequest& req) override
     {
-        if(req.llcConfig)
+        auto llc_tx_cfg = llc.get_tx_confg();
+
+        if (ILLC::E_TX_MODE_TM == llc_tx_cfg.mode)
         {
-            auto& peer_llc_tx_cfg = req.llcConfig->txConfig;
-            auto llc_tx_cfg = llc.get_tx_confg();
-
-            if (llc_tx_cfg.mode != to_config(peer_llc_tx_cfg.mode))
-            {
-                Logless(*main_logger, RRC_ERR,
-                    "ERR | LCRRC# | RRC_PushRequest mismatched modes!",
-                    (int) llc.get_lcid(),
-                    (int) rx_state);
-                on_rlf();
-                return;
-            }
-
-            if (ILLC::E_TX_MODE_TM == to_config(peer_llc_tx_cfg.mode))
-            {
-                reconfigure_rx(req);
-                activate(false, true);
-                return;
-            }
-
-            if (E_TXRX_STATE_NOT_CONFIGURED != rx_state)
-            {
-                Logless(*main_logger, RRC_ERR,
-                    "ERR | LCRRC# | Unexpected RRC_PushRequest when rx_state=#, forcing RLF!",
-                    (int) llc.get_lcid(),
-                    (int) rx_state);
-                on_rlf();
-                return;
-            }
-            
-            reconfigure_rx(req);
-            change_rx_state(E_TXRX_STATE_CONFIGURED);
-            on_init();
-
-            RRC msg;
-            msg.requestID = rrc.allocate_req_id();
-            msg.message = RRC_PushResponse{};
-
-            auto& response = std::get<RRC_PushResponse>(msg.message);
-            response.lcid = llc.get_lcid();
-
-            rrc.send_rrc(msg);
-
-            if (E_TXRX_STATE_CONFIGURED == tx_state)
-            {
-                activate();
-            }
+            return;
         }
+
+        if (ILLC::E_TX_MODE_AM != to_config(req.llcConfig.txConfig.mode))
+        {
+            Logless(*main_logger, RRC_ERR,
+                "ERR | LCRRC# | on_push_req (ignored: mismatch mode)",
+                (int) llc.get_lcid());
+            return;
+        }
+
+        if (E_TXRX_STATE_ACTIVE == tx_state)
+        {
+            on_rlf();
+            return;
+        }
+
+        if (E_TXRX_STATE_NOT_CONFIGURED == tx_state)
+        {
+            Logless(*main_logger, RRC_ERR,
+                "ERR | LCRRC# | on_push_req (peer init)",
+                (int) llc.get_lcid());
+            reconfigure_rx(req);
+            send_push_req();
+            send_push_resp(req_id);
+            change_rx_state(E_TXRX_STATE_CONFIGURED);
+            return;
+        }
+
+        Logless(*main_logger, RRC_ERR,
+            "ERR | LCRRC# | on_push_req (ignored: in progress)",
+                (int) llc.get_lcid());
+        send_push_resp(req_id);
+        return;
     }
 
     void on_rrc_message(int req_id, const RRC_PushResponse& msg) override
@@ -125,48 +119,53 @@ public:
 
         auto llc_tx_cfg = llc.get_tx_confg();
 
-        if (ILLC::E_TX_MODE_AM == llc_tx_cfg.mode)
+        if (ILLC::E_TX_MODE_TM == llc_tx_cfg.mode)
         {
-            if (E_TXRX_STATE_CONFIGURING != tx_state)
-            {
-                Logless(*main_logger, RRC_ERR,
-                    "ERR | LCRRC# | Unexpected RRC_PushResponse, forcing RLF!",
-                    (int) llc.get_lcid());
-                on_rlf();
-                return;
-            }
+            return;
+        }
 
-            change_tx_state(E_TXRX_STATE_CONFIGURED);
+        if (E_TXRX_STATE_NOT_CONFIGURED == tx_state)
+        {
+            Logless(*main_logger, RRC_ERR,
+                "ERR | LCRRC# | on_push_rsp (ignored: unexpected)",
+                (int) llc.get_lcid());
+            return;
+        }
 
-            if (E_TXRX_STATE_CONFIGURED == rx_state)
+        if (E_TXRX_STATE_CONFIGURED == tx_state ||
+            E_TXRX_STATE_ACTIVE == tx_state)
+        {
+            Logless(*main_logger, RRC_ERR,
+                "ERR | LCRRC# | on_push_rsp (ignored: retransmitted)",
+                (int) llc.get_lcid());
+            send_push_resp(req_id);
+            return;
+        }
+
+        Logless(*main_logger, RRC_ERR,
+            "ERR | LCRRC# | on_push_rsp (ignored: unexpected)",
+            (int) llc.get_lcid());
+
+        auto try_activate = [this](){
+            if (E_TXRX_STATE_CONFIGURED == tx_state ||
+                E_TXRX_STATE_CONFIGURED == rx_state)
             {
                 activate();
             }
-        }
-        else
+        };
+
+        if (E_TXRX_STATE_CONFIGURED == tx_state ||
+            E_TXRX_STATE_CONFIGURED == rx_state)
         {
-            // @todo Implement TM
+            activate();
             return;
         }
-          
+
+        timer.schedule(std::chrono::nanoseconds(1000*1000*1000), try_activate);
     }
 
     void on_init() override
     {
-        bool is_init_ignored = E_TXRX_STATE_CONFIGURING == tx_state;
-
-        Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | on_init ignored=#",
-            (int) llc.get_lcid(),
-            (int) is_init_ignored);
-
-        if (is_init_ignored)
-        {
-            return;
-        }
-        
-        change_tx_state(E_TXRX_STATE_CONFIGURING);
-
         auto lcid = llc.get_lcid();
         auto llc_tx_cfg = llc.get_tx_confg();
 
@@ -194,32 +193,62 @@ public:
         ep.set_tx_enabled(false);
         pdcp.set_tx_enabled(false);
         llc.set_tx_enabled(false);
+
+        ep.set_rx_enabled(false);
+        pdcp.set_rx_enabled(false);
+        llc.set_rx_enabled(false);
     }
 
 private:
-    void activate(bool tx=true, bool rx=true)
+    void activate()
     {
-        Logless(*main_logger, RRC_ERR, "ERR | LCRRC# | Activiated lcid=#",
+        Logless(*main_logger, RRC_ERR, "ERR | LCRRC# | Activated lcid=#",
+            (int) llc.get_lcid(),
             (int) llc.get_lcid());
 
-        if (tx)
-        {
-            pdcp.set_tx_enabled(true);
-            ep.set_tx_enabled(true);
-            change_tx_state(E_TXRX_STATE_ACTIVE);
-        }
+        pdcp.set_tx_enabled(true);
+        ep.set_tx_enabled(true);
+        change_tx_state(E_TXRX_STATE_ACTIVE);
 
-        if (rx)
-        {
-            pdcp.set_rx_enabled(true);
-            ep.set_rx_enabled(true);  
-            change_rx_state(E_TXRX_STATE_ACTIVE);
-        }
+        pdcp.set_rx_enabled(true);
+        ep.set_rx_enabled(true);  
+        change_rx_state(E_TXRX_STATE_ACTIVE);
 
-        if (tx) 
-            llc.set_tx_enabled(true);
-        if (rx)
-            llc.set_rx_enabled(true);
+        llc.set_tx_enabled(true);
+        llc.set_rx_enabled(true);
+    }
+
+    void send_push_req()
+    {
+        RRC msg;
+        msg.requestID = rrc.allocate_req_id();
+        msg.message = RRC_PushRequest{};
+
+        auto& request = std::get<RRC_PushRequest>(msg.message);
+
+        request.lcid = llc.get_lcid();
+
+        fill_from_config(request);
+
+        auto on_push_fail =  [this](){
+                Logless(*main_logger, RRC_ERR,
+                    "ERR | LCRRC# | push_req failed, forcing rlf!",
+                    (int) llc.get_lcid(),
+                    (int) llc.get_lcid());
+                on_rlf();
+            };
+
+        auto_send_rrc(3, msg, on_push_fail);
+    }
+
+    void send_push_resp(uint8_t req_id)
+    {
+        RRC msg;
+        msg.requestID = req_id;
+        msg.message = RRC_PushResponse{};
+        auto& response = std::get<RRC_PushResponse>(msg.message);
+        response.lcid = llc.get_lcid();
+        rrc.send_rrc(msg);
     }
 
     enum txrx_state_e {
@@ -237,7 +266,7 @@ private:
     void change_tx_state(txrx_state_e new_state)
     {
         Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | Change TX state, old=# new=#",
+            "ERR | LCRRC# | Change TX state old=# new=#",
             (int) llc.get_lcid(),
             state_str[tx_state],
             state_str[new_state]);
@@ -249,31 +278,29 @@ private:
     void change_rx_state(txrx_state_e new_state)
     {
         Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | Change RX state, old=# new=#",
+            "ERR | LCRRC# | Change RX state old=# new=#",
             (int) llc.get_lcid(),
-            (int) rx_state,
-            (int) new_state);
+            state_str[tx_state],
+            state_str[new_state]);
 
         rx_state = new_state;
     }
 
     void on_init_am()
     {
-        RRC msg;
-        msg.requestID = rrc.allocate_req_id();
-        msg.message = RRC_PushRequest{};
+        if (E_TXRX_STATE_CONFIGURING == tx_state ||
+            E_TXRX_STATE_CONFIGURED  == tx_state ||
+            E_TXRX_STATE_ACTIVE == tx_state)
+        {
+            return;
+        }
 
-        auto& request = std::get<RRC_PushRequest>(msg.message);
+        Logless(*main_logger, RRC_ERR,
+            "ERR | LCRRC# | on_init_am (self init)",
+            (int) llc.get_lcid());
 
-        fill_from_config(true, true, request);
-
-        auto_send_rrc(3, msg, [this](){
-                Logless(*main_logger, RRC_ERR,
-                    "ERR | LCRRC# | on_init failed, forcing rlf!",
-                    (int) llc.get_lcid(),
-                    (int) llc.get_lcid());
-                on_rlf();
-            });
+        change_tx_state(E_TXRX_STATE_CONFIGURING);
+        send_push_req();
     }
 
     void on_init_tm()
@@ -286,14 +313,13 @@ private:
     void reconfigure_rx(const T& msg)
     {
         auto& lcid = msg.lcid;
-        if (msg.llcConfig)
         {
             auto& llcConfig = msg.llcConfig;
 
             ILLC::rx_config_t llc_config_rx{};
 
-            llc_config_rx.mode = to_config(llcConfig->txConfig.mode);
-            llc_config_rx.crc_type = to_config(llcConfig->txConfig.crcType);
+            llc_config_rx.mode = to_config(llcConfig.txConfig.mode);
+            llc_config_rx.crc_type = to_config(llcConfig.txConfig.crcType);
 
             Logless(*main_logger, RRC_DBG,
                 "DBG | LCRRC# | Reconfiguring LLC lcid=\"#\"",
@@ -303,19 +329,18 @@ private:
             llc.reconfigure(llc_config_rx);
             llc.set_rx_enabled(false);
         }
-        if (msg.pdcpConfig)
         {
             auto& pdcpConfig = msg.pdcpConfig;
 
             IPDCP::rx_config_t pdcp_config_rx{};
 
-            pdcp_config_rx.allow_rlf = pdcpConfig->allowRLF;
-            pdcp_config_rx.allow_segmentation = pdcpConfig->allowSegmentation;
-            pdcp_config_rx.allow_reordering = pdcpConfig->allowReordering;
+            pdcp_config_rx.allow_rlf = pdcpConfig.allowRLF;
+            pdcp_config_rx.allow_segmentation = pdcpConfig.allowSegmentation;
+            pdcp_config_rx.allow_reordering = pdcpConfig.allowReordering;
 
-            if (pdcpConfig->maxSnDistance)
+            if (pdcpConfig.maxSnDistance)
             {
-                pdcp_config_rx.max_sn_distance = *pdcpConfig->maxSnDistance;
+                pdcp_config_rx.max_sn_distance = *pdcpConfig.maxSnDistance;
             }
 
             Logless(*main_logger, RRC_DBG,
@@ -329,31 +354,20 @@ private:
     }
 
     template<typename T>
-    void fill_from_config(
-        bool include_llc,
-        bool include_pdcp,
-        T& message)
+    void fill_from_config(T& message)
     {
-        if (include_llc)
-        {
-            auto llc_src = llc.get_tx_confg();
-            message.llcConfig = RRC_LLCConfig{};
-            auto& llcConfig = message.llcConfig;
-            llcConfig->txConfig.mode = to_rrc(llc_src.mode);
-            llcConfig->txConfig.crcType = to_rrc(llc_src.crc_type);
-        }
+        auto llc_src = llc.get_tx_confg();
+        auto& llcConfig = message.llcConfig;
+        llcConfig.txConfig.mode = to_rrc(llc_src.mode);
+        llcConfig.txConfig.crcType = to_rrc(llc_src.crc_type);
 
-        if (include_pdcp)
-        {
-            auto pdcp_src = pdcp.get_tx_config();
-            message.pdcpConfig = RRC_PDCPConfig{};
-            auto& pdcpConfig = message.pdcpConfig;
+        auto pdcp_src = pdcp.get_tx_config();
+        auto& pdcpConfig = message.pdcpConfig;
 
-            pdcpConfig->allowRLF = pdcp_src.allow_rlf;
-            pdcpConfig->allowSegmentation = pdcp_src.allow_segmentation;
-            pdcpConfig->allowReordering = pdcp_src.allow_reordering;
-            pdcpConfig->maxSnDistance = pdcp_src.max_sn_distance;
-        }
+        pdcpConfig.allowRLF = pdcp_src.allow_rlf;
+        pdcpConfig.allowSegmentation = pdcp_src.allow_segmentation;
+        pdcpConfig.allowReordering = pdcp_src.allow_reordering;
+        pdcpConfig.maxSnDistance = pdcp_src.max_sn_distance;
     }
 
     template <typename T>
@@ -363,6 +377,7 @@ private:
         Logless(*main_logger, RRC_ERR,
             "ERR | LCRRC# | auto send rrc req_id=# remain_retry=#",
             (int) llc.get_lcid(),
+            (int) msg.requestID,
             max_retry);
 
         if (!max_retry)

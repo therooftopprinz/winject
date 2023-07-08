@@ -19,13 +19,15 @@
 // Enumeration:  ('RRC_LLCCRCType', ('E_RRC_LLCCRCType_CRC32_04C11DB7', None))
 // Sequence:  RRC_LLCTxConfig ('RRC_LLCTxMode', 'mode')
 // Sequence:  RRC_LLCTxConfig ('RRC_LLCCRCType', 'crcType')
-// Sequence:  RRC_LLCConfig ('RRC_LLCTxConfig', 'txConfig')
 // Enumeration:  ('RRC_CipherAlgorithm', ('E_RRC_CipherAlgorithm_NONE', None))
 // Enumeration:  ('RRC_CipherAlgorithm', ('E_RRC_CipherAlgorithm_AES128_CBC', None))
 // Enumeration:  ('RRC_IntegrityAlgorithm', ('E_RRC_CipherAlgorithm_NONE', None))
 // Enumeration:  ('RRC_IntegrityAlgorithm', ('E_RRC_CipherAlgorithm_HMAC_SHA1', None))
 // Enumeration:  ('RRC_CompressionAlgorithm', ('RRC_CompressionAlgorithm_NONE', None))
 // Enumeration:  ('RRC_CompressionAlgorithm', ('RRC_CompressionAlgorithm_ZLIB', None))
+// Enumeration:  ('RRC_PushRequestReason', ('RRC_PushRequestReason_RLF', None))
+// Enumeration:  ('RRC_PushRequestReason', ('RRC_PushRequestReason_PEER_RLF', None))
+// Sequence:  RRC_LLCConfig ('RRC_LLCTxConfig', 'txConfig')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowRLF')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowSegmentation')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowReordering')
@@ -34,19 +36,17 @@
 // Sequence:  RRC_PDCPConfig ('RRC_IntegrityAlgorithm', 'integrityAlgorithm')
 // Sequence:  RRC_PDCPConfig ('RRC_CompressionAlgorithm', 'compressionAlgorithm')
 // Sequence:  RRC_PDCPConfig ('RRC_U8', 'compressionLevel')
-// Type:  ('RRC_LLCConfigOptional', {'type': 'RRC_LLCConfig'})
-// Type:  ('RRC_LLCConfigOptional', {'optional': ''})
-// Type:  ('RRC_PDCPConfigOptional', {'type': 'RRC_PDCPConfig'})
-// Type:  ('RRC_PDCPConfigOptional', {'optional': ''})
 // Sequence:  RRC_PullRequest ('RRC_U8', 'lcid')
+// Sequence:  RRC_PullRequest ('RRC_BOOL', 'forceApply')
 // Sequence:  RRC_PullRequest ('RRC_BOOL', 'includeLLCConfig')
 // Sequence:  RRC_PullRequest ('RRC_BOOL', 'includePDCPConfig')
 // Sequence:  RRC_PullResponse ('RRC_U8', 'lcid')
-// Sequence:  RRC_PullResponse ('RRC_LLCConfigOptional', 'llcConfig')
-// Sequence:  RRC_PullResponse ('RRC_PDCPConfigOptional', 'pdcpConfig')
+// Sequence:  RRC_PullResponse ('RRC_LLCConfig', 'llcConfig')
+// Sequence:  RRC_PullResponse ('RRC_PDCPConfig', 'pdcpConfig')
 // Sequence:  RRC_PushRequest ('RRC_U8', 'lcid')
-// Sequence:  RRC_PushRequest ('RRC_LLCConfigOptional', 'llcConfig')
-// Sequence:  RRC_PushRequest ('RRC_PDCPConfigOptional', 'pdcpConfig')
+// Sequence:  RRC_PushRequest ('RRC_PushRequestReason', 'reason')
+// Sequence:  RRC_PushRequest ('RRC_LLCConfig', 'llcConfig')
+// Sequence:  RRC_PushRequest ('RRC_PDCPConfig', 'pdcpConfig')
 // Sequence:  RRC_PushResponse ('RRC_U8', 'lcid')
 // Choice:  ('RRC_Message', 'RRC_PullRequest')
 // Choice:  ('RRC_Message', 'RRC_PullResponse')
@@ -91,11 +91,6 @@ struct RRC_LLCTxConfig
     RRC_LLCCRCType crcType;
 };
 
-struct RRC_LLCConfig
-{
-    RRC_LLCTxConfig txConfig;
-};
-
 enum class RRC_CipherAlgorithm : uint8_t
 {
     E_RRC_CipherAlgorithm_NONE,
@@ -114,6 +109,17 @@ enum class RRC_CompressionAlgorithm : uint8_t
     RRC_CompressionAlgorithm_ZLIB
 };
 
+enum class RRC_PushRequestReason : uint8_t
+{
+    RRC_PushRequestReason_RLF,
+    RRC_PushRequestReason_PEER_RLF
+};
+
+struct RRC_LLCConfig
+{
+    RRC_LLCTxConfig txConfig;
+};
+
 struct RRC_PDCPConfig
 {
     RRC_BOOL allowRLF;
@@ -126,11 +132,10 @@ struct RRC_PDCPConfig
     RRC_U8 compressionLevel;
 };
 
-using RRC_LLCConfigOptional = std::optional<RRC_LLCConfig>;
-using RRC_PDCPConfigOptional = std::optional<RRC_PDCPConfig>;
 struct RRC_PullRequest
 {
     RRC_U8 lcid;
+    RRC_BOOL forceApply;
     RRC_BOOL includeLLCConfig;
     RRC_BOOL includePDCPConfig;
 };
@@ -138,15 +143,16 @@ struct RRC_PullRequest
 struct RRC_PullResponse
 {
     RRC_U8 lcid;
-    RRC_LLCConfigOptional llcConfig;
-    RRC_PDCPConfigOptional pdcpConfig;
+    RRC_LLCConfig llcConfig;
+    RRC_PDCPConfig pdcpConfig;
 };
 
 struct RRC_PushRequest
 {
     RRC_U8 lcid;
-    RRC_LLCConfigOptional llcConfig;
-    RRC_PDCPConfigOptional pdcpConfig;
+    RRC_PushRequestReason reason;
+    RRC_LLCConfig llcConfig;
+    RRC_PDCPConfig pdcpConfig;
 };
 
 struct RRC_PushResponse
@@ -233,39 +239,6 @@ inline void str(const char* pName, const RRC_LLCTxConfig& pIe, std::string& pCtx
     }
 }
 
-inline void encode_per(const RRC_LLCConfig& pIe, cum::per_codec_ctx& pCtx)
-{
-    using namespace cum;
-    encode_per(pIe.txConfig, pCtx);
-}
-
-inline void decode_per(RRC_LLCConfig& pIe, cum::per_codec_ctx& pCtx)
-{
-    using namespace cum;
-    decode_per(pIe.txConfig, pCtx);
-}
-
-inline void str(const char* pName, const RRC_LLCConfig& pIe, std::string& pCtx, bool pIsLast)
-{
-    using namespace cum;
-    if (!pName)
-    {
-        pCtx = pCtx + "{";
-    }
-    else
-    {
-        pCtx = pCtx + "\"" + pName + "\":{";
-    }
-    size_t nOptional = 0;
-    size_t nMandatory = 1;
-    str("txConfig", pIe.txConfig, pCtx, !(--nMandatory+nOptional));
-    pCtx = pCtx + "}";
-    if (!pIsLast)
-    {
-        pCtx += ",";
-    }
-}
-
 inline void str(const char* pName, const RRC_CipherAlgorithm& pIe, std::string& pCtx, bool pIsLast)
 {
     using namespace cum;
@@ -305,6 +278,54 @@ inline void str(const char* pName, const RRC_CompressionAlgorithm& pIe, std::str
     }
     if (RRC_CompressionAlgorithm::RRC_CompressionAlgorithm_NONE == pIe) pCtx += "\"RRC_CompressionAlgorithm_NONE\"";
     if (RRC_CompressionAlgorithm::RRC_CompressionAlgorithm_ZLIB == pIe) pCtx += "\"RRC_CompressionAlgorithm_ZLIB\"";
+    if (!pIsLast)
+    {
+        pCtx += ",";
+    }
+}
+
+inline void str(const char* pName, const RRC_PushRequestReason& pIe, std::string& pCtx, bool pIsLast)
+{
+    using namespace cum;
+    if (pName)
+    {
+        pCtx = pCtx + "\"" + pName + "\":";
+    }
+    if (RRC_PushRequestReason::RRC_PushRequestReason_RLF == pIe) pCtx += "\"RRC_PushRequestReason_RLF\"";
+    if (RRC_PushRequestReason::RRC_PushRequestReason_PEER_RLF == pIe) pCtx += "\"RRC_PushRequestReason_PEER_RLF\"";
+    if (!pIsLast)
+    {
+        pCtx += ",";
+    }
+}
+
+inline void encode_per(const RRC_LLCConfig& pIe, cum::per_codec_ctx& pCtx)
+{
+    using namespace cum;
+    encode_per(pIe.txConfig, pCtx);
+}
+
+inline void decode_per(RRC_LLCConfig& pIe, cum::per_codec_ctx& pCtx)
+{
+    using namespace cum;
+    decode_per(pIe.txConfig, pCtx);
+}
+
+inline void str(const char* pName, const RRC_LLCConfig& pIe, std::string& pCtx, bool pIsLast)
+{
+    using namespace cum;
+    if (!pName)
+    {
+        pCtx = pCtx + "{";
+    }
+    else
+    {
+        pCtx = pCtx + "\"" + pName + "\":{";
+    }
+    size_t nOptional = 0;
+    size_t nMandatory = 1;
+    str("txConfig", pIe.txConfig, pCtx, !(--nMandatory+nOptional));
+    pCtx = pCtx + "}";
     if (!pIsLast)
     {
         pCtx += ",";
@@ -388,6 +409,7 @@ inline void encode_per(const RRC_PullRequest& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
     encode_per(pIe.lcid, pCtx);
+    encode_per(pIe.forceApply, pCtx);
     encode_per(pIe.includeLLCConfig, pCtx);
     encode_per(pIe.includePDCPConfig, pCtx);
 }
@@ -396,6 +418,7 @@ inline void decode_per(RRC_PullRequest& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
     decode_per(pIe.lcid, pCtx);
+    decode_per(pIe.forceApply, pCtx);
     decode_per(pIe.includeLLCConfig, pCtx);
     decode_per(pIe.includePDCPConfig, pCtx);
 }
@@ -412,8 +435,9 @@ inline void str(const char* pName, const RRC_PullRequest& pIe, std::string& pCtx
         pCtx = pCtx + "\"" + pName + "\":{";
     }
     size_t nOptional = 0;
-    size_t nMandatory = 3;
+    size_t nMandatory = 4;
     str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
+    str("forceApply", pIe.forceApply, pCtx, !(--nMandatory+nOptional));
     str("includeLLCConfig", pIe.includeLLCConfig, pCtx, !(--nMandatory+nOptional));
     str("includePDCPConfig", pIe.includePDCPConfig, pCtx, !(--nMandatory+nOptional));
     pCtx = pCtx + "}";
@@ -426,43 +450,17 @@ inline void str(const char* pName, const RRC_PullRequest& pIe, std::string& pCtx
 inline void encode_per(const RRC_PullResponse& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
-    uint8_t optionalmask[1] = {};
-    if (pIe.llcConfig)
-    {
-        set_optional(optionalmask, 0);
-    }
-    if (pIe.pdcpConfig)
-    {
-        set_optional(optionalmask, 1);
-    }
-    encode_per(optionalmask, sizeof(optionalmask), pCtx);
     encode_per(pIe.lcid, pCtx);
-    if (pIe.llcConfig)
-    {
-        encode_per(*pIe.llcConfig, pCtx);
-    }
-    if (pIe.pdcpConfig)
-    {
-        encode_per(*pIe.pdcpConfig, pCtx);
-    }
+    encode_per(pIe.llcConfig, pCtx);
+    encode_per(pIe.pdcpConfig, pCtx);
 }
 
 inline void decode_per(RRC_PullResponse& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
-    uint8_t optionalmask[1] = {};
-    decode_per(optionalmask, sizeof(optionalmask), pCtx);
     decode_per(pIe.lcid, pCtx);
-    if (check_optional(optionalmask, 0))
-    {
-        pIe.llcConfig = decltype(pIe.llcConfig)::value_type{};
-        decode_per(*pIe.llcConfig, pCtx);
-    }
-    if (check_optional(optionalmask, 1))
-    {
-        pIe.pdcpConfig = decltype(pIe.pdcpConfig)::value_type{};
-        decode_per(*pIe.pdcpConfig, pCtx);
-    }
+    decode_per(pIe.llcConfig, pCtx);
+    decode_per(pIe.pdcpConfig, pCtx);
 }
 
 inline void str(const char* pName, const RRC_PullResponse& pIe, std::string& pCtx, bool pIsLast)
@@ -477,18 +475,10 @@ inline void str(const char* pName, const RRC_PullResponse& pIe, std::string& pCt
         pCtx = pCtx + "\"" + pName + "\":{";
     }
     size_t nOptional = 0;
-    if (pIe.llcConfig) nOptional++;
-    if (pIe.pdcpConfig) nOptional++;
-    size_t nMandatory = 1;
+    size_t nMandatory = 3;
     str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
-    if (pIe.llcConfig)
-    {
-        str("llcConfig", *pIe.llcConfig, pCtx, !(nMandatory+--nOptional));
-    }
-    if (pIe.pdcpConfig)
-    {
-        str("pdcpConfig", *pIe.pdcpConfig, pCtx, !(nMandatory+--nOptional));
-    }
+    str("llcConfig", pIe.llcConfig, pCtx, !(--nMandatory+nOptional));
+    str("pdcpConfig", pIe.pdcpConfig, pCtx, !(--nMandatory+nOptional));
     pCtx = pCtx + "}";
     if (!pIsLast)
     {
@@ -499,43 +489,19 @@ inline void str(const char* pName, const RRC_PullResponse& pIe, std::string& pCt
 inline void encode_per(const RRC_PushRequest& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
-    uint8_t optionalmask[1] = {};
-    if (pIe.llcConfig)
-    {
-        set_optional(optionalmask, 0);
-    }
-    if (pIe.pdcpConfig)
-    {
-        set_optional(optionalmask, 1);
-    }
-    encode_per(optionalmask, sizeof(optionalmask), pCtx);
     encode_per(pIe.lcid, pCtx);
-    if (pIe.llcConfig)
-    {
-        encode_per(*pIe.llcConfig, pCtx);
-    }
-    if (pIe.pdcpConfig)
-    {
-        encode_per(*pIe.pdcpConfig, pCtx);
-    }
+    encode_per(pIe.reason, pCtx);
+    encode_per(pIe.llcConfig, pCtx);
+    encode_per(pIe.pdcpConfig, pCtx);
 }
 
 inline void decode_per(RRC_PushRequest& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
-    uint8_t optionalmask[1] = {};
-    decode_per(optionalmask, sizeof(optionalmask), pCtx);
     decode_per(pIe.lcid, pCtx);
-    if (check_optional(optionalmask, 0))
-    {
-        pIe.llcConfig = decltype(pIe.llcConfig)::value_type{};
-        decode_per(*pIe.llcConfig, pCtx);
-    }
-    if (check_optional(optionalmask, 1))
-    {
-        pIe.pdcpConfig = decltype(pIe.pdcpConfig)::value_type{};
-        decode_per(*pIe.pdcpConfig, pCtx);
-    }
+    decode_per(pIe.reason, pCtx);
+    decode_per(pIe.llcConfig, pCtx);
+    decode_per(pIe.pdcpConfig, pCtx);
 }
 
 inline void str(const char* pName, const RRC_PushRequest& pIe, std::string& pCtx, bool pIsLast)
@@ -550,18 +516,11 @@ inline void str(const char* pName, const RRC_PushRequest& pIe, std::string& pCtx
         pCtx = pCtx + "\"" + pName + "\":{";
     }
     size_t nOptional = 0;
-    if (pIe.llcConfig) nOptional++;
-    if (pIe.pdcpConfig) nOptional++;
-    size_t nMandatory = 1;
+    size_t nMandatory = 4;
     str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
-    if (pIe.llcConfig)
-    {
-        str("llcConfig", *pIe.llcConfig, pCtx, !(nMandatory+--nOptional));
-    }
-    if (pIe.pdcpConfig)
-    {
-        str("pdcpConfig", *pIe.pdcpConfig, pCtx, !(nMandatory+--nOptional));
-    }
+    str("reason", pIe.reason, pCtx, !(--nMandatory+nOptional));
+    str("llcConfig", pIe.llcConfig, pCtx, !(--nMandatory+nOptional));
+    str("pdcpConfig", pIe.pdcpConfig, pCtx, !(--nMandatory+nOptional));
     pCtx = pCtx + "}";
     if (!pIsLast)
     {

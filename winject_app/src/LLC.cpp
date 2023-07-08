@@ -24,6 +24,7 @@ lcid_t LLC::get_lcid()
 void LLC::set_tx_enabled(bool value)
 {
     std::unique_lock<std::mutex> lg(tx_mutex);
+    auto old_tx_enabled = is_tx_enabled;
     is_tx_enabled = value;
 
     if (tx_config.mode == E_TX_MODE_AM)
@@ -52,20 +53,23 @@ void LLC::set_tx_enabled(bool value)
     }
 
     Logless(*main_logger, LLC_INF,
-        "INF | LLC#   | tx_enable=#",
+        "INF | LLC#   | set_tx_enabled old=# new=#",
         (int) lcid,
+        (int) old_tx_enabled,
         (int) is_tx_enabled);
 }
 
 void LLC::set_rx_enabled(bool value)
 {
     std::unique_lock<std::mutex> lg(rx_mutex);
+    auto old_rx_enabled = is_rx_enabled;
     is_rx_enabled = value;
 
     Logless(*main_logger, LLC_INF,
-        "INF | LLC#   | rx_enable=#",
+        "INF | LLC#   | set_rx_enabled old=# new=#",
         (int) lcid,
-        (int)is_rx_enabled);
+        (int) old_rx_enabled,
+        (int) is_rx_enabled);
 }
 
 ILLC::tx_config_t LLC::get_tx_confg()
