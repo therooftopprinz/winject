@@ -26,7 +26,7 @@
     },
     "llc_configs": [
       {
-        "description:" : "rrc0",
+        "description:" : "rrc0-llc",
         "lcid" : 0,
         "tx_mode" : "TM",
         "scheduling_config" : {
@@ -36,7 +36,7 @@
         "common_tx_config" : {}
       },
       {
-        "description:" : "data1",
+        "description:" : "data1-llc",
         "lcid" : 1,
         "tx_mode" : "TM",
         "scheduling_config" : {
@@ -46,7 +46,7 @@
         "common_tx_config" : {}
       },
       {
-        "description:" : "data2",
+        "description:" : "data2-llc",
         "lcid" : 2,
         "tx_mode" : "AM",
         "scheduling_config" : {
@@ -61,7 +61,7 @@
         "common_tx_config" : {}
       },
       {
-        "description:" : "video7",
+        "description:" : "video7-llc",
         "lcid" : 7,
         "tx_mode" : "AM",
         "scheduling_config" : {
@@ -78,7 +78,7 @@
         }
       },
       {
-        "description:" : "video8",
+        "description:" : "video8-llc",
         "lcid" : 8,
         "tx_mode" : "AM",
         "scheduling_config" : {
@@ -97,7 +97,7 @@
     ],
     "pdcp_configs": [
       {
-        "description:" : "rrc0",
+        "description:" : "rrc0-pdcp",
         "lcid" : 0,
         "tx_config": {
           "allow_rlf" : false
@@ -107,7 +107,7 @@
         }
       },
       {
-        "description:" : "data1",
+        "description:" : "data1-pdcp",
         "lcid" : 1,
         "tx_config" : {
           "allow_rlf" : false,
@@ -122,7 +122,7 @@
         }
       },
       {
-        "description:" : "data2",
+        "description:" : "data2-pdcp",
         "lcid" : 2,
         "tx_config" : {
           "allow_rlf" : true,
@@ -138,7 +138,7 @@
         }
       },
       {
-        "description:" : "video",
+        "description:" : "video7-pdcp",
         "lcid" : 7,
         "tx_config" : {
           "allow_rlf" : false,
@@ -154,7 +154,7 @@
         }
       },
       {
-        "description:" : "video8",
+        "description:" : "video8-pdcp",
         "lcid" : 8,
         "tx_config" : {
           "allow_rlf" : false,

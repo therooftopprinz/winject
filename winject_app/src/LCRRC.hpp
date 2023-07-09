@@ -103,7 +103,7 @@ public:
             "ERR | LCRRC# | on_exchg_rsp",
             (int) llc.get_lcid());
 
-        reconfigure_rx(req);
+        reconfigure_rx(msg);
         change_txrx_state(E_TXRX_STATE_CONFIGURED);
 
         schedule_activate();
