@@ -625,22 +625,12 @@ void AppRRC::on_rrc_message_lcrrc(int req_id, const T& msg)
     }
 }
 
-void AppRRC::on_rrc_message(int req_id, const RRC_PullRequest& msg)
+void AppRRC::on_rrc_message(int req_id, const RRC_ExchangeRequest& msg)
 {
     on_rrc_message_lcrrc(req_id, msg);
 }
 
-void AppRRC::on_rrc_message(int req_id, const RRC_PullResponse& msg)
-{
-    on_rrc_message_lcrrc(req_id, msg);
-}
-
-void AppRRC::on_rrc_message(int req_id, const RRC_PushRequest& msg)
-{
-    on_rrc_message_lcrrc(req_id, msg);
-}
-
-void AppRRC::on_rrc_message(int req_id, const RRC_PushResponse& msg)
+void AppRRC::on_rrc_message(int req_id, const RRC_ExchangeResponse& msg)
 {
     on_rrc_message_lcrrc(req_id, msg);
 }

@@ -30,7 +30,7 @@ public:
 
     void check_response(int req_id)
     {
-        std::unique_lock<std::mutex> lg(rrc_requests_mutex);
+        std::unique_lock lg(rrc_requests_mutex);
         auto rrc_requests_it = rrc_requests.find(req_id);
 
         if (rrc_requests.end() == rrc_requests_it)
@@ -50,28 +50,8 @@ public:
             (int) req_id);
     }
 
-    void on_rrc_message(int req_id, const RRC_PullRequest& req) override
-    {
-        // RRC rrc;
-        // rrc.requestID = req_id;
-        // rrc.message = RRC_PullResponse{};
-        // auto& message = std::get<RRC_PullResponse>(rrc.message);
-        // fill_from_config(
-        //     req.lcid,
-        //     req.includeLLCConfig,
-        //     req.includePDCPConfig,
-        //     message);
-        // send_rrc(rrc);
-    }
 
-    void on_rrc_message(int req_id, const RRC_PullResponse& rsp) override
-    {
-        check_response(req_id);
-        // update_peer_config_and_reconfigure_rx(rsp);
-        // notify_resp_handler(req_id, rsp);
-    }
-
-    void on_rrc_message(int req_id, const RRC_PushRequest& req) override
+    void on_rrc_message(int req_id, const RRC_ExchangeRequest& req) override
     {
         auto llc_tx_cfg = llc.get_tx_confg();
 
@@ -83,37 +63,34 @@ public:
         if (ILLC::E_TX_MODE_AM != to_config(req.llcConfig.txConfig.mode))
         {
             Logless(*main_logger, RRC_ERR,
-                "ERR | LCRRC# | on_push_req (ignored: mismatch mode)",
+                "ERR | LCRRC# | on_exchg_req (ignored: mismatch mode)",
                 (int) llc.get_lcid());
-            return;
-        }
-
-        if (E_TXRX_STATE_ACTIVE == tx_state)
-        {
-            on_rlf();
-            return;
-        }
-
-        if (E_TXRX_STATE_NOT_CONFIGURED == tx_state)
-        {
-            Logless(*main_logger, RRC_ERR,
-                "ERR | LCRRC# | on_push_req (peer init)",
-                (int) llc.get_lcid());
-            reconfigure_rx(req);
-            send_push_req();
-            send_push_resp(req_id);
-            change_rx_state(E_TXRX_STATE_CONFIGURED);
             return;
         }
 
         Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | on_push_req (ignored: in progress)",
+            "ERR | LCRRC# | on_exchg_req",
                 (int) llc.get_lcid());
-        send_push_resp(req_id);
+
+        if (E_TXRX_STATE_ACTIVE == txrx_state)
+        {
+            Logless(*main_logger, RRC_ERR,
+                "ERR | LCRRC# | txrx already active, forcing rlf.",
+                    (int) llc.get_lcid());
+
+            on_rlf();
+        }
+
+        reconfigure_rx(req);
+        change_txrx_state(E_TXRX_STATE_CONFIGURED);
+
+        send_exchange_resp(req_id);
+
+        schedule_activate();
         return;
     }
 
-    void on_rrc_message(int req_id, const RRC_PushResponse& msg) override
+    void on_rrc_message(int req_id, const RRC_ExchangeResponse& msg) override
     {
         check_response(req_id);
 
@@ -124,44 +101,21 @@ public:
             return;
         }
 
-        if (E_TXRX_STATE_NOT_CONFIGURED == tx_state)
+        if (E_TXRX_STATE_CONFIGURING != txrx_state)
         {
             Logless(*main_logger, RRC_ERR,
-                "ERR | LCRRC# | on_push_rsp (ignored: unexpected)",
+                "ERR | LCRRC# | on_exchg_rsp (ignored: unexpected)",
                 (int) llc.get_lcid());
-            return;
-        }
-
-        if (E_TXRX_STATE_CONFIGURED == tx_state ||
-            E_TXRX_STATE_ACTIVE == tx_state)
-        {
-            Logless(*main_logger, RRC_ERR,
-                "ERR | LCRRC# | on_push_rsp (ignored: retransmitted)",
-                (int) llc.get_lcid());
-            send_push_resp(req_id);
             return;
         }
 
         Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | on_push_rsp (ignored: unexpected)",
+            "ERR | LCRRC# | on_exchg_rsp",
             (int) llc.get_lcid());
 
-        auto try_activate = [this](){
-            if (E_TXRX_STATE_CONFIGURED == tx_state ||
-                E_TXRX_STATE_CONFIGURED == rx_state)
-            {
-                activate();
-            }
-        };
+        change_txrx_state(E_TXRX_STATE_CONFIGURED);
 
-        if (E_TXRX_STATE_CONFIGURED == tx_state ||
-            E_TXRX_STATE_CONFIGURED == rx_state)
-        {
-            activate();
-            return;
-        }
-
-        timer.schedule(std::chrono::nanoseconds(1000*1000*1000), try_activate);
+        schedule_activate();
     }
 
     void on_init() override
@@ -187,8 +141,7 @@ public:
             (int) llc.get_lcid(),
             (int) lcid);
 
-        change_tx_state(E_TXRX_STATE_NOT_CONFIGURED);
-        change_rx_state(E_TXRX_STATE_NOT_CONFIGURED);
+        change_txrx_state(E_TXRX_STATE_NOT_CONFIGURED);
 
         ep.set_tx_enabled(false);
         pdcp.set_tx_enabled(false);
@@ -200,31 +153,44 @@ public:
     }
 
 private:
+    void schedule_activate()
+    {
+        std::unique_lock lg(activate_timer_mutex);
+        if (activate_timer)
+        {
+            timer.cancel(*activate_timer);
+        }
+
+        activate_timer = timer.schedule(std::chrono::nanoseconds(1000*1000*100),
+        [this](){
+            activate();   
+        });
+    }
     void activate()
     {
         Logless(*main_logger, RRC_ERR, "ERR | LCRRC# | Activated lcid=#",
             (int) llc.get_lcid(),
             (int) llc.get_lcid());
 
+        change_txrx_state(E_TXRX_STATE_ACTIVE);
+
         pdcp.set_tx_enabled(true);
         ep.set_tx_enabled(true);
-        change_tx_state(E_TXRX_STATE_ACTIVE);
 
         pdcp.set_rx_enabled(true);
         ep.set_rx_enabled(true);  
-        change_rx_state(E_TXRX_STATE_ACTIVE);
 
         llc.set_tx_enabled(true);
         llc.set_rx_enabled(true);
     }
 
-    void send_push_req()
+    void send_exchange_req()
     {
         RRC msg;
         msg.requestID = rrc.allocate_req_id();
-        msg.message = RRC_PushRequest{};
+        msg.message = RRC_ExchangeRequest{};
 
-        auto& request = std::get<RRC_PushRequest>(msg.message);
+        auto& request = std::get<RRC_ExchangeRequest>(msg.message);
 
         request.lcid = llc.get_lcid();
 
@@ -232,7 +198,7 @@ private:
 
         auto on_push_fail =  [this](){
                 Logless(*main_logger, RRC_ERR,
-                    "ERR | LCRRC# | push_req failed, forcing rlf!",
+                    "ERR | LCRRC# | exchange_req failed, forcing rlf!",
                     (int) llc.get_lcid(),
                     (int) llc.get_lcid());
                 on_rlf();
@@ -241,13 +207,15 @@ private:
         auto_send_rrc(3, msg, on_push_fail);
     }
 
-    void send_push_resp(uint8_t req_id)
+    void send_exchange_resp(uint8_t req_id)
     {
         RRC msg;
         msg.requestID = req_id;
-        msg.message = RRC_PushResponse{};
-        auto& response = std::get<RRC_PushResponse>(msg.message);
+        msg.message = RRC_ExchangeResponse{};
+        auto& response = std::get<RRC_ExchangeResponse>(msg.message);
         response.lcid = llc.get_lcid();
+        fill_from_config(response);
+
         rrc.send_rrc(msg);
     }
 
@@ -263,34 +231,22 @@ private:
         "E_TXRX_STATE_CONFIGURED",
         "E_TXRX_STATE_ACTIVE"};
 
-    void change_tx_state(txrx_state_e new_state)
-    {
-        Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | Change TX state old=# new=#",
-            (int) llc.get_lcid(),
-            state_str[tx_state],
-            state_str[new_state]);
-
-        tx_state = new_state;
-    }
-
-
-    void change_rx_state(txrx_state_e new_state)
+    void change_txrx_state(txrx_state_e new_state)
     {
         Logless(*main_logger, RRC_ERR,
             "ERR | LCRRC# | Change RX state old=# new=#",
             (int) llc.get_lcid(),
-            state_str[tx_state],
+            state_str[txrx_state],
             state_str[new_state]);
 
-        rx_state = new_state;
+        txrx_state = new_state;
     }
 
     void on_init_am()
     {
-        if (E_TXRX_STATE_CONFIGURING == tx_state ||
-            E_TXRX_STATE_CONFIGURED  == tx_state ||
-            E_TXRX_STATE_ACTIVE == tx_state)
+        if (E_TXRX_STATE_CONFIGURING == txrx_state ||
+            E_TXRX_STATE_CONFIGURED  == txrx_state ||
+            E_TXRX_STATE_ACTIVE == txrx_state)
         {
             return;
         }
@@ -299,8 +255,8 @@ private:
             "ERR | LCRRC# | on_init_am (self init)",
             (int) llc.get_lcid());
 
-        change_tx_state(E_TXRX_STATE_CONFIGURING);
-        send_push_req();
+        change_txrx_state(E_TXRX_STATE_CONFIGURING);
+        send_exchange_req();
     }
 
     void on_init_tm()
@@ -396,7 +352,7 @@ private:
                     (int) msg.requestID,
                     max_retry);
 
-                std::unique_lock<std::mutex> lg(rrc_requests_mutex);
+                std::unique_lock lg(rrc_requests_mutex);
                 auto rrc_requests_it = rrc_requests.find(msg.requestID);
                 if (rrc_requests.end() == rrc_requests_it)
                 {
@@ -427,7 +383,7 @@ private:
             exp_id,
             (int) msg.requestID);
 
-        std::unique_lock<std::mutex> lg(rrc_requests_mutex);
+        std::unique_lock lg(rrc_requests_mutex);
         rrc_requests.erase(msg.requestID);
         auto res = rrc_requests.emplace(msg.requestID, rrc_request_context_t{});
         auto& rrc_request = res.first->second;
@@ -446,8 +402,10 @@ private:
     std::map<uint8_t, rrc_request_context_t> rrc_requests;
     std::mutex rrc_requests_mutex;
 
-    std::atomic<txrx_state_e> tx_state = E_TXRX_STATE_NOT_CONFIGURED;
-    std::atomic<txrx_state_e> rx_state = E_TXRX_STATE_NOT_CONFIGURED;
+    std::atomic<txrx_state_e> txrx_state = E_TXRX_STATE_NOT_CONFIGURED;
+    
+    std::optional<uint64_t> activate_timer = 0;
+    std::mutex activate_timer_mutex;
 
     ILLC& llc;
     IPDCP& pdcp;

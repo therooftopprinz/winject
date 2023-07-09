@@ -86,39 +86,24 @@ Sequence RRC_PDCPConfig
     RRC_U8 compressionLevel
 };
 
-Sequence RRC_PullRequest
-{
-    RRC_U8 lcid,
-    RRC_BOOL forceApply,
-    RRC_BOOL includeLLCConfig,
-    RRC_BOOL includePDCPConfig
-};
-
-Sequence RRC_PullResponse
+Sequence RRC_ExchangeRequest
 {
     RRC_U8 lcid,
     RRC_LLCConfig llcConfig,
     RRC_PDCPConfig pdcpConfig
 };
 
-Sequence RRC_PushRequest
+Sequence RRC_ExchangeResponse
 {
     RRC_U8 lcid,
     RRC_LLCConfig llcConfig,
     RRC_PDCPConfig pdcpConfig
-};
-
-Sequence RRC_PushResponse
-{
-    RRC_U8 lcid
 };
 
 Choice RRC_Message
 {
-    RRC_PullRequest,
-    RRC_PullResponse,
-    RRC_PushRequest,
-    RRC_PushResponse
+    RRC_ExchangeRequest,
+    RRC_ExchangeResponse
 };
 
 Sequence RRC

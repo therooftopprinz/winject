@@ -25,8 +25,6 @@
 // Enumeration:  ('RRC_IntegrityAlgorithm', ('E_RRC_CipherAlgorithm_HMAC_SHA1', None))
 // Enumeration:  ('RRC_CompressionAlgorithm', ('RRC_CompressionAlgorithm_NONE', None))
 // Enumeration:  ('RRC_CompressionAlgorithm', ('RRC_CompressionAlgorithm_ZLIB', None))
-// Enumeration:  ('RRC_PushRequestReason', ('RRC_PushRequestReason_RLF', None))
-// Enumeration:  ('RRC_PushRequestReason', ('RRC_PushRequestReason_PEER_RLF', None))
 // Sequence:  RRC_LLCConfig ('RRC_LLCTxConfig', 'txConfig')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowRLF')
 // Sequence:  RRC_PDCPConfig ('RRC_BOOL', 'allowSegmentation')
@@ -36,22 +34,14 @@
 // Sequence:  RRC_PDCPConfig ('RRC_IntegrityAlgorithm', 'integrityAlgorithm')
 // Sequence:  RRC_PDCPConfig ('RRC_CompressionAlgorithm', 'compressionAlgorithm')
 // Sequence:  RRC_PDCPConfig ('RRC_U8', 'compressionLevel')
-// Sequence:  RRC_PullRequest ('RRC_U8', 'lcid')
-// Sequence:  RRC_PullRequest ('RRC_BOOL', 'forceApply')
-// Sequence:  RRC_PullRequest ('RRC_BOOL', 'includeLLCConfig')
-// Sequence:  RRC_PullRequest ('RRC_BOOL', 'includePDCPConfig')
-// Sequence:  RRC_PullResponse ('RRC_U8', 'lcid')
-// Sequence:  RRC_PullResponse ('RRC_LLCConfig', 'llcConfig')
-// Sequence:  RRC_PullResponse ('RRC_PDCPConfig', 'pdcpConfig')
-// Sequence:  RRC_PushRequest ('RRC_U8', 'lcid')
-// Sequence:  RRC_PushRequest ('RRC_PushRequestReason', 'reason')
-// Sequence:  RRC_PushRequest ('RRC_LLCConfig', 'llcConfig')
-// Sequence:  RRC_PushRequest ('RRC_PDCPConfig', 'pdcpConfig')
-// Sequence:  RRC_PushResponse ('RRC_U8', 'lcid')
-// Choice:  ('RRC_Message', 'RRC_PullRequest')
-// Choice:  ('RRC_Message', 'RRC_PullResponse')
-// Choice:  ('RRC_Message', 'RRC_PushRequest')
-// Choice:  ('RRC_Message', 'RRC_PushResponse')
+// Sequence:  RRC_ExchangeRequest ('RRC_U8', 'lcid')
+// Sequence:  RRC_ExchangeRequest ('RRC_LLCConfig', 'llcConfig')
+// Sequence:  RRC_ExchangeRequest ('RRC_PDCPConfig', 'pdcpConfig')
+// Sequence:  RRC_ExchangeResponse ('RRC_U8', 'lcid')
+// Sequence:  RRC_ExchangeResponse ('RRC_LLCConfig', 'llcConfig')
+// Sequence:  RRC_ExchangeResponse ('RRC_PDCPConfig', 'pdcpConfig')
+// Choice:  ('RRC_Message', 'RRC_ExchangeRequest')
+// Choice:  ('RRC_Message', 'RRC_ExchangeResponse')
 // Sequence:  RRC ('RRC_U8', 'requestID')
 // Sequence:  RRC ('RRC_Message', 'message')
 // Generating for C++
@@ -109,12 +99,6 @@ enum class RRC_CompressionAlgorithm : uint8_t
     RRC_CompressionAlgorithm_ZLIB
 };
 
-enum class RRC_PushRequestReason : uint8_t
-{
-    RRC_PushRequestReason_RLF,
-    RRC_PushRequestReason_PEER_RLF
-};
-
 struct RRC_LLCConfig
 {
     RRC_LLCTxConfig txConfig;
@@ -132,35 +116,21 @@ struct RRC_PDCPConfig
     RRC_U8 compressionLevel;
 };
 
-struct RRC_PullRequest
-{
-    RRC_U8 lcid;
-    RRC_BOOL forceApply;
-    RRC_BOOL includeLLCConfig;
-    RRC_BOOL includePDCPConfig;
-};
-
-struct RRC_PullResponse
+struct RRC_ExchangeRequest
 {
     RRC_U8 lcid;
     RRC_LLCConfig llcConfig;
     RRC_PDCPConfig pdcpConfig;
 };
 
-struct RRC_PushRequest
+struct RRC_ExchangeResponse
 {
     RRC_U8 lcid;
-    RRC_PushRequestReason reason;
     RRC_LLCConfig llcConfig;
     RRC_PDCPConfig pdcpConfig;
 };
 
-struct RRC_PushResponse
-{
-    RRC_U8 lcid;
-};
-
-using RRC_Message = std::variant<RRC_PullRequest,RRC_PullResponse,RRC_PushRequest,RRC_PushResponse>;
+using RRC_Message = std::variant<RRC_ExchangeRequest,RRC_ExchangeResponse>;
 struct RRC
 {
     RRC_U8 requestID;
@@ -284,21 +254,6 @@ inline void str(const char* pName, const RRC_CompressionAlgorithm& pIe, std::str
     }
 }
 
-inline void str(const char* pName, const RRC_PushRequestReason& pIe, std::string& pCtx, bool pIsLast)
-{
-    using namespace cum;
-    if (pName)
-    {
-        pCtx = pCtx + "\"" + pName + "\":";
-    }
-    if (RRC_PushRequestReason::RRC_PushRequestReason_RLF == pIe) pCtx += "\"RRC_PushRequestReason_RLF\"";
-    if (RRC_PushRequestReason::RRC_PushRequestReason_PEER_RLF == pIe) pCtx += "\"RRC_PushRequestReason_PEER_RLF\"";
-    if (!pIsLast)
-    {
-        pCtx += ",";
-    }
-}
-
 inline void encode_per(const RRC_LLCConfig& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
@@ -405,49 +360,7 @@ inline void str(const char* pName, const RRC_PDCPConfig& pIe, std::string& pCtx,
     }
 }
 
-inline void encode_per(const RRC_PullRequest& pIe, cum::per_codec_ctx& pCtx)
-{
-    using namespace cum;
-    encode_per(pIe.lcid, pCtx);
-    encode_per(pIe.forceApply, pCtx);
-    encode_per(pIe.includeLLCConfig, pCtx);
-    encode_per(pIe.includePDCPConfig, pCtx);
-}
-
-inline void decode_per(RRC_PullRequest& pIe, cum::per_codec_ctx& pCtx)
-{
-    using namespace cum;
-    decode_per(pIe.lcid, pCtx);
-    decode_per(pIe.forceApply, pCtx);
-    decode_per(pIe.includeLLCConfig, pCtx);
-    decode_per(pIe.includePDCPConfig, pCtx);
-}
-
-inline void str(const char* pName, const RRC_PullRequest& pIe, std::string& pCtx, bool pIsLast)
-{
-    using namespace cum;
-    if (!pName)
-    {
-        pCtx = pCtx + "{";
-    }
-    else
-    {
-        pCtx = pCtx + "\"" + pName + "\":{";
-    }
-    size_t nOptional = 0;
-    size_t nMandatory = 4;
-    str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
-    str("forceApply", pIe.forceApply, pCtx, !(--nMandatory+nOptional));
-    str("includeLLCConfig", pIe.includeLLCConfig, pCtx, !(--nMandatory+nOptional));
-    str("includePDCPConfig", pIe.includePDCPConfig, pCtx, !(--nMandatory+nOptional));
-    pCtx = pCtx + "}";
-    if (!pIsLast)
-    {
-        pCtx += ",";
-    }
-}
-
-inline void encode_per(const RRC_PullResponse& pIe, cum::per_codec_ctx& pCtx)
+inline void encode_per(const RRC_ExchangeRequest& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
     encode_per(pIe.lcid, pCtx);
@@ -455,7 +368,7 @@ inline void encode_per(const RRC_PullResponse& pIe, cum::per_codec_ctx& pCtx)
     encode_per(pIe.pdcpConfig, pCtx);
 }
 
-inline void decode_per(RRC_PullResponse& pIe, cum::per_codec_ctx& pCtx)
+inline void decode_per(RRC_ExchangeRequest& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
     decode_per(pIe.lcid, pCtx);
@@ -463,7 +376,7 @@ inline void decode_per(RRC_PullResponse& pIe, cum::per_codec_ctx& pCtx)
     decode_per(pIe.pdcpConfig, pCtx);
 }
 
-inline void str(const char* pName, const RRC_PullResponse& pIe, std::string& pCtx, bool pIsLast)
+inline void str(const char* pName, const RRC_ExchangeRequest& pIe, std::string& pCtx, bool pIsLast)
 {
     using namespace cum;
     if (!pName)
@@ -486,25 +399,23 @@ inline void str(const char* pName, const RRC_PullResponse& pIe, std::string& pCt
     }
 }
 
-inline void encode_per(const RRC_PushRequest& pIe, cum::per_codec_ctx& pCtx)
+inline void encode_per(const RRC_ExchangeResponse& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
     encode_per(pIe.lcid, pCtx);
-    encode_per(pIe.reason, pCtx);
     encode_per(pIe.llcConfig, pCtx);
     encode_per(pIe.pdcpConfig, pCtx);
 }
 
-inline void decode_per(RRC_PushRequest& pIe, cum::per_codec_ctx& pCtx)
+inline void decode_per(RRC_ExchangeResponse& pIe, cum::per_codec_ctx& pCtx)
 {
     using namespace cum;
     decode_per(pIe.lcid, pCtx);
-    decode_per(pIe.reason, pCtx);
     decode_per(pIe.llcConfig, pCtx);
     decode_per(pIe.pdcpConfig, pCtx);
 }
 
-inline void str(const char* pName, const RRC_PushRequest& pIe, std::string& pCtx, bool pIsLast)
+inline void str(const char* pName, const RRC_ExchangeResponse& pIe, std::string& pCtx, bool pIsLast)
 {
     using namespace cum;
     if (!pName)
@@ -516,44 +427,10 @@ inline void str(const char* pName, const RRC_PushRequest& pIe, std::string& pCtx
         pCtx = pCtx + "\"" + pName + "\":{";
     }
     size_t nOptional = 0;
-    size_t nMandatory = 4;
+    size_t nMandatory = 3;
     str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
-    str("reason", pIe.reason, pCtx, !(--nMandatory+nOptional));
     str("llcConfig", pIe.llcConfig, pCtx, !(--nMandatory+nOptional));
     str("pdcpConfig", pIe.pdcpConfig, pCtx, !(--nMandatory+nOptional));
-    pCtx = pCtx + "}";
-    if (!pIsLast)
-    {
-        pCtx += ",";
-    }
-}
-
-inline void encode_per(const RRC_PushResponse& pIe, cum::per_codec_ctx& pCtx)
-{
-    using namespace cum;
-    encode_per(pIe.lcid, pCtx);
-}
-
-inline void decode_per(RRC_PushResponse& pIe, cum::per_codec_ctx& pCtx)
-{
-    using namespace cum;
-    decode_per(pIe.lcid, pCtx);
-}
-
-inline void str(const char* pName, const RRC_PushResponse& pIe, std::string& pCtx, bool pIsLast)
-{
-    using namespace cum;
-    if (!pName)
-    {
-        pCtx = pCtx + "{";
-    }
-    else
-    {
-        pCtx = pCtx + "\"" + pName + "\":{";
-    }
-    size_t nOptional = 0;
-    size_t nMandatory = 1;
-    str("lcid", pIe.lcid, pCtx, !(--nMandatory+nOptional));
     pCtx = pCtx + "}";
     if (!pIsLast)
     {
@@ -575,14 +452,6 @@ inline void encode_per(const RRC_Message& pIe, cum::per_codec_ctx& pCtx)
     {
         encode_per(std::get<1>(pIe), pCtx);
     }
-    else if (2 == type)
-    {
-        encode_per(std::get<2>(pIe), pCtx);
-    }
-    else if (3 == type)
-    {
-        encode_per(std::get<3>(pIe), pCtx);
-    }
 }
 
 inline void decode_per(RRC_Message& pIe, cum::per_codec_ctx& pCtx)
@@ -593,23 +462,13 @@ inline void decode_per(RRC_Message& pIe, cum::per_codec_ctx& pCtx)
     decode_per(type, pCtx);
     if (0 == type)
     {
-        pIe = RRC_PullRequest();
+        pIe = RRC_ExchangeRequest();
         decode_per(std::get<0>(pIe), pCtx);
     }
     else if (1 == type)
     {
-        pIe = RRC_PullResponse();
+        pIe = RRC_ExchangeResponse();
         decode_per(std::get<1>(pIe), pCtx);
-    }
-    else if (2 == type)
-    {
-        pIe = RRC_PushRequest();
-        decode_per(std::get<2>(pIe), pCtx);
-    }
-    else if (3 == type)
-    {
-        pIe = RRC_PushResponse();
-        decode_per(std::get<3>(pIe), pCtx);
     }
 }
 
@@ -624,7 +483,7 @@ inline void str(const char* pName, const RRC_Message& pIe, std::string& pCtx, bo
             pCtx += "\"" + std::string(pName) + "\":{";
         else
             pCtx += "{";
-        std::string name = "RRC_PullRequest";
+        std::string name = "RRC_ExchangeRequest";
         str(name.c_str(), std::get<0>(pIe), pCtx, true);
         pCtx += "}";
     }
@@ -634,28 +493,8 @@ inline void str(const char* pName, const RRC_Message& pIe, std::string& pCtx, bo
             pCtx += "\"" + std::string(pName) + "\":{";
         else
             pCtx += "{";
-        std::string name = "RRC_PullResponse";
+        std::string name = "RRC_ExchangeResponse";
         str(name.c_str(), std::get<1>(pIe), pCtx, true);
-        pCtx += "}";
-    }
-    else if (2 == type)
-    {
-        if (pName)
-            pCtx += "\"" + std::string(pName) + "\":{";
-        else
-            pCtx += "{";
-        std::string name = "RRC_PushRequest";
-        str(name.c_str(), std::get<2>(pIe), pCtx, true);
-        pCtx += "}";
-    }
-    else if (3 == type)
-    {
-        if (pName)
-            pCtx += "\"" + std::string(pName) + "\":{";
-        else
-            pCtx += "{";
-        std::string name = "RRC_PushResponse";
-        str(name.c_str(), std::get<3>(pIe), pCtx, true);
         pCtx += "}";
     }
     if (!pIsLast)

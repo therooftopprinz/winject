@@ -14,10 +14,8 @@ struct ILCRRC
 
     virtual void on_init() = 0;
     virtual void on_rlf() = 0;
-    virtual void on_rrc_message(int req_id, const RRC_PullRequest& req) = 0;
-    virtual void on_rrc_message(int req_id, const RRC_PullResponse& rsp) = 0;
-    virtual void on_rrc_message(int req_id, const RRC_PushRequest& req) = 0;
-    virtual void on_rrc_message(int req_id, const RRC_PushResponse& msg) = 0;
+    virtual void on_rrc_message(int req_id, const RRC_ExchangeRequest& req) = 0;
+    virtual void on_rrc_message(int req_id, const RRC_ExchangeResponse& rsp) = 0;
 };
 
 #endif // __ILCRRC_HPP__

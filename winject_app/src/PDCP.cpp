@@ -16,19 +16,18 @@ lcid_t PDCP::get_attached_lcid()
 void PDCP::set_tx_enabled(bool value)
 {
     std::unique_lock<std::shared_mutex> lg(tx_mutex);
-    // std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
     auto old_tx_enabled = is_tx_enabled;
-    is_tx_enabled = value;
-    // to_tx_queue.clear();
-    current_tx_buffer.clear();
-    current_tx_offset = 0;
-    lg.unlock();
 
     Logless(*main_logger, PDCP_INF, 
-        "INF | PDCP#  | set_tx_enabled old# new=#",
+        "INF | PDCP#  | set_tx_enabled old=# new=#",
         (int) lcid,
         (int) old_tx_enabled,
         (int) is_tx_enabled);
+
+    current_tx_offset = 0;
+    current_tx_buffer.clear();
+    is_tx_enabled = value;
+    lg.unlock();
 }
 
 void PDCP::set_rx_enabled(bool value)
@@ -542,7 +541,7 @@ bool PDCP::to_tx(buffer_t buffer)
         }
 
         Logless(*main_logger, PDCP_TRC,
-            "TRC | PDCP#  | to tx msg_sz=# queue_sz=#",
+            "TRC | PDCP#  | to_tx msg_sz=# queue_sz=#",
             (int) lcid,
             buffer.size(),
             to_tx_queue.size());

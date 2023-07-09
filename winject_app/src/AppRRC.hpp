@@ -89,10 +89,8 @@ private:
     template <typename T>
     void on_rrc_message_lcrrc(int req_id, const T& req);
 
-    void on_rrc_message(int req_id, const RRC_PullRequest& req);
-    void on_rrc_message(int req_id, const RRC_PullResponse& rsp);
-    void on_rrc_message(int req_id, const RRC_PushRequest& req);
-    void on_rrc_message(int req_id, const RRC_PushResponse& msg);
+    void on_rrc_message(int req_id, const RRC_ExchangeRequest& req);
+    void on_rrc_message(int req_id, const RRC_ExchangeResponse& rsp);
 
     struct rrc_event_stop_t
     {};

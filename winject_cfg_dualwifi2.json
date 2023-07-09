@@ -172,12 +172,12 @@
     ],
     "app_config" :
     {
-      "wifi_over_udp_" :
+      "wifi_over_udp" :
       {
-        "tx_address" : "127.0.0.1:22001",
-        "rx_address" : "127.0.0.1:22002"
+        "tx_address" : "127.0.0.1:21001",
+        "rx_address" : "127.0.0.1:22001"
       },
-      "txrx_device" : "wlx24ec999b30f3",
+      "txrx_device_" : "wlx24ec999b30f3",
       "tx_device_" : "wlx24ec99ca8bd1",
       "rx_device_" : "wlx24ec99cab775",
       "udp_console" : "127.0.0.1:22000"

@@ -97,7 +97,10 @@ public:
         if (mLogful)
         {
             uint8_t logbuff[4096*2];
-            int flen = std::sprintf((char*)logbuff, "%lluus %lluT ", (unsigned long long)pTime, (unsigned long long)(pThread));
+
+            double dptime = double(pTime)/1000000;
+
+            int flen = std::sprintf((char*)logbuff, "%.6lf us %lluT ", dptime, (unsigned long long)(pThread));
             size_t sz = logful(logbuff + flen, id, ts...) + flen;
             logbuff[sz++] = '\n';
             [[maybe_unused]] auto rv = ::write(1, logbuff, sz);
