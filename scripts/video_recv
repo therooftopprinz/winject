@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ "$#" -eq 0 ]; then
+    echo "video_recv <instance> <lcid>" 
+    #                    1         2
+    exit
+fi
+
+tx_port=${1}${2}1
+rx_port=${1}${2}2
+
+gst-launch-1.0 udpsrc port=$rx_port caps = "application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96" ! rtph264depay ! avdec_h264 ! autovideosink

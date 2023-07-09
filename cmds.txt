@@ -22,9 +22,9 @@ nc -u localhost 21021 -p 21022
 nc -u localhost 22021 -p 22022
 
 WIFI1 > WIFI2
-./udp_checker --host=127.0.0.1 --port=21021 --mode=send --size=1250 --rate=5000
-./udp_checker --host=127.0.0.1 --port=22022 --mode=recv --stats=1
+./udp_checker/udp_checker --host=127.0.0.1 --port=21021 --mode=send --size=1250 --rate=5000
+./udp_checker/udp_checker --host=127.0.0.1 --port=22022 --mode=recv --stats=1
 
 WIFI2 > WIFI1
-./udp_checker --host=127.0.0.1 --port=22021 --mode=send --size=1250 --rate=1000
-./udp_checker --host=127.0.0.1 --port=21022 --mode=recv --stats=1
+./udp_checker/udp_checker --host=127.0.0.1 --port=22021 --mode=send --size=1250 --rate=1000
+./udp_checker/udp_checker --host=127.0.0.1 --port=21022 --mode=recv --stats=1

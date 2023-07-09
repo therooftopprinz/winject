@@ -1,0 +1,11 @@
+#!/bin/sh
+
+if [ "$#" -eq 0 ]; then
+    echo "chat <instance> <lcid>"
+    exit
+fi
+
+tx_port=${1}${2}1
+rx_port=${1}${2}2
+
+nc -u localhost $tx_port -p $rx_port

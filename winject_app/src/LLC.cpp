@@ -258,18 +258,21 @@ void LLC::on_tx(tx_info_t& info)
 
         if (retx_count >= tx_config.max_retx_count)
         {
-
-            Logless(*main_logger, LLC_ERR,
-                "ERR | LLC#   | RLF",
-                int(lcid));
-
             to_retx_list.pop_front();
             if (tx_config.allow_rlf)
             {
+                Logless(*main_logger, LLC_ERR,
+                    "ERR | LLC#   | RLF triggered",
+                    int(lcid));
+
                 info.out_allocated = 0;
                 rrc.on_rlf(lcid);
                 return;
             }
+
+            Logless(*main_logger, LLC_ERR,
+                "ERR | LLC#   | RLF inhibited",
+                int(lcid));
 
             // RETX dropped, aquire new PDCP PDU
 
@@ -350,6 +353,7 @@ void LLC::on_rx(rx_info_t& info)
 
     if (!is_rx_enabled)
     {
+        rrc.on_init(lcid);
         return;
     }
 

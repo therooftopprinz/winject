@@ -55,11 +55,6 @@ public:
     {
         auto llc_tx_cfg = llc.get_tx_confg();
 
-        if (ILLC::E_TX_MODE_TM == llc_tx_cfg.mode)
-        {
-            return;
-        }
-
         if (ILLC::E_TX_MODE_AM != to_config(req.llcConfig.txConfig.mode))
         {
             Logless(*main_logger, RRC_ERR,
@@ -96,11 +91,6 @@ public:
 
         auto llc_tx_cfg = llc.get_tx_confg();
 
-        if (ILLC::E_TX_MODE_TM == llc_tx_cfg.mode)
-        {
-            return;
-        }
-
         if (E_TXRX_STATE_CONFIGURING != txrx_state)
         {
             Logless(*main_logger, RRC_ERR,
@@ -113,6 +103,7 @@ public:
             "ERR | LCRRC# | on_exchg_rsp",
             (int) llc.get_lcid());
 
+        reconfigure_rx(req);
         change_txrx_state(E_TXRX_STATE_CONFIGURED);
 
         schedule_activate();
@@ -120,17 +111,20 @@ public:
 
     void on_init() override
     {
-        auto lcid = llc.get_lcid();
-        auto llc_tx_cfg = llc.get_tx_confg();
+        if (E_TXRX_STATE_CONFIGURING == txrx_state ||
+            E_TXRX_STATE_CONFIGURED  == txrx_state ||
+            E_TXRX_STATE_ACTIVE == txrx_state)
+        {
+            return;
+        }
 
-        if (ILLC::E_TX_MODE_AM == llc_tx_cfg.mode)
-        {
-            on_init_am();
-        }
-        else
-        {
-            on_init_tm();
-        }
+        Logless(*main_logger, RRC_ERR,
+            "ERR | LCRRC# | on_init_am (self init)",
+            (int) llc.get_lcid());
+
+        change_txrx_state(E_TXRX_STATE_CONFIGURING);
+
+        send_exchange_req();
     }
 
     void on_rlf() override
@@ -240,29 +234,6 @@ private:
             state_str[new_state]);
 
         txrx_state = new_state;
-    }
-
-    void on_init_am()
-    {
-        if (E_TXRX_STATE_CONFIGURING == txrx_state ||
-            E_TXRX_STATE_CONFIGURED  == txrx_state ||
-            E_TXRX_STATE_ACTIVE == txrx_state)
-        {
-            return;
-        }
-
-        Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | on_init_am (self init)",
-            (int) llc.get_lcid());
-
-        change_txrx_state(E_TXRX_STATE_CONFIGURING);
-        send_exchange_req();
-    }
-
-    void on_init_tm()
-    {
-        // @todo Implement TM
-        return;
     }
 
     template<typename T>

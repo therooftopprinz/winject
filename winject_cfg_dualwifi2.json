@@ -56,7 +56,7 @@
         "am_tx_config": {
           "allow_rlf" : true,
           "arq_window_size" : 30,
-          "max_retx_count" : 100
+          "max_retx_count" : 15
         },
         "common_tx_config" : {}
       },
@@ -126,9 +126,9 @@
         "lcid" : 2,
         "tx_config" : {
           "allow_rlf" : true,
-          "allow_segmentation" : true,
+          "allow_segmentation" : false,
           "allow_reordering" : true,
-          "max_sn_distance" : 1500,
+          "max_sn_distance" : 500,
           "min_commit_size" : 0
         },
         "endpoint_config" : {
@@ -172,12 +172,12 @@
     ],
     "app_config" :
     {
-      "wifi_over_udp" :
+      "wifi_over_udp_" :
       {
         "tx_address" : "127.0.0.1:21001",
         "rx_address" : "127.0.0.1:22001"
       },
-      "txrx_device_" : "wlx24ec999b30f3",
+      "txrx_device" : "wlx24ec999b30f3",
       "tx_device_" : "wlx24ec99ca8bd1",
       "rx_device_" : "wlx24ec99cab775",
       "udp_console" : "127.0.0.1:22000"
