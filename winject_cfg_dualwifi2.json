@@ -24,176 +24,154 @@
       "hwsrc" : "7890ab",
       "hwdst" : "123456"
     },
-    "llc_configs": [
+    "lc_configs": [
       {
-        "description:" : "rrc0-llc",
         "lcid" : 0,
-        "tx_mode" : "TM",
-        "scheduling_config" : {
-          "nd_pdu_size" : 0,
-          "quanta" : 4294967295
+        "description:" : "rrc0",
+        "llc_config" : {
+          "tx_mode" : "TM",
+          "scheduling_config" : {
+            "nd_pdu_size" : 0,
+            "quanta" : 4294967295
+          },
+          "common_tx_config" : {}
         },
-        "common_tx_config" : {}
+        "pdcp_config" : {
+          "description:" : "rrc0-pdcp",
+          "lcid" : 0,
+          "tx_config": {
+            "allow_rlf" : false
+          },
+          "endpoint_config" : {
+            "type" : "RRC0"
+          }
+        }
       },
       {
-        "description:" : "data1-llc",
         "lcid" : 1,
-        "tx_mode" : "AM",
-        "scheduling_config" : {
-          "nd_pdu_size" : 64,
-          "quanta" : 1000
+        "description:" : "data1",
+        "llc_config" : {
+          "tx_mode" : "AM",
+          "scheduling_config" : {
+            "nd_pdu_size" : 64,
+            "quanta" : 1000
+          },
+          "am_tx_config": {
+            "allow_rlf" : true,
+            "arq_window_size" : 30,
+            "max_retx_count" : 15
+          },
+          "common_tx_config" : {}
         },
-        "am_tx_config": {
-          "allow_rlf" : true,
-          "arq_window_size" : 30,
-          "max_retx_count" : 15
-        },
-        "common_tx_config" : {}
+        "pdcp_config" : {
+          "tx_config" : {
+            "allow_rlf" : true,
+            "allow_segmentation" : true,
+            "allow_reordering" : true,
+            "min_commit_size" : 500
+          },
+          "endpoint_config" : {
+            "type" : "UDP",
+            "udp_tx_address" : "127.0.0.1:22011",
+            "udp_rx_address" : "127.0.0.1:22012"
+          }
+        }
       },
       {
-        "description:" : "data2-llc",
+        "description:" : "data2",
         "lcid" : 2,
-        "tx_mode" : "AM",
-        "scheduling_config" : {
-          "nd_pdu_size" : 64,
-          "quanta" : 1000
+        "llc_config" : {
+          "tx_mode" : "AM",
+          "scheduling_config" : {
+            "nd_pdu_size" : 64,
+            "quanta" : 1000
+          },
+          "am_tx_config": {
+            "allow_rlf" : true,
+            "arq_window_size" : 30,
+            "max_retx_count" : 15
+          },
+          "common_tx_config" : {}
         },
-        "am_tx_config": {
-          "allow_rlf" : true,
-          "arq_window_size" : 30,
-          "max_retx_count" : 15
-        },
-        "common_tx_config" : {}
+        "pdcp_config" : {
+          "tx_config" : {
+            "allow_rlf" : true,
+            "allow_segmentation" : true,
+            "allow_reordering" : true,
+            "max_sn_distance" : 500,
+            "min_commit_size" : 0
+          },
+          "endpoint_config" : {
+            "type" : "UDP",
+            "udp_tx_address" : "127.0.0.1:22021",
+            "udp_rx_address" : "127.0.0.1:22022"
+          }
+        }
       },
       {
-        "description:" : "vpn3-llc",
-        "lcid" : 3,
-        "tx_mode" : "TM",
-        "scheduling_config" : {
-          "nd_pdu_size" : 0,
-          "quanta" : 1450
-        },
-        "common_tx_config" : {}
-      },
-      {
-        "description:" : "video7-llc",
         "lcid" : 7,
-        "tx_mode" : "AM",
-        "scheduling_config" : {
-          "nd_pdu_size" : 50,
-          "quanta" : 1450
+        "description:" : "video7",
+        "llc_config" : {
+          "tx_mode" : "AM",
+          "scheduling_config" : {
+            "nd_pdu_size" : 50,
+            "quanta" : 1450
+          },
+          "am_tx_config": {
+            "allow_rlf" : false,
+            "arq_window_size" : 30,
+            "max_retx_count" : 50
+          },
+          "common_tx_config": {
+            "crc_type" : "NONE"
+          }
         },
-        "am_tx_config": {
-          "allow_rlf" : false,
-          "arq_window_size" : 30,
-          "max_retx_count" : 50
-        },
-        "common_tx_config": {
-          "crc_type" : "NONE"
+        "pdcp_config" : {
+          "tx_config" : {
+            "allow_rlf" : false,
+            "allow_segmentation" : true,
+            "allow_reordering" : true,
+            "max_sn_distance" : 1000,
+            "min_commit_size" : 0
+          },
+          "endpoint_config" : {
+            "type" : "UDP",
+            "udp_tx_address" : "127.0.0.1:22071",
+            "udp_rx_address" : "127.0.0.1:22072"
+          }
         }
       },
       {
-        "description:" : "video8-llc",
+        "description:" : "video8",
         "lcid" : 8,
-        "tx_mode" : "AM",
-        "scheduling_config" : {
-          "nd_pdu_size" : 50,
-          "quanta" : 1450
+        "llc_config" : {
+          "tx_mode" : "AM",
+          "scheduling_config" : {
+            "nd_pdu_size" : 50,
+            "quanta" : 1450
+          },
+          "am_tx_config": {
+            "allow_rlf" : false,
+            "arq_window_size" : 30,
+            "max_retx_count" : 50
+          },
+          "common_tx_config": {
+            "crc_type" : "NONE"
+          }
         },
-        "am_tx_config": {
-          "allow_rlf" : false,
-          "arq_window_size" : 30,
-          "max_retx_count" : 50
-        },
-        "common_tx_config": {
-          "crc_type" : "NONE"
-        }
-      }
-    ],
-    "pdcp_configs": [
-      {
-        "description:" : "rrc0-pdcp",
-        "lcid" : 0,
-        "tx_config": {
-          "allow_rlf" : false
-        },
-        "endpoint_config" : {
-          "type" : "RRC0"
-        }
-      },
-      {
-        "description:" : "data1-pdcp",
-        "lcid" : 1,
-        "tx_config" : {
-          "allow_rlf" : true,
-          "allow_segmentation" : true,
-          "allow_reordering" : true,
-          "min_commit_size" : 500
-        },
-        "endpoint_config" : {
-          "type" : "UDP",
-          "udp_tx_address" : "127.0.0.1:22011",
-          "udp_rx_address" : "127.0.0.1:22012"
-        }
-      },
-      {
-        "description:" : "data2-pdcp",
-        "lcid" : 2,
-        "tx_config" : {
-          "allow_rlf" : true,
-          "allow_segmentation" : true,
-          "allow_reordering" : true,
-          "max_sn_distance" : 500,
-          "min_commit_size" : 0
-        },
-        "endpoint_config" : {
-          "type" : "UDP",
-          "udp_tx_address" : "127.0.0.1:22021",
-          "udp_rx_address" : "127.0.0.1:22022"
-        }
-      },
-      {
-        "description:" : "vpn3-pdcp",
-        "lcid" : 3,
-        "tx_config": {
-          "allow_rlf" : false
-        },
-        "endpoint_config" : {
-          "type" : "UDP",
-          "udp_tx_address" : "192.168.8.130:22031",
-          "udp_rx_address" : "18.141.177.159:1194"
-        }
-      },
-      {
-        "description:" : "video7-pdcp",
-        "lcid" : 7,
-        "tx_config" : {
-          "allow_rlf" : false,
-          "allow_segmentation" : true,
-          "allow_reordering" : true,
-          "max_sn_distance" : 1000,
-          "min_commit_size" : 0
-        },
-        "endpoint_config" : {
-          "type" : "UDP",
-          "udp_tx_address" : "127.0.0.1:22071",
-          "udp_rx_address" : "127.0.0.1:22072"
-        }
-      },
-      {
-        "description:" : "video8-pdcp",
-        "lcid" : 8,
-        "tx_config" : {
-          "allow_rlf" : false,
-          "allow_segmentation" : true,
-          "allow_reordering" : true,
-          "max_sn_distance" : 500,
-          "min_commit_size" : 0
-        },
-        "endpoint_config" : {
-          "type" : "UDP",
-          "udp_tx_address" : "127.0.0.1:22081",
-          "udp_rx_address" : "127.0.0.1:22082"
+        "pdcp_config" : {
+          "tx_config" : {
+            "allow_rlf" : false,
+            "allow_segmentation" : true,
+            "allow_reordering" : true,
+            "max_sn_distance" : 500,
+            "min_commit_size" : 0
+          },
+          "endpoint_config" : {
+            "type" : "UDP",
+            "udp_tx_address" : "127.0.0.1:22081",
+            "udp_rx_address" : "127.0.0.1:22082"
+          }
         }
       }
     ],

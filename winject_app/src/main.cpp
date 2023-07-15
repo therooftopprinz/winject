@@ -17,6 +17,8 @@ constexpr static bool DEFAULT_ALLOW_SEGMENTATION = false;
 constexpr static bool DEFAULT_ALLOW_REORDERING = false;
 constexpr static size_t DEFAULT_MIN_COMMIT_SIZE = 0;
 constexpr static size_t DEFAULT_MAX_SN_DISTANCE = 1000;
+constexpr static bool DEFAULT_AUTO_INIT_ON_TX = false;
+constexpr static bool DEFAULT_AUTO_INIT_ON_RX = false;
 
 
 template<> 
@@ -77,8 +79,7 @@ int main()
     IRRC::config_t rrc_config;
     auto& rrc =  croot.at("rrc_config");
     auto& frame =  rrc.at("frame_config");
-    auto& llcs =  rrc.at("llc_configs");
-    auto& pdcps =  rrc.at("pdcp_configs");
+    auto& lc_configs =  rrc.at("lc_configs");
     auto& app =  rrc.at("app_config");
 
     Logless(*main_logger, MAN_INF, "INF | main | --- FEC ---");
@@ -105,42 +106,42 @@ int main()
     Logless(*main_logger, MAN_INF, "INF | main | frame_config.hwsrc: #", rrc_config.frame_config.hwsrc.c_str());
     Logless(*main_logger, MAN_INF, "INF | main | frame_config.hwdst: #", rrc_config.frame_config.hwdst.c_str());
 
-    Logless(*main_logger, MAN_INF, "INF | main | --- LLCs ---");
-    for (auto& llc : llcs)
+
+
+    Logless(*main_logger, MAN_INF, "INF | main | --- Logical Channels ---");
+    for (auto& lc : lc_configs)
     {
-        uint8_t lcid = llc.at("lcid");
-        auto& llc_config = rrc_config.llc_configs[lcid];
+        auto& llc =  lc.at("llc_config");
+        auto& pdcp =  lc.at("pdcp_config");
+
+        uint8_t lcid = lc.at("lcid");
+
+        // LLC
+        auto& llc_tx_config = rrc_config.llc_tx_configs[lcid];
+        auto& llc_rx_config = rrc_config.llc_rx_configs[lcid];
         auto& scheduling_config = rrc_config.scheduling_configs[lcid];
 
-        llc_config.mode = to_tx_mode(llc.at("tx_mode"));
+        llc_tx_config.mode = to_tx_mode(llc.at("tx_mode"));
+
         auto& scheduling_config_j = llc.at("scheduling_config");
         scheduling_config.nd_gpdu_max_size = value_or(scheduling_config_j, "nd_pdu_size", DEFAULT_ND_PDU_SIZE);
         scheduling_config.quanta = value_or(scheduling_config_j, "quanta", DEFAULT_QUANTA);
-        if (ILLC::tx_mode_e::E_TX_MODE_AM == llc_config.mode)
+        if (ILLC::tx_mode_e::E_TX_MODE_AM == llc_tx_config.mode)
         {
             auto& tx_config = llc.at("am_tx_config");
-            llc_config.allow_rlf = value_or(tx_config, "allow_rlf", DEFAULT_ALLOW_RLF);
-            llc_config.arq_window_size = value_or(tx_config, "arq_window_size", DEFAULT_ARQ_WINDOW_SIZE);
-            llc_config.max_retx_count = value_or(tx_config, "max_retx_count", DEFAULT_MAX_RETX_COUNT);
+            llc_tx_config.allow_rlf = value_or(tx_config, "allow_rlf", DEFAULT_ALLOW_RLF);
+            llc_tx_config.arq_window_size = value_or(tx_config, "arq_window_size", DEFAULT_ARQ_WINDOW_SIZE);
+            llc_tx_config.max_retx_count = value_or(tx_config, "max_retx_count", DEFAULT_MAX_RETX_COUNT);
         }
 
         auto& common_tx_config = llc.at("common_tx_config");
-        llc_config.crc_type = to_crc_type(value_or(common_tx_config, "crc_type", DEFAULT_CRC_TYPE));
+        llc_tx_config.crc_type = to_crc_type(value_or(common_tx_config, "crc_type", DEFAULT_CRC_TYPE));
 
-        Logless(*main_logger, MAN_INF, "INF | main | lcid: #", (int) lcid);
-        Logless(*main_logger, MAN_INF, "INF | main |   mode: #", (int) llc_config.mode);
-        Logless(*main_logger, MAN_INF, "INF | main |   arq_window_size: #", llc_config.arq_window_size);
-        Logless(*main_logger, MAN_INF, "INF | main |   max_retx_count: #", llc_config.max_retx_count);
-        Logless(*main_logger, MAN_INF, "INF | main |   crc_type: #", (int) llc_config.crc_type);
-        Logless(*main_logger, MAN_INF, "INF | main |   nd_gpdu_max_size: #", scheduling_config.nd_gpdu_max_size);
-        Logless(*main_logger, MAN_INF, "INF | main |   quanta: #", scheduling_config.quanta);
-        Logless(*main_logger, MAN_INF, "INF | main |   allow_rlf: #", (int) llc_config.allow_rlf);
-    }
+        llc_rx_config.auto_init_on_rx = value_or(llc, "auto_init_on_rx", DEFAULT_AUTO_INIT_ON_RX);
 
-    Logless(*main_logger, MAN_INF, "INF | main | --- PDCPs ---");
-    for (auto& pdcp : pdcps)
-    {
-        uint8_t lcid = pdcp.at("lcid");
+        llc_rx_config.mode = llc_rx_config.mode;
+        llc_rx_config.crc_type = llc_rx_config.crc_type;
+
         auto& pdcp_config = rrc_config.pdcp_configs[lcid];
 
         auto& pdcp_tx_config = pdcp.at("tx_config");
@@ -149,6 +150,7 @@ int main()
         pdcp_config.allow_reordering = value_or(pdcp_tx_config,"allow_reordering", DEFAULT_ALLOW_REORDERING);
         pdcp_config.min_commit_size = value_or(pdcp_tx_config,"min_commit_size", DEFAULT_MIN_COMMIT_SIZE);
         pdcp_config.max_sn_distance = value_or(pdcp_tx_config,"max_sn_distance", DEFAULT_MAX_SN_DISTANCE);
+        pdcp_config.auto_init_on_tx = value_or(pdcp_tx_config,"auto_init_on_tx", DEFAULT_AUTO_INIT_ON_TX);
 
         auto& endpoint_config = pdcp.at("endpoint_config");
         auto& ep_config = rrc_config.ep_configs[lcid];
@@ -156,20 +158,34 @@ int main()
         ep_config.type = endpoint_config.at("type");
 
         Logless(*main_logger, MAN_INF, "INF | main | lcid: #", (int) lcid);
-        Logless(*main_logger, MAN_INF, "INF | main |   allow_rlf: #", (int) pdcp_config.allow_rlf);
+        Logless(*main_logger, MAN_INF, "INF | main |   mode: #", (int) llc_tx_config.mode);
+        if (llc_tx_config.mode == ILLC::E_TX_MODE_AM)
+        {
+        Logless(*main_logger, MAN_INF, "INF | main |   arq_window_size: #", llc_tx_config.arq_window_size);
+        Logless(*main_logger, MAN_INF, "INF | main |   max_retx_count: #", llc_tx_config.max_retx_count);
+        }
+        Logless(*main_logger, MAN_INF, "INF | main |   nd_gpdu_max_size: #", scheduling_config.nd_gpdu_max_size);
+        Logless(*main_logger, MAN_INF, "INF | main |   quanta: #", scheduling_config.quanta);
+        Logless(*main_logger, MAN_INF, "INF | main |   crc_type: #", (int) llc_tx_config.crc_type);
+        Logless(*main_logger, MAN_INF, "INF | main |   auto_init_on_rx: #", (int) llc_rx_config.auto_init_on_rx);
+        Logless(*main_logger, MAN_INF, "INF | main |   auto_init_on_tx: #", (int) pdcp_config.auto_init_on_tx);
+        Logless(*main_logger, MAN_INF, "INF | main |   allow_rlf_llc: #", (int) llc_tx_config.allow_rlf);
+        Logless(*main_logger, MAN_INF, "INF | main |   allow_rlf_pdcp: #", (int) pdcp_config.allow_rlf);
         Logless(*main_logger, MAN_INF, "INF | main |   allow_segmentation: #", (int) pdcp_config.allow_segmentation);
         Logless(*main_logger, MAN_INF, "INF | main |   allow_reordering: #", (int) pdcp_config.allow_reordering);
+        if (pdcp_config.allow_rlf)
         Logless(*main_logger, MAN_INF, "INF | main |   max_sn_distance: #", pdcp_config.max_sn_distance);
         Logless(*main_logger, MAN_INF, "INF | main |   min_commit_size: #", pdcp_config.min_commit_size);
         Logless(*main_logger, MAN_INF, "INF | main |   type: #", ep_config.type.c_str());
-
         if (ep_config.type == "UDP")
         {
             ep_config.address1 = endpoint_config.at("udp_tx_address");
             ep_config.address2 = endpoint_config.at("udp_rx_address");
-            Logless(*main_logger, MAN_INF, "INF | main |   udp_tx_address: #", ep_config.address1.c_str());
-            Logless(*main_logger, MAN_INF, "INF | main |   udp_rx_address: #", ep_config.address2.c_str());
+        Logless(*main_logger, MAN_INF, "INF | main |   udp_tx_address: #", ep_config.address1.c_str());
+        Logless(*main_logger, MAN_INF, "INF | main |   udp_rx_address: #", ep_config.address2.c_str());
         }
+
+        Logless(*main_logger, MAN_INF, "INF | main |");
     }
 
     if (app.count("txrx_device"))

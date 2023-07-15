@@ -1,5 +1,5 @@
-#ifndef __IReactor_HPP__
-#define __IReactor_HPP__
+#ifndef __BFC_IREACTOR_HPP__
+#define __BFC_IREACTOR_HPP__
 
 #include <functional>
 
@@ -21,4 +21,4 @@ public:
 
 } // namespace bfc
 
-#endif // __IReactor_HPP__
+#endif // __BFC_IREACTOR_HPP__

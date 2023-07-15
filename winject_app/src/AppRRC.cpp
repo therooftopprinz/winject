@@ -327,17 +327,12 @@ void AppRRC::setup_pdcps()
 void AppRRC::setup_llcs()
 {
     Logless(*main_logger, RRC_INF, "INF | AppRRC | Setting up LLCs...");
-    for (auto& llc_ : config.llc_configs)
+    for (auto& llc_tx_config : config.llc_tx_configs)
     {
+        auto id = llc_tx_config.first;
+        auto& tx_config = llc_tx_config.second;
 
-        auto id = llc_.first;
-        auto& tx_config = llc_.second;
-
-        ILLC::rx_config_t rx_config{};
-
-        // Copy tx_config initially
-        rx_config.crc_type = tx_config.crc_type;
-        rx_config.mode = tx_config.mode;
+        auto& rx_config = config.llc_rx_configs[id];
 
         auto pdcp = pdcps[id];
         auto llc = std::make_shared<LLC>(*pdcp, *this, id,

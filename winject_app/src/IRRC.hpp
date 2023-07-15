@@ -56,7 +56,8 @@ struct IRRC
     {
         frame_config_t frame_config;
         std::vector<fec_config_t> fec_configs;
-        std::map<uint8_t, ILLC::tx_config_t> llc_configs;
+        std::map<uint8_t, ILLC::tx_config_t> llc_tx_configs;
+        std::map<uint8_t, ILLC::rx_config_t> llc_rx_configs;
         std::map<uint8_t, ITxScheduler::llc_scheduling_config_t> scheduling_configs;
         std::map<uint8_t, IPDCP::tx_config_t> pdcp_configs;
         std::map<uint8_t, IEndPoint::config_t> ep_configs;

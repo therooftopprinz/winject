@@ -16,15 +16,15 @@
 
 namespace bfc
 {
-struct IUdpFactory
+struct ITcpFactory
 {
     virtual std::unique_ptr<ISocket> create() = 0;
 };
 
-class UdpSocket : public ISocket
+class TcpSocket : public ISocket
 {
 public:
-    UdpSocket()
+    TcpSocket()
         : mSockFd(socket(AF_INET, SOCK_DGRAM, 0))
     {
         if (mSockFd  < 0)
@@ -34,7 +34,7 @@ public:
         }
     }
 
-    ~UdpSocket()
+    ~TcpSocket()
     {
         if (mSockFd>=0)
         {
@@ -55,32 +55,24 @@ public:
 
     ssize_t sendto(const bfc::ConstBufferView& pData, const Ip4Port& pAddr, int pFlags=0)
     {
-        sockaddr_in to;
-        to.sin_family = AF_INET;
-        to.sin_addr.s_addr = htonl(pAddr.addr);
-        to.sin_port = htons(pAddr.port);
-        return ::sendto(mSockFd, pData.data(), pData.size(), pFlags, (sockaddr*)&to, sizeof(to));
+        errno = EFAULT;
+        return-1;
     }
 
     ssize_t recvfrom(bfc::BufferView& pData, Ip4Port& pAddr, int pFlags=0)
     {
-        sockaddr_in framddr;
-        socklen_t framddrSz = sizeof(framddr);
-        auto sz = ::recvfrom(mSockFd, pData.data(), pData.size(), pFlags, (sockaddr*)&framddr, &framddrSz);
-        pAddr.addr = ntohl(framddr.sin_addr.s_addr);
-        pAddr.port = ntohs(framddr.sin_port);
-        return sz;
+        errno = EFAULT;
+        return-1;
     }
 
     ssize_t send(const bfc::ConstBufferView& pData, int pFlags=0)
     {
-        errno = EFAULT;
-        return-1;
+        return ::send(mSockFd, pData.data(), pData.size(), pFlags);
     }
+
     ssize_t recv(bfc::BufferView& pData, int pFlags=0)
     {
-        errno = EFAULT;
-        return -1;
+        return ::recv(mSockFd, pData.data(), pData.size(), pFlags);
     }
 
     int setsockopt(int pLevel, int pOptionName, const void *pOptionValue, socklen_t pOptionLen)
@@ -97,12 +89,12 @@ private:
     int mSockFd;
 };
 
-class UdpFactory : public IUdpFactory
+class TcpFactory : public ITcpFactory
 {
 public:
     std::unique_ptr<ISocket> create()
     {
-        return std::make_unique<UdpSocket>();
+        return std::make_unique<TcpSocket>();
     }
 };
 

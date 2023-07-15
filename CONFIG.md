@@ -96,7 +96,7 @@ otherwise the frames coming from the peer will be filtered out.
 
 Used to define the LLCs (Logical Link Channels)
 
-## 2.1 - lcid
+### 2.1 - lcid
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/llc_configs/lcid |
@@ -106,7 +106,7 @@ Used to define the LLCs (Logical Link Channels)
 
 Logical Channel ID
 
-## 2.2 - tx_mode
+### 2.2 - tx_mode
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/llc_configs/tx_mode |
@@ -116,7 +116,7 @@ Transmission Mode
 * AM - Akcnowledge Mode
 * TM - Transparent Mode
 
-## 2.3 - scheduling_config
+### 2.3 - scheduling_config
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/llc_configs/scheduling_config |
@@ -124,7 +124,7 @@ Transmission Mode
 
 Used to configure the LLC scheduling parameters
 
-## 2.3.1 - nd_pdu_size
+### 2.3.1 - nd_pdu_size
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/llc_configs/scheduling_config/nd_pdu_size |
@@ -137,7 +137,7 @@ This has no use in `tx_mode=TM`.
 Setting it to `0` will disable non data guaranteed PDU,
 although LLC will still allocate ACKs from scheduling slice.
 
-## 2.3.1 - quanta
+### 2.3.1 - quanta
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/llc_configs/scheduling_config/quanta |
@@ -147,7 +147,7 @@ although LLC will still allocate ACKs from scheduling slice.
 Byte slice for LLC in each scheduling round.
 The higher the number the higher the priority of the LLC will be.
 
-## 2.4 - am_tx_config
+### 2.4 - am_tx_config
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/llc_configs/am_tx_config |
@@ -155,7 +155,7 @@ The higher the number the higher the priority of the LLC will be.
 
 Acknowledged Mode Transmit Configuration, only used when `tx_mode=AM`
 
-## 2.4.3 - allow_rlf
+### 2.4.3 - allow_rlf
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/llc_configs/am_tx_config/bool |
@@ -164,7 +164,7 @@ Acknowledged Mode Transmit Configuration, only used when `tx_mode=AM`
 
 Allow LLC to trigger RLF.
 
-## 2.4.2 - arq_window_size
+### 2.4.2 - arq_window_size
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/llc_configs/am_tx_config/arq_window_size |
@@ -174,7 +174,7 @@ Allow LLC to trigger RLF.
 Automatic Repeat Request window size used to determine the next
 retransmission slot for the unacknowdedged LLC PDU.
 
-## 2.4.3 - max_retx_count
+### 2.4.3 - max_retx_count
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/llc_configs/am_tx_config/max_retx_count |
@@ -185,7 +185,7 @@ Maximum number of retransmission before triggering RLF.
 
 If `allow_rlf=0`, max_retx_count PDUs will be dropped.
 
-## 2.5.1 - common_tx_config
+### 2.5.1 - common_tx_config
 |      | JSON Info                      |
 |------|--------------------------------| 
 | path | rrc_config/llc_configs/common_tx_config |
@@ -194,7 +194,7 @@ If `allow_rlf=0`, max_retx_count PDUs will be dropped.
 Common Transmit Configuration, used by both acknowledged mode and 
 transparent mode.
 
-## 2.5.1 - crc_type
+### 2.5.1 - crc_type
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/llc_configs/common_tx_config/crc_type |
@@ -211,7 +211,16 @@ If `crc_type=NONE`, CRC Check will be disabled.
 |------|------|------------|
 | CRC32_04C11DB7 | 32-bit | 04C11DB7 |
 
-# 3 - pdcp_configs
+### 2.6 auto_init_on_rx
+|      | JSON Info                      |
+|------|--------------------------------|
+| path | rrc_config/llc_configs/auto_init_on_tx |
+| type | bool |
+| default | false |
+
+Auto initiate when LLC PDU is received but not active.
+
+## 3 - pdcp_configs
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/pdcp_configs |
@@ -220,7 +229,7 @@ If `crc_type=NONE`, CRC Check will be disabled.
 Used to define the PDCPs (Packet Data Convergence Protocol) and endpoint 
 instances.
 
-## 3.1 - lcid
+### 3.1 - lcid
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/pdcp_configs/lcid |
@@ -230,7 +239,7 @@ instances.
 
 Logical Channel ID which is bound to LLC
 
-## 3.2 - tx_config
+### 3.2 - tx_config
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/pdcp_configs/tx_config |
@@ -238,7 +247,7 @@ Logical Channel ID which is bound to LLC
 
 Transmit Configuration
 
-## 3.2.1 - allow_segmentation
+### 3.2.1 - allow_segmentation
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/pdcp_configs/tx_config/allow_segmentation |
@@ -249,7 +258,7 @@ Allow end point packet segmentation.
 Larger packes that doesn't fit to the scheduled bytes will be broken
 down into multiple PDCP segments.
 
-## 3.2.2 - allow_reordering
+### 3.2.2 - allow_reordering
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/pdcp_configs/tx_config/allow_reordering |
@@ -258,7 +267,7 @@ down into multiple PDCP segments.
 
 Allow endpoint packet to be received in the original sending order.
 
-## 3.2.3 - allow_rlf
+### 3.2.3 - allow_rlf
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/pdcp_configs/tx_config/allow_rlf |
@@ -267,7 +276,7 @@ Allow endpoint packet to be received in the original sending order.
 
 Allow PDCP triggered RLF.
 
-## 3.2.4 - max_sn_distance
+### 3.2.4 - max_sn_distance
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/pdcp_configs/tx_config/max_sn_distance |
@@ -281,7 +290,7 @@ indicative of dropped LLC packet thereby triggering RLF (Radio Link Failure).
 If `allow_rlf=0`, last completed packet will be moved up to the next pending
 packet with distance less than max_sn_distance.
 
-## 3.2.5 - min_commit_size
+### 3.2.5 - min_commit_size
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/pdcp_configs/tx_config/min_commit_size |
@@ -291,7 +300,7 @@ packet with distance less than max_sn_distance.
 Minimum bytes scheduled for PDCP before segment gets allocated.
 If `min_commit_size=0`, will always commit scheduled bytes.
 
-## 3.3 - endpoint_config
+### 3.3 - endpoint_config
 |      | JSON Info                      |
 |------|--------------------------------| 
 | path | rrc_config/pdcp_configs/endpoint_config |
@@ -299,7 +308,7 @@ If `min_commit_size=0`, will always commit scheduled bytes.
 
 Endpoint configuration
 
-## 3.3.1 - type
+### 3.3.1 - type
 |      | JSON Info                      |
 |------|--------------------------------| 
 | path | rrc_config/pdcp_configs/endpoint_config/type |
@@ -316,7 +325,7 @@ Endpoint configuration
 | PIPE | Named Pipe |
 | UART | Serial Device |
 
-## 3.3.2 - udp_tx_address
+### 3.3.2 - udp_tx_address
 |      | JSON Info                      |
 |------|--------------------------------| 
 | path | rrc_config/pdcp_configs/endpoint_config/udp_tx_address |
@@ -324,7 +333,7 @@ Endpoint configuration
 
 Available only when `type=UDP`
 
-## 3.3.3 - udp_rx_address
+### 3.3.3 - udp_rx_address
 |      | JSON Info                      |
 |------|--------------------------------| 
 | path | rrc_config/pdcp_configs/endpoint_config/udp_rx_address |
@@ -332,7 +341,7 @@ Available only when `type=UDP`
 
 Available only when `type=UDP`
 
-## 3.3.4 - tcp_address
+### 3.3.4 - tcp_address
 |      | JSON Info                      |
 |------|--------------------------------| 
 | path | rrc_config/pdcp_configs/endpoint_config/tcp_address |
@@ -340,7 +349,7 @@ Available only when `type=UDP`
 
 Available only when `type=TCP`
 
-## 3.3.5 - path
+### 3.3.5 - path
 |      | JSON Info                      |
 |------|--------------------------------| 
 | path | rrc_config/pdcp_configs/endpoint_config/path |
@@ -348,7 +357,16 @@ Available only when `type=TCP`
 
 Filesystem path 
 
-# 4 - app_config
+### 3.4 auto_init_on_tx
+|      | JSON Info                      |
+|------|--------------------------------|
+| path | rrc_config/llc_configs/auto_init_on_tx |
+| type | bool |
+| default | false |
+
+Auto initiate when EP packet is received but not active.
+
+## 4 - app_config
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/app_config |
@@ -356,7 +374,7 @@ Filesystem path
 
 Used to define application and hardware settings. 
 
-## 4.1 - wifi_over_udp
+### 4.1 - wifi_over_udp
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/app_config/wifi_over_udp |
@@ -364,19 +382,19 @@ Used to define application and hardware settings.
 
 Used to connect over UDP instead of actual WIFI device.
 
-## 4.1.1 - tx_address
+### 4.1.1 - tx_address
 |      | JSON Info                      |
 |------|--------------------------------| 
 | path | rrc_config/app_config/wifi_over_udp/tx_address |
 | type | host:port |
 
-## 4.1.2 - rx_address
+### 4.1.2 - rx_address
 |      | JSON Info                      |
 |------|--------------------------------| 
 | path | rrc_config/app_config/wifi_over_udp/rx_address |
 | type | host:port |
 
-## 4.2 - tx_device
+### 4.2 - tx_device
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/app_config/tx_device |
@@ -384,7 +402,7 @@ Used to connect over UDP instead of actual WIFI device.
 
 WIFI device used for transmit in dual wifi configuration.
 
-## 4.3 - rx_device
+### 4.3 - rx_device
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/app_config/rx_device |
@@ -392,7 +410,7 @@ WIFI device used for transmit in dual wifi configuration.
 
 WIFI device used for receive in dual wifi configuration.
 
-## 4.4 - txrx_device
+### 4.4 - txrx_device
 |      | JSON Info                      |
 |------|--------------------------------|
 | path | rrc_config/app_config/txrx_device |
@@ -400,7 +418,7 @@ WIFI device used for receive in dual wifi configuration.
 
 WIFI device used for transmit/receive in single wifi configuration.
 
-## 4.1.1 - udp_console
+### 4.1.1 - udp_console
 |      | JSON Info                      |
 |------|--------------------------------| 
 | path | rrc_config/app_config/udp_console |

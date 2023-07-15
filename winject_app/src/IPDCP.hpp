@@ -39,6 +39,7 @@ struct IPDCP
         bool allow_rlf = false;
         bool allow_segmentation = false;
         bool allow_reordering = false;
+        bool auto_init_on_tx = false;
         size_t max_sn_distance = 20;
         size_t min_commit_size = 1000;
         size_t max_tx_queue_size = 512;

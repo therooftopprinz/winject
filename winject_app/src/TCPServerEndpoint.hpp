@@ -1,21 +1,23 @@
-#ifndef __WINJECT_UDPENDPOINT_HPP__
-#define __WINJECT_UDPENDPOINT_HPP__
+#ifndef __WINJECT_TCPSERVER_ENDPOOINT_HPP__
+#define __WINJECT_TCPSERVER_ENDPOOINT_HPP__
 
 #include <string>
 #include <atomic>
 #include <mutex>
 
+#include <sys/eventfd.h>
+
 #include <bfc/IReactor.hpp>
-#include <bfc/Udp.hpp>
+#include <bfc/Tcp.hpp>
 
 #include "IPDCP.hpp"
 #include "IEndPoint.hpp"
 #include "Logger.hpp"
 
-class UDPEndPoint : public IEndPoint
+class TCPServerEndPoint : public IEndPoint
 {
 public:
-    UDPEndPoint(
+    TCPServerEndPoint(
         const IEndPoint::config_t& config,
         IPDCP& pdcp)
         : config(config)
@@ -60,7 +62,7 @@ public:
         is_rx_enabled = value;
     }
 
-    ~UDPEndPoint()
+    ~TCPServerEndPoint()
     {
         pdcp_tx_running = false;
         pdcp_rx_running = false;
@@ -145,7 +147,7 @@ private:
     }
 
     config_t config;
-    bfc::UdpSocket sock;
+    bfc::TcpSocket sock;
     bfc::Ip4Port target_addr;
     IPDCP& pdcp;
 
@@ -164,4 +166,4 @@ private:
     int ep_event_fd;
 };
 
-#endif // __WINJECT_UDPENDPOINT_HPP__
+#endif // __WINJECT_TCPSERVER_ENDPOOINT_HPP__
