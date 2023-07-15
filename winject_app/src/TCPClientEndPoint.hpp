@@ -60,7 +60,7 @@ public:
             auto old_tx_enabled = is_tx_enabled;
             is_tx_enabled = value;
             Logless(*main_logger, LLC_INF,
-                "INF | TCPEP#  | set_tx_enabled old=# new=#",
+                "INF | TCPEP# | set_tx_enabled old=# new=#",
                 (int) config.lcid,
                 (int) old_tx_enabled,
                 (int) is_tx_enabled);
@@ -76,7 +76,7 @@ public:
             auto old_rx_enabled = is_tx_enabled;
             is_rx_enabled = value;
             Logless(*main_logger, LLC_INF,
-                "INF | TCPEP#  | set_rx_enabled old=# new=#",
+                "INF | TCPEP# | set_rx_enabled old=# new=#",
                 (int) config.lcid,
                 (int) old_rx_enabled,
                 (int) is_rx_enabled);
@@ -127,12 +127,23 @@ private:
         // RLF and client active
         if (is_rlf())
         {
+            Logless(*main_logger, TEP_ERR,
+                "ERR | TCPEP# | RLF detected, target will be disconnected.",
+                (int)config.lcid,
+                strerror(errno));
             targetSock = bfc::TcpSocket(-1);
         }
         else if (is_active())
         {
             targetSock = bfc::TcpSocket();
-            if (0 > targetSock.connect(target_addr))
+            if (targetSock.connect(target_addr) >= 0)
+            {
+                Logless(*main_logger, TEP_ERR,
+                    "ERR | TCPEP# | connected to targetSock=#",
+                    (int)config.lcid,
+                    targetSock.handle());
+            }
+            else
             {
                 Logless(*main_logger, TEP_ERR,
                     "ERR | TCPEP# | connect error(#)",
@@ -175,10 +186,10 @@ private:
             if ( rv < 0)
             {
                 Logless(*main_logger, TEP_ERR,
-                    "ERR | TCPEP# | select error(_)",
+                    "ERR | TCPEP# | select error(#)",
                     (int)config.lcid,
                     strerror(errno));
-                return;
+                continue;
             }
 
             if (FD_ISSET(targetSock.handle(), &recv_set))

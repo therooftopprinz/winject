@@ -52,6 +52,11 @@ void LLC::set_tx_enabled(bool value)
         to_retx_list.clear();
     }
 
+    {
+        std::unique_lock lg(to_ack_list_mutex);
+        to_ack_list.clear();
+    }
+
     Logless(*main_logger, LLC_INF,
         "INF | LLCT#  | set_tx_enabled old=# new=#",
         (int) lcid,

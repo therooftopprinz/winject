@@ -15,6 +15,11 @@ lcid_t PDCP::get_attached_lcid()
 
 void PDCP::set_tx_enabled(bool value)
 {
+    {
+        std::unique_lock lg(to_tx_queue_mutex);
+        to_tx_queue.clear();
+    }
+
     std::unique_lock<std::shared_mutex> lg(tx_mutex);
     auto old_tx_enabled = is_tx_enabled;
 
@@ -27,6 +32,8 @@ void PDCP::set_tx_enabled(bool value)
     current_tx_offset = 0;
     current_tx_buffer.clear();
     is_tx_enabled = value;
+
+
     lg.unlock();
 }
 

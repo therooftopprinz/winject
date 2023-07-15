@@ -74,7 +74,7 @@
           },
           "endpoint_config" : {
             "type" : "TCPC",
-            "tcp_address" : "127.0.0.1:22"
+            "tcp_address" : "127.0.0.1:22012"
           }
         }
       },
