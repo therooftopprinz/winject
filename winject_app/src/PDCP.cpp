@@ -19,7 +19,7 @@ void PDCP::set_tx_enabled(bool value)
     auto old_tx_enabled = is_tx_enabled;
 
     Logless(*main_logger, PDCP_INF, 
-        "INF | PDCP#  | set_tx_enabled old=# new=#",
+        "INF | PDCPT# | set_tx_enabled old=# new=#",
         (int) lcid,
         (int) old_tx_enabled,
         (int) is_tx_enabled);
@@ -48,7 +48,7 @@ void PDCP::set_rx_enabled(bool value)
     lg.unlock();
 
     Logless(*main_logger, PDCP_INF,
-        "INF | PDCP#  | set_rx_enabled old=# new=#",
+        "INF | PDCPR# | set_rx_enabled old=# new=#",
         (int) lcid,
         (int) old_rx_enabled,
         (int) is_rx_enabled);
@@ -61,10 +61,10 @@ void PDCP::reconfigure(const tx_config_t& config)
         std::unique_lock<std::shared_mutex> lg(tx_mutex);
         tx_config = config;
 
-        Logless(*main_logger, PDCP_INF, "INF | PDCP#  | reconfigure tx:", (int)lcid);
-        Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_segmentation: #", (int)lcid, (int) tx_config.allow_segmentation);
-        Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_reordering: #", (int)lcid, (int) tx_config.allow_reordering);
-        Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   min_commit_size: #", (int)lcid, tx_config.min_commit_size);
+        Logless(*main_logger, PDCP_INF, "INF | PDCPT# | reconfigure tx:", (int)lcid);
+        Logless(*main_logger, PDCP_INF, "INF | PDCPT# |   allow_segmentation: #", (int)lcid, (int) tx_config.allow_segmentation);
+        Logless(*main_logger, PDCP_INF, "INF | PDCPT# |   allow_reordering: #", (int)lcid, (int) tx_config.allow_reordering);
+        Logless(*main_logger, PDCP_INF, "INF | PDCPT# |   min_commit_size: #", (int)lcid, tx_config.min_commit_size);
 
         status = is_tx_enabled;
     }
@@ -78,10 +78,10 @@ void PDCP::reconfigure(const rx_config_t& config)
         std::unique_lock<std::shared_mutex> lg(rx_mutex);
         rx_config = config;
 
-        Logless(*main_logger, PDCP_INF, "INF | PDCP#  | reconfigure rx:", (int) lcid);
-        Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_rlf: #", (int) lcid, (int) rx_config.allow_rlf);
-        Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_segmentation: #", (int) lcid, (int) rx_config.allow_segmentation);
-        Logless(*main_logger, PDCP_INF, "INF | PDCP#  |   allow_reordering: #", (int) lcid, (int) rx_config.allow_reordering);
+        Logless(*main_logger, PDCP_INF, "INF | PDCPR# | reconfigure rx:", (int) lcid);
+        Logless(*main_logger, PDCP_INF, "INF | PDCPR# |   allow_rlf: #", (int) lcid, (int) rx_config.allow_rlf);
+        Logless(*main_logger, PDCP_INF, "INF | PDCPR# |   allow_segmentation: #", (int) lcid, (int) rx_config.allow_segmentation);
+        Logless(*main_logger, PDCP_INF, "INF | PDCPR# |   allow_reordering: #", (int) lcid, (int) rx_config.allow_reordering);
 
         status = is_rx_enabled;
     }
@@ -102,7 +102,7 @@ IPDCP::rx_config_t PDCP::get_rx_config()
 
 void PDCP::print_stats()
 {
-    LoglessF(*main_logger, LLC_STS, "STS | LLC#   | RAW #,#,#,#,#,#", (int) lcid,
+    LoglessF(*main_logger, LLC_STS, "STS | PDCP#  | RAW #,#,#,#,#,#", (int) lcid,
         stats.tx_queue_size.load(),
         stats.rx_reorder_size.load(),
         stats.rx_invalid_pdu.load(),
@@ -164,7 +164,7 @@ void PDCP::on_tx(tx_info_t& info)
         if (tx_config.min_commit_size > info.out_pdu.size ||
             pdcp.get_header_size() >= info.out_pdu.size)
         {
-            Logless(*main_logger, PDCP_TRC, "TRC | PDCP#  | not enough allocation", (int)lcid);
+            Logless(*main_logger, PDCP_TRC, "TRC | PDCPT# | not enough allocation", (int)lcid);
             return;
         }
 
@@ -205,7 +205,7 @@ void PDCP::on_tx(tx_info_t& info)
 
                 buffer_t pdu = std::move(to_tx_queue.front());
                 stats.tx_queue_size = to_tx_queue.size();
-                Logless(*main_logger, PDCP_TRC, "TRC | PDCP#  | allocated data sn=# data_sz=# to_tx_queue_sz=#",
+                Logless(*main_logger, PDCP_TRC, "TRC | PDCPT# | allocated data sn=# data_sz=# to_tx_queue_sz=#",
                     (int) lcid,
                     (int) tx_sn,
                     pdu.size(),
@@ -249,7 +249,7 @@ void PDCP::on_tx(tx_info_t& info)
                 bool is_last = current_tx_offset >= current_tx_buffer.size();
 
                 Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCP#  | allocated data sn=# seg_off=# seg_size=# is_last=# to_tx_queue_sz=#",
+                    "TRC | PDCPT# | allocated data sn=# seg_off=# seg_size=# is_last=# to_tx_queue_sz=#",
                     (int)lcid,
                     (int) tx_sn,
                     old_offset,
@@ -310,9 +310,10 @@ void PDCP::update_rx_sn(pdcp_sn_t sn, bool fast_forward)
                 current_rx_buffer_el.reset();
                 stats.rx_reorder_size.fetch_sub(1);
                 Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCP#  | transported packet sn=#",
+                    "TRC | PDCPR# | transported packet sn=# size=#",
                     (int) lcid,
-                    rx_sn);
+                    rx_sn,
+                    current_rx_buffer.size());
                 
                 rx_sn++;
                 std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
@@ -329,9 +330,10 @@ void PDCP::update_rx_sn(pdcp_sn_t sn, bool fast_forward)
                 current_rx_buffer_el.reset();
 
                 Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCP#  | Dropped packet sn=#",
+                    "TRC | PDCPR# | Dropped packet sn=# dist=#",
                     (int) lcid,
-                    rx_sn);
+                    rx_sn,
+                    sn_dist);
 
                 rx_sn++;
                 if (rx_sn == sn || rx_config.max_sn_distance > sn_dist)
@@ -406,7 +408,7 @@ void PDCP::on_rx(rx_info_t& info)
             if (sn_dist && (max_sn - sn_dist) <= rx_config.max_sn_distance)
             {
                 Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCP#  | Ignored completed (before) sn=#",
+                    "TRC | PDCPR# | Ignored completed (before) sn=#",
                     (int) lcid,
                     sn);
                 continue;
@@ -416,7 +418,7 @@ void PDCP::on_rx(rx_info_t& info)
             if (sn_dist > rx_config.max_sn_distance)
             {
                 Logless(*main_logger, PDCP_ERR,
-                    "ERR | PDCP#  | sn out of range! sn=# rx_sn=# distance=#",
+                    "ERR | PDCPR# | sn out of range! sn=# rx_sn=# distance=#",
                     (int) lcid,
                     sn,
                     rx_sn,
@@ -438,7 +440,7 @@ void PDCP::on_rx(rx_info_t& info)
             if (current_rx_buffer_el.is_complete())
             {
                 Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCP#  | Ignored completed (after) sn=#",
+                    "TRC | PDCPR# | Ignored completed (after) sn=#",
                     (int) lcid,
                     sn);
                 continue;
@@ -467,7 +469,7 @@ void PDCP::on_rx(rx_info_t& info)
             }
 
             Logless(*main_logger, PDCP_TRC,
-                "TRC | PDCP#  | segment complete=# sn=# rx_sn=# is_last=# seg_off=# seg_sz=#",
+                "TRC | PDCPR# | segment complete=# sn=# rx_sn=# is_last=# seg_off=# seg_sz=#",
                 (int) lcid,
                 (int) current_rx_buffer_el.is_complete(),
                 sn,
@@ -541,7 +543,7 @@ bool PDCP::to_tx(buffer_t buffer)
         }
 
         Logless(*main_logger, PDCP_TRC,
-            "TRC | PDCP#  | to_tx msg_sz=# queue_sz=#",
+            "TRC | PDCPT# | to_tx msg_sz=# queue_sz=#",
             (int) lcid,
             buffer.size(),
             to_tx_queue.size());

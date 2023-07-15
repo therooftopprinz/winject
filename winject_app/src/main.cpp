@@ -167,8 +167,8 @@ int main()
         {
             ep_config.address1 = endpoint_config.at("udp_tx_address");
             ep_config.address2 = endpoint_config.at("udp_rx_address");
-            Logless(*main_logger, MAN_INF, "INF | main |   udp_tx_address: #", ep_config.address2.c_str());
-            Logless(*main_logger, MAN_INF, "INF | main |   udp_rx_address: #", ep_config.address1.c_str());
+            Logless(*main_logger, MAN_INF, "INF | main |   udp_tx_address: #", ep_config.address1.c_str());
+            Logless(*main_logger, MAN_INF, "INF | main |   udp_rx_address: #", ep_config.address2.c_str());
         }
     }
 

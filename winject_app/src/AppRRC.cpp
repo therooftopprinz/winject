@@ -17,7 +17,6 @@ AppRRC::AppRRC(const config_t& config)
     srcss >> srcraw;
     winject::ieee_802_11::filters::winject_src src_filter(srcraw);
 
-    // @dont attach filter for wifi over udp
     if (!config.app_config.woudp_rx.size() && !config.app_config.wifi_device2.size())
     {
         wifi = std::make_shared<WIFI>(config.app_config.wifi_device);
@@ -55,11 +54,6 @@ AppRRC::~AppRRC()
 
     Logless(*main_logger, RRC_DBG, "DBG | AppRRC | AppRRC stopping...");
 
-    if (wifi_rx_thread.joinable())
-    {
-        wifi_rx_thread.join();
-    }
-
     if (rrc_rx_thread.joinable())
     {
         rrc_rx_thread.join();
@@ -80,7 +74,6 @@ AppRRC::~AppRRC()
 
 void AppRRC::stop()
 {
-    wifi_rx_running = false;
     rrc_rx_running = false;
     timer.stop();
     timer2.stop();
@@ -444,60 +437,54 @@ void AppRRC::setup_rrc()
     rrc_rx_thread =  std::thread([this](){
         pthread_setname_np(pthread_self(), "RRC_RRC_RX");
         run_rrc_rx();});
-    wifi_rx_thread = std::thread([this](){
-        pthread_setname_np(pthread_self(), "RRC_WIFI_RX");
-        run_wifi_rx();});
+
     timer2_thread = std::thread([this](){
         pthread_setname_np(pthread_self(), "RRC_TIMER2");
         timer2.run();});
+
+    reactor.addReadHandler(wifi->handle(), [this](){
+            on_wifi_rx();
+        });
 }
 
-void AppRRC::run_wifi_rx()
+void AppRRC::on_wifi_rx()
 {
-    wifi_rx_running = true;
-    while (wifi_rx_running)
+    int rv = wifi->recv(rx_buff, sizeof(rx_buff));
+
+    if (rv<0)
     {
-        int rv = wifi->recv(rx_buff, sizeof(rx_buff));
-
-        if (EAGAIN == errno || EWOULDBLOCK == errno)
-        {
-            continue;
-        }
-        if (rv<0)
-        {
-            Logless(*main_logger, RRC_ERR, "ERR | AppRRC | wifi recv failed! errno=# error=#", errno, strerror(errno));
-            continue;
-        }
-
-        winject::radiotap::radiotap_t radiotap(rx_buff);
-        winject::ieee_802_11::frame_t frame80211(radiotap.end(), rx_buff+sizeof(rx_buff));
-
-        auto frame80211end = rx_buff+rv;
-        size_t size =  frame80211end-frame80211.frame_body-4;
-
-        if (main_logger->get_logbit(WRX_BUF))
-        {
-            Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
-        }
-        Logless(*main_logger, RRC_TRC, "TRC | AppRRC | recv size #", rv);
-        if (main_logger->get_logbit(WRX_RAD))
-        {
-            Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
-        }
-        if (main_logger->get_logbit(WRX_802))
-        {
-            Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
-            Logless(*main_logger, RRC_TRC, "TR2 | AppRRC |   frame body size: #", size);
-            Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | -----------------------");
-        }
-
-        if (!frame80211.frame_body)
-        {
-            continue;
-        }
-
-        process_rx_frame(frame80211.frame_body, size);
+        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | wifi recv failed! errno=# error=#", errno, strerror(errno));
+        return;
     }
+
+    winject::radiotap::radiotap_t radiotap(rx_buff);
+    winject::ieee_802_11::frame_t frame80211(radiotap.end(), rx_buff+sizeof(rx_buff));
+
+    auto frame80211end = rx_buff+rv;
+    size_t size =  frame80211end-frame80211.frame_body-4;
+
+    if (main_logger->get_logbit(WRX_BUF))
+    {
+        Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
+    }
+    Logless(*main_logger, RRC_TRC, "TRC | AppRRC | recv size #", rv);
+    if (main_logger->get_logbit(WRX_RAD))
+    {
+        Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
+    }
+    if (main_logger->get_logbit(WRX_802))
+    {
+        Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
+        Logless(*main_logger, RRC_TRC, "TR2 | AppRRC |   frame body size: #", size);
+        Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | -----------------------");
+    }
+
+    if (!frame80211.frame_body)
+    {
+        return;
+    }
+
+    process_rx_frame(frame80211.frame_body, size);
 }
 
 void AppRRC::process_rx_frame(uint8_t* start, size_t size)

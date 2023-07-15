@@ -3,6 +3,7 @@
 
 #include <string>
 #include <atomic>
+#include <mutex>
 
 #include <bfc/IReactor.hpp>
 #include <bfc/Udp.hpp>
@@ -29,10 +30,7 @@ public:
             throw std::runtime_error("UDPEndPoint: failed");
         }
 
-        // struct timeval tv;
-        // tv.tv_sec = 0;
-        // tv.tv_usec = 1000*100;
-        // setsockopt(sock.handle(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+        ep_event_fd = eventfd(0, EFD_SEMAPHORE);
 
         target_addr = bfc::toIp4Port(config.address2);
 
@@ -52,13 +50,13 @@ public:
 
     void set_tx_enabled(bool value) override
     {
-        std::unique_lock<std::mutex> lg(txrx_mutex);
+        std::unique_lock lg(txrx_mutex);
         is_tx_enabled = value;
     }
 
     void set_rx_enabled(bool value) override
     {
-        std::unique_lock<std::mutex> lg(txrx_mutex);
+        std::unique_lock lg(txrx_mutex);
         is_rx_enabled = value;
     }
 
@@ -66,6 +64,9 @@ public:
     {
         pdcp_tx_running = false;
         pdcp_rx_running = false;
+
+        uint64_t one = 1;
+        write(ep_event_fd, &one, sizeof(one));
 
         if (pdcp_tx_thread.joinable())
         {
@@ -75,7 +76,6 @@ public:
         if (pdcp_rx_thread.joinable())
         {
             pdcp_rx_thread.join();
-        
         }
     }
 
@@ -83,20 +83,49 @@ private:
     void run_pdcp_tx()
     {
         pdcp_tx_running = true;
+        // struct timeval tv = {1, 0};
+        fd_set recv_set;
+        FD_ZERO(&recv_set);
+        auto maxfd = std::max(sock.handle(), ep_event_fd)+1;
+    
         while (pdcp_tx_running)
         {
-            bfc::BufferView bv{buffer_read, sizeof(buffer_read)};
-            bfc::Ip4Port sender_addr;
-            auto rv = sock.recvfrom(bv, sender_addr);
-            if (EAGAIN == errno || EWOULDBLOCK == errno || EINTR == errno)
+            FD_SET(sock.handle(), &recv_set);
+            FD_SET(ep_event_fd,   &recv_set);
+
+            auto rv = select(maxfd, &recv_set, nullptr, nullptr, nullptr);
+
+            if (EAGAIN == errno || EINTR == errno)
             {
                 continue;
             }
-            if (rv>0)
+
+            if ( rv < 0)
             {
-                buffer_t b(rv);
-                std::memcpy(b.data(), bv.data(), rv);
-                while (pdcp_tx_running & !pdcp.to_tx(std::move(b)));
+                Logless(*main_logger, TEP_ERR,
+                    "ERR | UDPEP# | select error(_)",
+                    (int)config.lcid,
+                    strerror(errno));
+                return;
+            }
+
+            if (FD_ISSET(sock.handle(), &recv_set))
+            {
+                bfc::BufferView bv{buffer_read, sizeof(buffer_read)};
+                bfc::Ip4Port sender_addr;
+                auto rv = sock.recvfrom(bv, sender_addr);
+
+                if (rv>0)
+                {
+                    target_addr = sender_addr;
+                    buffer_t b(rv);
+                    std::memcpy(b.data(), bv.data(), rv);
+                    while (pdcp_tx_running & !pdcp.to_tx(std::move(b)));
+                }
+            }
+            if (FD_ISSET(ep_event_fd, &recv_set))
+            {
+                return;
             }
         }
     }
@@ -131,6 +160,8 @@ private:
     std::mutex txrx_mutex;
     bool is_tx_enabled = false;
     bool is_rx_enabled = false;
+
+    int ep_event_fd;
 };
 
 #endif // __WINJECTUM_UDPENDPOINT_HPP__

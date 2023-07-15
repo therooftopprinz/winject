@@ -53,16 +53,6 @@ public:
 
     void on_rrc_message(int req_id, const RRC_ExchangeRequest& req) override
     {
-        auto llc_tx_cfg = llc.get_tx_confg();
-
-        if (ILLC::E_TX_MODE_AM != to_config(req.llcConfig.txConfig.mode))
-        {
-            Logless(*main_logger, RRC_ERR,
-                "ERR | LCRRC# | on_exchg_req (ignored: mismatch mode)",
-                (int) llc.get_lcid());
-            return;
-        }
-
         Logless(*main_logger, RRC_ERR,
             "ERR | LCRRC# | on_exchg_req",
                 (int) llc.get_lcid());
@@ -89,15 +79,13 @@ public:
     {
         check_response(req_id);
 
-        auto llc_tx_cfg = llc.get_tx_confg();
-
-        if (E_TXRX_STATE_CONFIGURING != txrx_state)
-        {
-            Logless(*main_logger, RRC_ERR,
-                "ERR | LCRRC# | on_exchg_rsp (ignored: unexpected)",
-                (int) llc.get_lcid());
-            return;
-        }
+        // if (E_TXRX_STATE_CONFIGURING != txrx_state)
+        // {
+        //     Logless(*main_logger, RRC_ERR,
+        //         "ERR | LCRRC# | on_exchg_rsp (ignored: unexpected)",
+        //         (int) llc.get_lcid());
+        //     return;
+        // }
 
         Logless(*main_logger, RRC_ERR,
             "ERR | LCRRC# | on_exchg_rsp",

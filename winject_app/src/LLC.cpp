@@ -53,7 +53,7 @@ void LLC::set_tx_enabled(bool value)
     }
 
     Logless(*main_logger, LLC_INF,
-        "INF | LLC#   | set_tx_enabled old=# new=#",
+        "INF | LLCT#  | set_tx_enabled old=# new=#",
         (int) lcid,
         (int) old_tx_enabled,
         (int) is_tx_enabled);
@@ -66,7 +66,7 @@ void LLC::set_rx_enabled(bool value)
     is_rx_enabled = value;
 
     Logless(*main_logger, LLC_INF,
-        "INF | LLC#   | set_rx_enabled old=# new=#",
+        "INF | LLCR#  | set_rx_enabled old=# new=#",
         (int) lcid,
         (int) old_rx_enabled,
         (int) is_rx_enabled);
@@ -90,12 +90,12 @@ void LLC::reconfigure(const tx_config_t& config)
             tx_crc_size = 4;
         }
 
-        Logless(*main_logger, LLC_INF, "INF | LLC#   | reconfigure tx:", (int)lcid);
-        Logless(*main_logger, LLC_INF, "INF | LLC#   |   mode: #", (int)lcid, (int)tx_config.mode);
-        Logless(*main_logger, LLC_INF, "INF | LLC#   |   arq_window_size: #", (int)lcid, tx_config.arq_window_size);
-        Logless(*main_logger, LLC_INF, "INF | LLC#   |   max_retx_count: #", (int)lcid, tx_config.max_retx_count);
-        Logless(*main_logger, LLC_INF, "INF | LLC#   |   crc_type: #", (int)lcid, (int)tx_config.crc_type);
-        Logless(*main_logger, LLC_INF, "INF | LLC#   |   crc_size: #", (int)lcid, tx_crc_size);
+        Logless(*main_logger, LLC_INF, "INF | LLCT#  | reconfigure tx:", (int)lcid);
+        Logless(*main_logger, LLC_INF, "INF | LLCT#  |   mode: #", (int)lcid, (int)tx_config.mode);
+        Logless(*main_logger, LLC_INF, "INF | LLCT#  |   arq_window_size: #", (int)lcid, tx_config.arq_window_size);
+        Logless(*main_logger, LLC_INF, "INF | LLCT#  |   max_retx_count: #", (int)lcid, tx_config.max_retx_count);
+        Logless(*main_logger, LLC_INF, "INF | LLCT#  |   crc_type: #", (int)lcid, (int)tx_config.crc_type);
+        Logless(*main_logger, LLC_INF, "INF | LLCT#  |   crc_size: #", (int)lcid, tx_crc_size);
     }
     set_tx_enabled(status);
 }
@@ -119,10 +119,10 @@ void LLC::reconfigure(const rx_config_t& config)
             rx_crc_size = 4;
         }
 
-        Logless(*main_logger, LLC_INF, "INF | LLC#   | reconfigure rx:", (int) lcid);
-        Logless(*main_logger, LLC_INF, "INF | LLC#   |   mode: #", (int) lcid, (int) rx_config.mode);
-        Logless(*main_logger, LLC_INF, "INF | LLC#   |   crc_type: #", (int) lcid, (int) rx_config.crc_type);
-        Logless(*main_logger, LLC_INF, "INF | LLC#   |   crc_size: #", (int) lcid, rx_crc_size);
+        Logless(*main_logger, LLC_INF, "INF | LLCR#  | reconfigure rx:", (int) lcid);
+        Logless(*main_logger, LLC_INF, "INF | LLCR#  |   mode: #", (int) lcid, (int) rx_config.mode);
+        Logless(*main_logger, LLC_INF, "INF | LLCR#  |   crc_type: #", (int) lcid, (int) rx_config.crc_type);
+        Logless(*main_logger, LLC_INF, "INF | LLCR#  |   crc_size: #", (int) lcid, rx_crc_size);
     }
     set_rx_enabled(status);
 }
@@ -181,7 +181,7 @@ void LLC::on_tx(tx_info_t& info)
                 acks[n_acks].count = ack.second;
                 info.out_pdu.size -= sizeof(llc_payload_ack_t);
 
-                Logless(*main_logger, LLC_TRC, "TRC | LLC#   | ack sn=# cx=#",
+                Logless(*main_logger, LLC_TRC, "TRC | LLCT#  | ack sn=# cx=#",
                     int(lcid), ack.first, ack.second);
 
                 n_acks++;
@@ -250,7 +250,7 @@ void LLC::on_tx(tx_info_t& info)
         retx_count = retx_pdu.retry_count + 1;
 
         Logless(*main_logger, LLC_TRC,
-            "TRC | LLC#   | retx=#/# to_retx_list_sz=#",
+            "TRC | LLCT#  | retx=#/# to_retx_list_sz=#",
             int(lcid),
             retx_count,
             tx_config.max_retx_count,
@@ -262,7 +262,7 @@ void LLC::on_tx(tx_info_t& info)
             if (tx_config.allow_rlf)
             {
                 Logless(*main_logger, LLC_ERR,
-                    "ERR | LLC#   | RLF triggered",
+                    "ERR | LLCT#  | RLF triggered",
                     int(lcid));
 
                 info.out_allocated = 0;
@@ -271,7 +271,7 @@ void LLC::on_tx(tx_info_t& info)
             }
 
             Logless(*main_logger, LLC_ERR,
-                "ERR | LLC#   | RLF inhibited",
+                "ERR | LLCT#  | RLF inhibited",
                 int(lcid));
 
             // RETX dropped, aquire new PDCP PDU
@@ -338,7 +338,7 @@ void LLC::on_tx(tx_info_t& info)
     tx_lg.unlock();
 
     Logless(*main_logger, LLC_TRC,
-        "TRC | LLC#   | pdu slot=# tx_idx=# ack_idx=# sn=# pdu_sz=#",
+        "TRC | LLCT#  | pdu slot=# tx_idx=# ack_idx=# sn=# pdu_sz=#",
         (int) lcid,
         slot_number,
         tx_idx,
@@ -372,7 +372,7 @@ void LLC::on_rx(rx_info_t& info)
         {
             if (llc_header_size+i*sizeof(llc_payload_ack_t) > llc_size)
             {
-                Logless(*main_logger, LLC_ERR, "ERR | LLC#   | ack overrun, llc_size=# ack_idx=#",
+                Logless(*main_logger, LLC_ERR, "ERR | LLCT# | ack overrun, llc_size=# ack_idx=#",
                     int(lcid), llc_size, i);
                 break;
             }
@@ -393,7 +393,7 @@ void LLC::on_rx(rx_info_t& info)
                 stats.bytes_sent.fetch_add(sent_slot.pdcp_pdu_size);
 
                 Logless(*main_logger, LLC_TRC,
-                    "TRC | LLC#   | acked idx=# sn=#",
+                    "TRC | LLCT#  | acked idx=# sn=#",
                     (int) lcid, ack_slot.sent_index,
                     (int) sn);
 
@@ -412,8 +412,10 @@ void LLC::on_rx(rx_info_t& info)
         info.in_pdu.base += llc.get_header_size();
         info.in_pdu.size -= llc.get_header_size();
 
-        Logless(*main_logger, LLC_TRC, "TRC | LLC#   | data rx pdu_sz=#",
-            int(lcid), info.in_pdu.size);
+        Logless(*main_logger, LLC_TRC, "TRC | LLCR#  | llc_rx sn=# pdu_sz=#",
+            (int) lcid,
+            (int) llc.get_SN(),
+            info.in_pdu.size);
 
         stats.bytes_recv.fetch_add(info.in_pdu.size);
         stats.pkt_recv.fetch_add(1);
@@ -436,7 +438,7 @@ void LLC::check_retransmit(size_t slot_number)
     }
 
     Logless(*main_logger, LLC_TRC,
-        "TRC | LLC#   | retxing current_slot=# sent_index=#",
+        "TRC | LLCT#  | retxing current_slot=# sent_index=#",
         int(lcid),
         slot_number,
         this_slot.sent_index);

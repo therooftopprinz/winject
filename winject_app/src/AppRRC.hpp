@@ -64,7 +64,7 @@ private:
     void setup_lcrrc();
     void setup_rrc();
 
-    void run_wifi_rx();
+    void on_wifi_rx();
 
     void process_rx_frame(uint8_t* start, size_t size);
 
@@ -133,8 +133,6 @@ private:
     bfc::Timer<> timer2;
     std::thread timer_thread;
     std::thread timer2_thread;
-    std::thread wifi_rx_thread;
-    std::atomic_bool wifi_rx_running = false;
     std::atomic_uint8_t rrc_req_id = 0;
     std::shared_ptr<IWIFI> wifi;
     TxScheduler tx_scheduler;
