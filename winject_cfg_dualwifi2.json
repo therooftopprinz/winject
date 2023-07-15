@@ -27,17 +27,18 @@
     "lc_configs": [
       {
         "lcid" : 0,
-        "description:" : "rrc0",
+        "description" : "rrc0",
         "llc_config" : {
           "tx_mode" : "TM",
           "scheduling_config" : {
             "nd_pdu_size" : 0,
             "quanta" : 4294967295
           },
-          "common_tx_config" : {}
+          "common_tx_config" : {},
+          "common_rx_config" : {}
         },
         "pdcp_config" : {
-          "description:" : "rrc0-pdcp",
+          "description" : "rrc0-pdcp",
           "lcid" : 0,
           "tx_config": {
             "allow_rlf" : false
@@ -49,7 +50,7 @@
       },
       {
         "lcid" : 1,
-        "description:" : "data1",
+        "description" : "ssh1",
         "llc_config" : {
           "tx_mode" : "AM",
           "scheduling_config" : {
@@ -59,26 +60,26 @@
           "am_tx_config": {
             "allow_rlf" : true,
             "arq_window_size" : 30,
-            "max_retx_count" : 15
+            "max_retx_count" : 100
           },
-          "common_tx_config" : {}
+          "common_tx_config" : {},
+          "common_rx_config" : {}
         },
         "pdcp_config" : {
           "tx_config" : {
             "allow_rlf" : true,
             "allow_segmentation" : true,
             "allow_reordering" : true,
-            "min_commit_size" : 500
+            "max_sn_distance" : 3000
           },
           "endpoint_config" : {
-            "type" : "UDP",
-            "udp_tx_address" : "127.0.0.1:22011",
-            "udp_rx_address" : "127.0.0.1:22012"
+            "type" : "TCPC",
+            "tcp_address" : "127.0.0.1:22"
           }
         }
       },
       {
-        "description:" : "data2",
+        "description" : "data2",
         "lcid" : 2,
         "llc_config" : {
           "tx_mode" : "AM",
@@ -91,7 +92,8 @@
             "arq_window_size" : 30,
             "max_retx_count" : 15
           },
-          "common_tx_config" : {}
+          "common_tx_config" : {},
+          "common_rx_config" : {}
         },
         "pdcp_config" : {
           "tx_config" : {
@@ -110,7 +112,7 @@
       },
       {
         "lcid" : 7,
-        "description:" : "video7",
+        "description" : "video7",
         "llc_config" : {
           "tx_mode" : "AM",
           "scheduling_config" : {
@@ -124,10 +126,14 @@
           },
           "common_tx_config": {
             "crc_type" : "NONE"
+          },
+          "common_rx_config" : {
+            "auto_init_on_rx" : true
           }
         },
         "pdcp_config" : {
           "tx_config" : {
+            "auto_init_on_tx" : true,
             "allow_rlf" : false,
             "allow_segmentation" : true,
             "allow_reordering" : true,
@@ -142,7 +148,7 @@
         }
       },
       {
-        "description:" : "video8",
+        "description" : "video8",
         "lcid" : 8,
         "llc_config" : {
           "tx_mode" : "AM",
@@ -157,10 +163,14 @@
           },
           "common_tx_config": {
             "crc_type" : "NONE"
+          },
+          "common_rx_config" : {
+            "auto_init_on_rx" : true
           }
         },
         "pdcp_config" : {
           "tx_config" : {
+            "auto_init_on_tx" : true,
             "allow_rlf" : false,
             "allow_segmentation" : true,
             "allow_reordering" : true,

@@ -53,6 +53,12 @@ public:
         return ::bind(mSockFd, (sockaddr *)&myaddr, sizeof(myaddr));
     }
 
+    int connect(const Ip4Port& pAddr) override
+    {
+        errno = EFAULT;
+        return -1;
+    }
+
     ssize_t sendto(const bfc::ConstBufferView& pData, const Ip4Port& pAddr, int pFlags=0)
     {
         sockaddr_in to;
@@ -91,6 +97,11 @@ public:
     int handle()
     {
         return mSockFd;
+    }
+
+    operator bool() override
+    {
+        return mSockFd >= 0;
     }
 
 private:

@@ -338,7 +338,7 @@ void LLC::on_tx(tx_info_t& info)
     tx_lg.unlock();
 
     Logless(*main_logger, LLC_TRC,
-        "TRC | LLCT#  | pdu slot=# tx_idx=# ack_idx=# sn=# pdu_sz=#",
+        "TRC | LLCT#  | pdu slot=# tx_idx=# expected_ack_idx=# sn=# pdu_sz=#",
         (int) lcid,
         slot_number,
         tx_idx,
@@ -351,7 +351,7 @@ void LLC::on_rx(rx_info_t& info)
 {
     std::unique_lock<std::mutex> lg(rx_mutex);
 
-    if (!is_rx_enabled)
+    if (!is_rx_enabled && rx_config.auto_init_on_rx)
     {
         rrc.on_init(lcid);
         return;

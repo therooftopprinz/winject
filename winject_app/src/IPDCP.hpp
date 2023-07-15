@@ -76,7 +76,7 @@ struct IPDCP
     virtual void on_tx(tx_info_t&) = 0;
     virtual void on_rx(rx_info_t&) = 0;
     virtual buffer_t to_rx(uint64_t=-1) = 0;
-    virtual bool to_tx(buffer_t) = 0;
+    virtual bool to_tx(buffer_t&&) = 0;
 
     virtual lcid_t get_attached_lcid() = 0;
 

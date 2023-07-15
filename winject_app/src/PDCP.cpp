@@ -523,11 +523,11 @@ buffer_t PDCP::to_rx(uint64_t timeout_us)
         return {};
     }
 
-bool PDCP::to_tx(buffer_t buffer)
+bool PDCP::to_tx(buffer_t&& buffer)
     {
         std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
 
-        if (!is_tx_enabled)
+        if (!is_tx_enabled && tx_config.auto_init_on_tx)
         {
             rrc.on_init(lcid);
         }

@@ -157,13 +157,13 @@ private:
         change_txrx_state(E_TXRX_STATE_ACTIVE);
 
         pdcp.set_tx_enabled(true);
-        ep.set_tx_enabled(true);
-
         pdcp.set_rx_enabled(true);
-        ep.set_rx_enabled(true);  
 
         llc.set_tx_enabled(true);
         llc.set_rx_enabled(true);
+
+        ep.set_tx_enabled(true);
+        ep.set_rx_enabled(true);  
     }
 
     void send_exchange_req()

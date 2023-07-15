@@ -5,6 +5,7 @@
 
 #include <bfc/CommandManager.hpp>
 #include <bfc/Udp.hpp>
+#include <bfc/Tcp.hpp>
 #include <bfc/EpollReactor.hpp>
 #include <bfc/Timer.hpp>
 
@@ -24,6 +25,8 @@
 #include "LLC.hpp"
 #include "PDCP.hpp"
 #include "UDPEndPoint.hpp"
+#include "TCPServerEndPoint.hpp"
+#include "TCPClientEndPoint.hpp"
 #include "LCRRC.hpp"
 
 #include "rrc_utils.hpp"

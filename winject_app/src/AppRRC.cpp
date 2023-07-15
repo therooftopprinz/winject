@@ -363,6 +363,34 @@ void AppRRC::setup_eps()
 
             eps.emplace(id, ep);
         }
+        else if (ep_config.type == "TCPS")
+        {
+            auto pdcp_it = pdcps.find(id);
+            if (pdcp_it == pdcps.end())
+            {
+                continue;
+            }
+
+            auto ep = std::make_shared<TCPServerEndPoint>(ep_config,
+                *this,
+                *pdcp_it->second);
+
+            eps.emplace(id, ep);
+        }
+        else if (ep_config.type == "TCPC")
+        {
+            auto pdcp_it = pdcps.find(id);
+            if (pdcp_it == pdcps.end())
+            {
+                continue;
+            }
+
+            auto ep = std::make_shared<TCPClientEndPoint>(ep_config,
+                *this,
+                *pdcp_it->second);
+
+            eps.emplace(id, ep);
+        }
     }
 }
 

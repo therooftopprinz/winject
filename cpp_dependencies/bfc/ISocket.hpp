@@ -29,12 +29,14 @@ struct Ip4Port
 struct ISocket
 {
     virtual int bind(const Ip4Port& pAddr) = 0;
+    virtual int connect(const Ip4Port& pAddr) = 0;
     virtual ssize_t sendto(const bfc::ConstBufferView& pData, const Ip4Port& pAddr, int pFlags=0) = 0;
     virtual ssize_t recvfrom(bfc::BufferView& pData, Ip4Port& pAddr, int pFlags=0) = 0;
     virtual ssize_t send(const bfc::ConstBufferView& pData, int pFlags=0) = 0;
     virtual ssize_t recv(bfc::BufferView& pData, int pFlags=0) = 0;
     virtual int setsockopt(int pLevel, int pOptionName, const void *pOptionValue, socklen_t pOptionLen) = 0;
-    virtual int handle() = 0 ;
+    virtual int handle() = 0;
+    virtual operator bool() = 0;
 };
 
 inline Ip4Port toIp4Port(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint16_t port)

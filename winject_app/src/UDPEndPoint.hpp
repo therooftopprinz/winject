@@ -5,6 +5,8 @@
 #include <atomic>
 #include <mutex>
 
+#include <sys/eventfd.h>
+
 #include <bfc/IReactor.hpp>
 #include <bfc/Udp.hpp>
 
@@ -31,6 +33,14 @@ public:
         }
 
         ep_event_fd = eventfd(0, EFD_SEMAPHORE);
+        if (0 > ep_event_fd)
+        {
+            Logless(*main_logger, TEP_ERR,
+                "ERR | TCPEP# | Event FD error(_)",
+                (int)config.lcid,
+                strerror(errno));
+            throw std::runtime_error("TCPEndPoint: failed");
+        }
 
         target_addr = bfc::toIp4Port(config.address2);
 

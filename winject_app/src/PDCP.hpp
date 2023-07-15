@@ -32,7 +32,7 @@ public:
     void on_rx(rx_info_t& info) override;
 
     buffer_t to_rx(uint64_t timeout_us=-1) override;
-    bool to_tx(buffer_t buffer) override;
+    bool to_tx(buffer_t&& buffer) override;
     
 
     const stats_t& get_stats() override;

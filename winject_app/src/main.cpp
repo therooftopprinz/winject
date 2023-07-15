@@ -1,5 +1,7 @@
 #include <fstream>
 
+#include <signal.h>
+
 #include <json/json.hpp>
 #include "AppRRC.hpp"
 
@@ -62,6 +64,9 @@ T value_or(const nlohmann::json& json, const std::string& key, T value)
 
 int main()
 {
+    auto ignore = SIG_IGN;
+    sigaction(SIGPIPE, (struct sigaction*) &ignore, NULL);
+
     main_logger = std::make_unique<LoggerType>("main.log");
     main_logger->logful();
 
@@ -108,13 +113,19 @@ int main()
 
 
 
-    Logless(*main_logger, MAN_INF, "INF | main | --- Logical Channels ---");
+    Logless(*main_logger, MAN_INF, "INF | main | --- LOGICAL CHANNELS ---");
     for (auto& lc : lc_configs)
     {
         auto& llc =  lc.at("llc_config");
         auto& pdcp =  lc.at("pdcp_config");
 
         uint8_t lcid = lc.at("lcid");
+        std::string desc = value_or(lc, "description", std::string());
+        if (desc.size())
+        {
+            desc.insert(desc.begin(),'(');
+            desc.push_back(')');
+        }
 
         // LLC
         auto& llc_tx_config = rrc_config.llc_tx_configs[lcid];
@@ -137,7 +148,8 @@ int main()
         auto& common_tx_config = llc.at("common_tx_config");
         llc_tx_config.crc_type = to_crc_type(value_or(common_tx_config, "crc_type", DEFAULT_CRC_TYPE));
 
-        llc_rx_config.auto_init_on_rx = value_or(llc, "auto_init_on_rx", DEFAULT_AUTO_INIT_ON_RX);
+        auto& common_rx_config = llc.at("common_rx_config");
+        llc_rx_config.auto_init_on_rx = value_or(common_rx_config, "auto_init_on_rx", DEFAULT_AUTO_INIT_ON_RX);
 
         llc_rx_config.mode = llc_rx_config.mode;
         llc_rx_config.crc_type = llc_rx_config.crc_type;
@@ -157,7 +169,7 @@ int main()
         ep_config.lcid = lcid;
         ep_config.type = endpoint_config.at("type");
 
-        Logless(*main_logger, MAN_INF, "INF | main | lcid: #", (int) lcid);
+        Logless(*main_logger, MAN_INF, "INF | main | lcid: # #", (int) lcid, desc.c_str());
         Logless(*main_logger, MAN_INF, "INF | main |   mode: #", (int) llc_tx_config.mode);
         if (llc_tx_config.mode == ILLC::E_TX_MODE_AM)
         {
@@ -183,6 +195,16 @@ int main()
             ep_config.address2 = endpoint_config.at("udp_rx_address");
         Logless(*main_logger, MAN_INF, "INF | main |   udp_tx_address: #", ep_config.address1.c_str());
         Logless(*main_logger, MAN_INF, "INF | main |   udp_rx_address: #", ep_config.address2.c_str());
+        }
+        else if (ep_config.type == "TCPS")
+        {
+            ep_config.address1 = endpoint_config.at("tcp_address");
+        Logless(*main_logger, MAN_INF, "INF | main |   tcp_address: #", ep_config.address1.c_str());
+        }
+        else if (ep_config.type == "TCPC")
+        {
+            ep_config.address1 = endpoint_config.at("tcp_address");
+        Logless(*main_logger, MAN_INF, "INF | main |   tcp_address: #", ep_config.address1.c_str());
         }
 
         Logless(*main_logger, MAN_INF, "INF | main |");
