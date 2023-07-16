@@ -268,7 +268,7 @@ private:
     IRRC& rrc;
     frame_info_t frame_info;
     std::optional<int> slot_timer_id;
-    int64_t last_tick;
+    int64_t last_tick = 0;
     double tick_pid_integral = 0;
     // @note indexed by lcid
     std::vector<scheduling_ctx_t> schedules_info;

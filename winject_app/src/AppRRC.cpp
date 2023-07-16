@@ -238,6 +238,7 @@ void AppRRC::perform_tx(size_t payload_size)
 void AppRRC::setup_80211_base_frame()
 {
     Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Generating base frame for TX...");
+    std::memset(tx_buff,0,sizeof(tx_buff));
     radiotap = winject::radiotap::radiotap_t(tx_buff);
     radiotap.header->presence |= winject::radiotap::E_FIELD_PRESENCE_FLAGS;
     radiotap.header->presence |= winject::radiotap::E_FIELD_PRESENCE_RATE;
