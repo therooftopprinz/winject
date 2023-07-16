@@ -79,7 +79,7 @@
         }
       },
       {
-        "description" : "data2",
+        "description" : "vpn2",
         "lcid" : 2,
         "llc_config" : {
           "tx_mode" : "AM",
@@ -90,23 +90,23 @@
           "am_tx_config": {
             "allow_rlf" : true,
             "arq_window_size" : 30,
-            "max_retx_count" : 15
+            "max_retx_count" : 100
           },
           "common_tx_config" : {},
           "common_rx_config" : {}
         },
         "pdcp_config" : {
           "tx_config" : {
-            "allow_rlf" : true,
+            "allow_rlf" : false,
             "allow_segmentation" : true,
             "allow_reordering" : true,
-            "max_sn_distance" : 500,
+            "max_sn_distance" : 3000,
             "min_commit_size" : 0
           },
           "endpoint_config" : {
             "type" : "UDP",
-            "udp_tx_address" : "127.0.0.1:22021",
-            "udp_rx_address" : "127.0.0.1:22022"
+            "udp_tx_address" : "0.0.0.0:22021",
+            "udp_rx_address" : "18.141.177.159:1194"
           }
         }
       },

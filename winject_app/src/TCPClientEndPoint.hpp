@@ -106,9 +106,20 @@ private:
     constexpr static uint64_t EVENTFD_STOP = 0xFFFFFFFFFFFFFFFF;
     constexpr static uint64_t EVENTFD_BREAK_SELECT = 1;
 
-    void notify_event(uint64_t val)
+    void notify_event(uint64_t event)
     {
-        write(ep_event_fd, &val, sizeof(val));
+        Logless(*main_logger, TEP_ERR,
+            "INF | TCPEP# | notify event=#",
+            (int)config.lcid,
+            event);
+        
+        {
+            std::unique_lock lg(ep_event_mutex);
+            ep_event.push_back(event);
+        }
+
+        uint64_t one = 1;
+        write(ep_event_fd, &one, sizeof(one));
     }
 
     bool is_active()
@@ -216,8 +227,17 @@ private:
 
             if (FD_ISSET(ep_event_fd, &recv_set))
             {
+                uint64_t nevent;
+                read(ep_event_fd, &nevent, sizeof(nevent));
+
                 uint64_t val;
-                read(ep_event_fd, &val, sizeof(val));
+
+                {
+                    std::unique_lock lg(ep_event_mutex);
+                    val = ep_event.front();
+                    ep_event.pop_front();
+                }
+
                 if (EVENTFD_STOP == val)
                 {
                     Logless(*main_logger, TEP_ERR,
@@ -273,6 +293,8 @@ private:
     bool is_rx_enabled = false;
 
     int ep_event_fd;
+    std::deque<uint64_t> ep_event;
+    std::shared_mutex ep_event_mutex;
 };
 
 #endif // __WINJECT_TCPCLIENT_ENDPOOINT_HPP__

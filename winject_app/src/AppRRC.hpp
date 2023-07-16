@@ -37,7 +37,6 @@ public:
     AppRRC(const config_t& config);
     ~AppRRC();
 
-    void stop();
 
     void run();
 
@@ -48,6 +47,8 @@ public:
     void send_rrc(const RRC& rrc) override;
 
     void perform_tx(size_t payload_size) override;
+
+    void stop() override;
 
 private:
     void on_console_read();

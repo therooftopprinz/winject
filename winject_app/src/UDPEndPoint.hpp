@@ -32,7 +32,7 @@ public:
             throw std::runtime_error("UDPEndPoint: failed");
         }
 
-        ep_event_fd = eventfd(0, EFD_SEMAPHORE);
+        ep_event_fd = eventfd(0, 0);
         if (0 > ep_event_fd)
         {
             Logless(*main_logger, TEP_ERR,

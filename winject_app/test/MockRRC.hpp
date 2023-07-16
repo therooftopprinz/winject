@@ -11,6 +11,7 @@ struct MockRRC : public IRRC
     MOCK_METHOD0(allocate_req_id, uint8_t());
     MOCK_METHOD1(send_rrc, void(const RRC& rrc));
     MOCK_METHOD1(perform_tx, void(size_t));
+    MOCK_METHOD0(stop, void());
 };
 
 #endif // __WINJECTUMTST_MOCKRRC_HPP__

@@ -4,7 +4,7 @@ AppRRC::AppRRC(const config_t& config)
     : config(config)
     , tx_scheduler(timer, *this)
 {
-    rrc_event_fd = eventfd(0, EFD_SEMAPHORE);
+    rrc_event_fd = eventfd(0, 0);
 
     if (-1 == rrc_event_fd)
     {
@@ -48,8 +48,6 @@ AppRRC::AppRRC(const config_t& config)
 
 AppRRC::~AppRRC()
 {
-    close(rrc_event_fd); 
-
     stop();
 
     Logless(*main_logger, RRC_DBG, "DBG | AppRRC | AppRRC stopping...");
@@ -70,14 +68,8 @@ AppRRC::~AppRRC()
     }
 
     eps.clear();
-}
 
-void AppRRC::stop()
-{
-    rrc_rx_running = false;
-    timer.stop();
-    timer2.stop();
-    reactor.stop();
+    close(rrc_event_fd); 
 }
 
 void AppRRC::on_console_read()
@@ -132,7 +124,7 @@ std::string AppRRC::on_cmd_pull(bfc::ArgsMap&& args)
 
 std::string AppRRC::on_cmd_stop(bfc::ArgsMap&& args)
 {
-    push_rrc_event(rrc_event_stop_t{});
+    stop();
     return "stop:\n";
 }
 
@@ -671,7 +663,10 @@ uint8_t AppRRC::allocate_req_id()
 
 void AppRRC::on_rrc_event(const rrc_event_stop_t&)
 {
-    stop();
+    rrc_rx_running = false;
+    timer.stop();
+    timer2.stop();
+    reactor.stop();
 }
 
 void AppRRC::on_rrc_event(const rrc_event_rlf_t& rlf)
@@ -700,4 +695,9 @@ void AppRRC::push_rrc_event(T&& event)
     std::unique_lock<std::mutex> lg(rrc_event_mutex);
     rrc_events.emplace_back(std::forward<T&&>(event));
     notify_rrc_event();
+}
+
+void AppRRC::stop()
+{
+    push_rrc_event(rrc_event_stop_t{});
 }

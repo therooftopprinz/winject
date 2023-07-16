@@ -69,6 +69,7 @@ struct IRRC
     virtual void on_init(lcid_t) = 0;
     virtual uint8_t allocate_req_id() = 0;
     virtual void send_rrc(const RRC& rrc) = 0;
+    virtual void stop() = 0;
 
     virtual void perform_tx(size_t) = 0;
 };
