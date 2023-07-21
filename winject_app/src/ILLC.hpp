@@ -2,6 +2,7 @@
 #define __WINJECTUM_ILLC_HPP__
 
 #include <atomic>
+#include <bfc/Metric.hpp>
 
 #include "pdu.hpp"
 #include "frame_defs.hpp"
@@ -39,12 +40,12 @@ struct ILLC
 
     struct stats_t
     {
-        std::atomic<uint64_t> pkt_sent;
-        std::atomic<uint64_t> pkt_resent;
-        std::atomic<uint64_t> pkt_recv;
-        std::atomic<uint64_t> bytes_sent;
-        std::atomic<uint64_t> bytes_resent;
-        std::atomic<uint64_t> bytes_recv;
+        bfc::IMetric* pkt_sent = nullptr;
+        bfc::IMetric* pkt_resent = nullptr;
+        bfc::IMetric* pkt_recv = nullptr;
+        bfc::IMetric* bytes_sent = nullptr;
+        bfc::IMetric* bytes_resent = nullptr;
+        bfc::IMetric* bytes_recv = nullptr;
     };
 
     virtual ~ILLC(){} 
@@ -59,7 +60,6 @@ struct ILLC
     virtual void reconfigure(const tx_config_t&) = 0;
     virtual void reconfigure(const rx_config_t&) = 0;
     virtual lcid_t get_lcid() = 0;
-
     virtual const stats_t& get_stats() = 0;
 };
 

@@ -23,12 +23,14 @@ constexpr static size_t DEFAULT_MIN_COMMIT_SIZE = 0;
 constexpr static size_t DEFAULT_MAX_SN_DISTANCE = 1000;
 constexpr static bool DEFAULT_AUTO_INIT_ON_TX = false;
 constexpr static bool DEFAULT_AUTO_INIT_ON_RX = false;
+const static std::string DEFAULT_LOGBIT = "1111111111111111111111111111111011111";
 static const char* config_file = "config.json";
 
 
 template<> 
 const char* LoggerType::LoggerRef = "LoggerRefXD";
 std::unique_ptr<LoggerType> main_logger;
+std::unique_ptr<bfc::IMonitor> main_monitor;
 
 fec_type_e to_fec_type_e(std::string s)
 {
@@ -72,18 +74,15 @@ int main()
     main_logger = std::make_unique<LoggerType>("main.log");
     main_logger->logful();
 
+    main_monitor = std::make_unique<bfc::Monitor>(500, "metrics");
+
     for (auto i=0u; i<app_logbit_e::MAX; i++)
     {
         main_logger->set_logbit(true, i);
     }
 
-    main_logger->set_logbit(false, PDCP_STS);
-    main_logger->set_logbit(false, LLC_STS);
-
     while (true)
     {
-
-
         Logless(*main_logger, MAN_INF, "INF | main | Reading from #", config_file);
 
         std::ifstream f(config_file);
@@ -234,6 +233,13 @@ int main()
         }
 
         rrc_config.app_config.udp_console = app.at("udp_console");
+        std::string logbit_str = value_or(app,"logbit", DEFAULT_LOGBIT);
+
+        size_t idx = 0;
+        for (auto c : logbit_str)
+        {
+            main_logger->set_logbit(c=='1', idx++);
+        }
 
         Logless(*main_logger, MAN_INF, "INF | main | --- APP ---");
         Logless(*main_logger, MAN_INF, "INF | main | wifi_device1: #", rrc_config.app_config.wifi_device.c_str());
@@ -241,6 +247,7 @@ int main()
         Logless(*main_logger, MAN_INF, "INF | main | woudp_tx: #", rrc_config.app_config.woudp_tx.c_str());
         Logless(*main_logger, MAN_INF, "INF | main | woudp_rx: #", rrc_config.app_config.woudp_rx.c_str());
         Logless(*main_logger, MAN_INF, "INF | main | udp_console #", rrc_config.app_config.udp_console.c_str());
+        Logless(*main_logger, MAN_INF, "INF | main | logbit #", logbit_str.c_str());
 
         int main_event_fd = eventfd(0, EFD_SEMAPHORE);
         int inot_fd = inotify_init();
@@ -251,6 +258,7 @@ int main()
 
         auto config_watcher = [main_event_fd, inot_fd, &app_rrc, &reload_config]()
             {
+                pthread_setname_np(pthread_self(), "CFG_WATCHER");
                 auto maxfd = std::max(main_event_fd, inot_fd) + 1;
                 fd_set watcher_set;
                 FD_ZERO(&watcher_set);

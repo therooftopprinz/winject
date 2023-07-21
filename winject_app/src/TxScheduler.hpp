@@ -21,10 +21,7 @@ public:
 
     ~TxScheduler()
     {
-        if (slot_timer_id)
-        {
-            timer.cancel(*slot_timer_id);
-        }
+        stop();
     }
 
     void add_llc(lcid_t lcid, ILLC* llc)
@@ -54,11 +51,7 @@ public:
         std::unique_lock<std::mutex> lg(this_mutex);
         frame_info.fec_type = c.fec_type;
 
-        if (slot_timer_id)
-        {
-            timer.cancel(*slot_timer_id);
-            slot_timer_id.reset();
-        }
+        stop();
 
         frame_info.slot_interval_us = c.slot_interval_us;
         frame_info.fec_type = c.fec_type;
@@ -83,36 +76,66 @@ public:
         header_size = c.header_size;
     }
 
+   void stop() override
+   {
+        ticker_running = false;
+        if (ticker.joinable())
+        {
+            ticker.join();
+        }
+   }
+
 private:
     void schedule_tick()
     {
-        if (frame_info.slot_interval_us)
+        ticker = std::thread([this](){run_ticker();});
+    }
+
+    void run_ticker()
+    {
+        pthread_setname_np(pthread_self(), "TX_TICKER");
+        ticker_running = true;
+        while (ticker_running)
         {
-            auto now = std::chrono::duration_cast<std::chrono::microseconds>(
+            tick();
+        }
+        Logless(*main_logger, TXS_INF, "INF | TxSchd | Scheduler tick has ended.");
+    }
+
+    void tick_wait(int64_t now)
+    {
+        auto now2 = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch())
+            .count();
+        auto diff_time2 = now2-now;
+
+
+        int64_t diff_time = now - last_tick;
+        int64_t error = frame_info.slot_interval_us - diff_time;
+        last_tick = now;
+
+        if (error!=0 && main_logger->get_logbit(TXS_TIC))
+        {
+            Logless(*main_logger, TXS_TRC,
+                "TRC | TxSchd | TICK #\t#\t#",
+                now,
+                error,
+                diff_time2);
+        }
+
+        auto until = now + frame_info.slot_interval_us;
+        // auto wait_time = until-now;
+        // if (wait_time>0)
+        // {
+        //     std::this_thread::sleep_for(std::chrono::microseconds(wait_time));
+        // }
+        while(until>now)
+        {
+            now = std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::high_resolution_clock::now().time_since_epoch())
                 .count();
-            int64_t wait_time = 0;
-            int64_t diff_time = now - last_tick;
-            int64_t error = frame_info.slot_interval_us - diff_time;
-            tick_pid_integral += double(error)*0.1;
-
-            last_tick = now;
-
-            if (std::abs(error) > frame_info.slot_interval_us)
-            {
-                wait_time = frame_info.slot_interval_us;
-                tick_pid_integral = 0;
-            }
-            else
-            {
-                wait_time = frame_info.slot_interval_us
-                    + tick_pid_integral;
-            }
-
-            slot_timer_id = timer.schedule(std::chrono::nanoseconds(
-                wait_time*1000), 
-                [this](){tick();});
         }
+
     }
 
     void tick()
@@ -120,132 +143,151 @@ private:
         auto now = std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::high_resolution_clock::now().time_since_epoch())
                 .count();
-
-        schedule_tick();
-
-        std::unique_lock<std::mutex> lg(this_mutex);
-        frame_info.slot_number++;
-
-        tx_info_t tx_info{frame_info};
-        uint8_t* cursor = buffer + header_size;
-        size_t frame_payload_remaining = frame_info.frame_payload_size;
-
-        auto advance_cursor = [&cursor, &frame_payload_remaining](size_t size)
         {
-            cursor += size;
-            frame_payload_remaining -= size;
-        };
 
-        uint8_t *fec_type = cursor;
-        *fec_type = frame_info.fec_type;
-        advance_cursor (sizeof(*fec_type));
+            // schedule_tick();
 
-        // @todo : setup fec structure
+            std::unique_lock<std::mutex> lg(this_mutex);
+            frame_info.slot_number++;
 
-        schedules_cache.clear();
-        schedules_cache.reserve(llcs.size());
+            tx_info_t tx_info{frame_info};
+            uint8_t* cursor = buffer + header_size;
+            size_t frame_payload_remaining = frame_info.frame_payload_size;
 
-        // @note probing of tx data and non data pdu allocation
-        tx_info.in_allow_data = false;
-        for (int i=0; i<llcs.size(); i++)
-        {
-            if (!llcs[i])
+            auto advance_cursor = [&cursor, &frame_payload_remaining](size_t size)
             {
-                continue;
-            }
+                cursor += size;
+                frame_payload_remaining -= size;
+            };
 
-            auto& llc = llcs[i];
-            auto& schedule = schedules_info[i];
+            uint8_t *fec_type = cursor;
+            *fec_type = frame_info.fec_type;
+            advance_cursor (sizeof(*fec_type));
 
-            tx_info.out_pdu.base = cursor;
-            tx_info.out_pdu.size = std::min(frame_payload_remaining, schedule.nd_gpdu_max_size);
-            tx_info.out_tx_available = false;
-            tx_info.out_has_data_loaded = false;
-            tx_info.out_allocated = 0;
+            // @todo : setup fec structure
 
-            llc->on_tx(tx_info);
+            schedules_cache.clear();
+            schedules_cache.reserve(llcs.size());
 
-            advance_cursor (tx_info.out_allocated);
-
-            schedule.has_schedulable = tx_info.out_tx_available;
-            schedule.has_data_allocated = tx_info.out_has_data_loaded;
-
-            if (schedule.has_schedulable)
+            // @note probing of tx data and non data pdu allocation
+            tx_info.in_allow_data = false;
+            for (int i=0; i<llcs.size(); i++)
             {
-                schedules_cache.emplace_back(&schedule);
-                Logless(*main_logger, TXS_TRC,
-                    "TRC | TxSchd | has schedule slot=# lcid=# def=# n-dalloc=#",
-                    frame_info.slot_number,
-                    (int) i,
-                    schedule.deficit,
-                    tx_info.out_allocated);
-            }
-            else
-            {
-                schedule.deficit = 0;
-            }
-        }
-
-        tx_info.in_allow_data = true;
-
-        while (frame_payload_remaining)
-        {
-            for (auto i : schedules_cache)
-            {
-                i->deficit += i->quanta;
-            }
-
-            std::sort(schedules_cache.begin(), schedules_cache.end(),
-                [](const scheduling_ctx_t* a, const scheduling_ctx_t* b) -> bool
+                if (!llcs[i])
                 {
-                    return *a < *b;
-                });
+                    continue;
+                }
 
-            size_t schedulable_count = 0;
-            size_t max_quanta_allocated = 0;
-            for (auto i : schedules_cache)
+                auto& llc = llcs[i];
+                auto& schedule = schedules_info[i];
+
+                tx_info.out_pdu.base = cursor;
+                tx_info.out_pdu.size = std::min(frame_payload_remaining, schedule.nd_gpdu_max_size);
+                tx_info.out_tx_available = false;
+                tx_info.out_has_data_loaded = false;
+                tx_info.out_allocated = 0;
+
+                llc->on_tx(tx_info);
+
+                advance_cursor (tx_info.out_allocated);
+
+                schedule.has_schedulable = tx_info.out_tx_available;
+                schedule.has_data_allocated = tx_info.out_has_data_loaded;
+
+                if (schedule.has_schedulable)
+                {
+                    schedules_cache.emplace_back(&schedule);
+                    Logless(*main_logger, TXS_TRC,
+                        "TRC | TxSchd | has schedule ndpdu slot=# lcid=# deficit=# alloc=#",
+                        frame_info.slot_number,
+                        (int) i,
+                        schedule.deficit,
+                        tx_info.out_allocated);
+                }
+                else
+                {
+                    schedule.deficit = schedule.deficit*8/10;
+                }
+            }
+
+            tx_info.in_allow_data = true;
+            
+            while (frame_payload_remaining)
             {
-                auto& schedule = *i;
-                // @note : last schedulable
-                if (schedule.has_data_allocated)
+                for (auto i : schedules_cache)
+                {
+                    i->deficit += i->quanta;
+                }
+
+                std::sort(schedules_cache.begin(), schedules_cache.end(),
+                    [](const scheduling_ctx_t* a, const scheduling_ctx_t* b) -> bool
+                    {
+                        return (*a > *b);
+                    });
+
+                size_t schedulable_count = 0;
+                size_t max_quanta_allocated = 0;
+                for (auto i : schedules_cache)
+                {
+                    auto& schedule = *i;
+                    // @note : last schedulable
+                    if (schedule.has_data_allocated)
+                    {
+                        break;
+                    }
+
+                    schedulable_count++;
+
+                    max_quanta_allocated = std::max(max_quanta_allocated, schedule.deficit);
+
+                    tx_info.out_pdu.base = cursor;
+                    tx_info.out_pdu.size = std::min(frame_payload_remaining, schedule.deficit);
+                    tx_info.out_tx_available = false;
+                    tx_info.out_allocated = 0;
+                    tx_info.out_has_data_loaded = false;
+                    schedule.llc->on_tx(tx_info);
+
+                    advance_cursor(tx_info.out_allocated);
+
+                    schedule.has_data_allocated = tx_info.out_has_data_loaded;
+                    schedule.current_alloc = tx_info.out_allocated;
+
+                    Logless(*main_logger, TXS_TRC,
+                        "TRC | TxSchd | has schedule udpdu slot=# lcid=# quanta=# deficit=# alloc=# has_data=# avail=#",
+                        frame_info.slot_number,
+                        (int) i->llc->get_lcid(),
+                        (int) i->quanta,
+                        schedule.deficit,
+                        tx_info.out_allocated,
+                        (int) tx_info.out_has_data_loaded,
+                        frame_payload_remaining);
+                }
+
+                if (max_quanta_allocated > frame_payload_remaining ||
+                    schedulable_count==0)
                 {
                     break;
                 }
-
-                schedulable_count++;
-
-                max_quanta_allocated = std::max(max_quanta_allocated, schedule.deficit);
-
-                tx_info.out_pdu.base = cursor;
-                tx_info.out_pdu.size = std::min(frame_payload_remaining, schedule.deficit);
-                tx_info.out_tx_available = false;
-                tx_info.out_allocated = 0;
-                tx_info.out_has_data_loaded = false;
-                schedule.llc->on_tx(tx_info);
-                advance_cursor(tx_info.out_allocated);
-
-                schedule.has_data_allocated = tx_info.out_has_data_loaded;
-
-                Logless(*main_logger, TXS_TRC,
-                    "TRC | TxSchd | has schedule slot=# lcid=# deficit=# alloc=# has_data=#",
-                    frame_info.slot_number,
-                    (int) i->llc->get_lcid(),
-                    schedule.deficit,
-                    tx_info.out_allocated,
-                    (int) tx_info.out_has_data_loaded);
             }
 
-            if (max_quanta_allocated>frame_info.frame_payload_size || schedulable_count==0)
+            for (auto schedule : schedules_cache)
             {
-                break;
+                if (schedule->has_data_allocated)
+                {
+                    schedule->deficit -= schedule->current_alloc;
+                    schedule->current_alloc = 0; 
+                }
+            }
+
+
+            size_t send_size = frame_info.frame_payload_size - frame_payload_remaining;
+            if (send_size > 1)
+            {
+                rrc.perform_tx(send_size);
             }
         }
 
-        size_t send_size = frame_info.frame_payload_size - frame_payload_remaining;
-        if (send_size > 1)
-        {
-            rrc.perform_tx(send_size);
-        }
+        tick_wait(now);
     }
 
     struct scheduling_ctx_t
@@ -254,22 +296,24 @@ private:
         size_t deficit = 0;
         size_t quanta = 0;
         size_t nd_gpdu_max_size = 0;
+        size_t current_alloc = 0;
         bool has_schedulable = false; 
         bool has_data_allocated = false;
 
-        bool operator<(const scheduling_ctx_t& other) const
+        bool operator>(const scheduling_ctx_t& other) const
         {
-            return deficit*(!has_data_allocated) <
+            return deficit*(!has_data_allocated) >
                 other.deficit*(!other.has_data_allocated);
         }
     };
 
+    std::thread ticker;
+    std::atomic_bool ticker_running = false;
+
     bfc::ITimer& timer;
     IRRC& rrc;
     frame_info_t frame_info;
-    std::optional<int> slot_timer_id;
     int64_t last_tick = 0;
-    double tick_pid_integral = 0;
     // @note indexed by lcid
     std::vector<scheduling_ctx_t> schedules_info;
     // @note indexed by lcid

@@ -5,6 +5,7 @@
 template<>
 const char* LoggerType::LoggerRef = "LoggerRefXD";
 std::unique_ptr<LoggerType> main_logger;
+std::unique_ptr<bfc::IMonitor> main_monitor;
 
 int main(int argc, char **argv)
 {

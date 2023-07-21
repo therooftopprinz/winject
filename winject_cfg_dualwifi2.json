@@ -55,7 +55,7 @@
           "tx_mode" : "AM",
           "scheduling_config" : {
             "nd_pdu_size" : 64,
-            "quanta" : 1000
+            "quanta" : 100
           },
           "am_tx_config": {
             "allow_rlf" : true,
@@ -195,7 +195,8 @@
       "txrx_device" : "wlx24ec999b30f3",
       "tx_device_" : "wlx24ec99ca8bd1",
       "rx_device_" : "wlx24ec99cab775",
-      "udp_console" : "127.0.0.1:22000"
+      "udp_console" : "127.0.0.1:22000",
+      "logbit" : "1111111111111111111111111111111011111"
     }
   }
 }

@@ -6,7 +6,14 @@ PDCP::PDCP(IRRC& rrc, lcid_t lcid, const tx_config_t& tx_config, const rx_config
     , rx_buffer_ring(8192)
     , tx_config(tx_config)
     , rx_config(rx_config)
-{}
+{
+    stats.tx_queue_size       = &main_monitor->getMetric(to_pdcp_stat("tx_queue_size", lcid));
+    stats.rx_reorder_size     = &main_monitor->getMetric(to_pdcp_stat("rx_reorder_size", lcid));
+    stats.rx_invalid_pdu      = &main_monitor->getMetric(to_pdcp_stat("rx_invalid_pdu", lcid));
+    stats.rx_ignored_pdu      = &main_monitor->getMetric(to_pdcp_stat("rx_ignored_pdu", lcid));
+    stats.rx_invalid_segment  = &main_monitor->getMetric(to_pdcp_stat("rx_invalid_segment", lcid));
+    stats.rx_segment_rcvd     = &main_monitor->getMetric(to_pdcp_stat("rx_segment_rcvd", lcid));
+}
 
 lcid_t PDCP::get_attached_lcid()
 {
@@ -51,6 +58,8 @@ void PDCP::set_rx_enabled(bool value)
     }
 
     rx_sn_synced = false;
+
+    stats.rx_reorder_size->store(0);
 
     lg.unlock();
 
@@ -107,41 +116,9 @@ IPDCP::rx_config_t PDCP::get_rx_config()
     return rx_config;
 }
 
-void PDCP::print_stats()
-{
-    LoglessF(*main_logger, LLC_STS, "STS | PDCP#  | RAW #,#,#,#,#,#", (int) lcid,
-        stats.tx_queue_size.load(),
-        stats.rx_reorder_size.load(),
-        stats.rx_invalid_pdu.load(),
-        stats.rx_ignored_pdu.load(),
-        stats.rx_invalid_segment.load(),
-        stats.rx_segment_rcvd.load());
-
-    std::atomic<uint64_t> tx_queue_size;
-    std::atomic<uint64_t> rx_reorder_size;
-    std::atomic<uint64_t> rx_invalid_pdu;
-    std::atomic<uint64_t> rx_ignored_pdu;
-    std::atomic<uint64_t> rx_invalid_segment;
-    std::atomic<uint64_t> rx_segment_rcvd;
-
-    Logless(*main_logger, PDCP_STS, "STS | PDCP#  | STATS:", (int) lcid);
-    Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   tx_queue_size:      #", (int) lcid, stats.tx_queue_size.load());
-    Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   rx_reorder_size:    #", (int) lcid, stats.rx_reorder_size.load());
-    Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   rx_invalid_pdu:     #", (int) lcid, stats.rx_invalid_pdu.load());
-    Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   rx_ignored_pdu:     #", (int) lcid, stats.rx_ignored_pdu.load());
-    Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   rx_invalid_segment: #", (int) lcid, stats.rx_invalid_segment.load());
-    Logless(*main_logger, PDCP_STS, "STS | PDCP#  |   rx_segment_rcvd:    #", (int) lcid, stats.rx_segment_rcvd.load());
-}
-
 void PDCP::on_tx(tx_info_t& info)
     {
         auto slot_number = info.in_frame_info.slot_number;
-        if ( (is_tx_enabled || is_rx_enabled) && last_stats_slot != slot_number &&
-            (info.in_frame_info.slot_number & 0x7FF) == 0x7FF)
-        {
-            last_stats_slot = slot_number;
-            print_stats();
-        }
 
         std::unique_lock<std::shared_mutex> lg(tx_mutex);
 
@@ -211,7 +188,7 @@ void PDCP::on_tx(tx_info_t& info)
                 }
 
                 buffer_t pdu = std::move(to_tx_queue.front());
-                stats.tx_queue_size = to_tx_queue.size();
+                stats.tx_queue_size->store(to_tx_queue.size());
                 Logless(*main_logger, PDCP_TRC, "TRC | PDCPT# | allocated data sn=# data_sz=# to_tx_queue_sz=#",
                     (int) lcid,
                     (int) tx_sn,
@@ -294,7 +271,7 @@ void PDCP::update_rx_sn(pdcp_sn_t sn, bool fast_forward)
         {
             auto& current_rx_buffer_el = rx_buffer_ring[0];
             current_rx_buffer_el.reset();
-            stats.rx_reorder_size.fetch_sub(1);
+            stats.rx_reorder_size->fetch_sub(1);
             std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
             to_rx_queue.emplace_back(std::move(rx_buffer_ring[0].buffer));
             to_rx_queue_cv.notify_one();
@@ -315,7 +292,7 @@ void PDCP::update_rx_sn(pdcp_sn_t sn, bool fast_forward)
             if (current_rx_buffer_el.is_complete())
             {
                 current_rx_buffer_el.reset();
-                stats.rx_reorder_size.fetch_sub(1);
+                stats.rx_reorder_size->fetch_sub(1);
                 Logless(*main_logger, PDCP_TRC,
                     "TRC | PDCPR# | transported packet sn=# size=#",
                     (int) lcid,
@@ -331,7 +308,7 @@ void PDCP::update_rx_sn(pdcp_sn_t sn, bool fast_forward)
             {
                 if (current_rx_buffer_el.recvd_offsets.size())
                 {
-                    stats.rx_reorder_size.fetch_sub(1);
+                    stats.rx_reorder_size->fetch_sub(1);
                 }
 
                 current_rx_buffer_el.reset();
@@ -360,7 +337,7 @@ void PDCP::on_rx(rx_info_t& info)
         std::unique_lock<std::shared_mutex> lg(rx_mutex);
         if (!is_rx_enabled)
         {
-            stats.rx_ignored_pdu.fetch_add(1);
+            stats.rx_ignored_pdu->fetch_add(1);
             return;
         }
 
@@ -373,7 +350,7 @@ void PDCP::on_rx(rx_info_t& info)
 
         if (pdcp.get_header_size() >= info.in_pdu.size)
         {
-            stats.rx_invalid_pdu.fetch_add(1);
+            stats.rx_invalid_pdu->fetch_add(1);
             return;
         }
 
@@ -388,11 +365,11 @@ void PDCP::on_rx(rx_info_t& info)
 
             if (segment.get_header_size() >= available_data)
             {
-                if (available_data) stats.rx_invalid_segment.fetch_add(1);
+                if (available_data) stats.rx_invalid_segment->fetch_add(1);
                 break;
             }
 
-            stats.rx_segment_rcvd.fetch_add(1);
+            stats.rx_segment_rcvd->fetch_add(1);
 
             pdcp_sn_t sn = segment.get_SN().value_or(0u);
 
@@ -487,7 +464,7 @@ void PDCP::on_rx(rx_info_t& info)
 
             if (current_rx_buffer_el.is_complete())
             {
-                stats.rx_reorder_size.fetch_add(1);
+                stats.rx_reorder_size->fetch_add(1);
                 update_rx_sn(sn, fast_forward);
             }
         }

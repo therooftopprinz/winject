@@ -48,6 +48,7 @@ AppRRC::AppRRC(const config_t& config)
 
 AppRRC::~AppRRC()
 {
+    tx_scheduler.stop();
     stop();
 
     Logless(*main_logger, RRC_DBG, "DBG | AppRRC | AppRRC stopping...");
@@ -133,7 +134,6 @@ std::string AppRRC::on_cmd_log(bfc::ArgsMap&& args)
     auto logbit_str = args.arg("bit").value_or("");
     if (!logbit_str.empty())
     {
-        auto logbit = std::stoul(logbit_str, nullptr, 2);
         size_t idx = 0;
         for (auto c : logbit_str)
         {
@@ -147,53 +147,6 @@ std::string AppRRC::on_cmd_log(bfc::ArgsMap&& args)
         main_logger->set_logbit(value, idx);
     }
     return "level set.\n";
-}
-
-std::string AppRRC::on_cmd_stats(bfc::ArgsMap&& args)
-{
-    auto lcid = args.argAs<int>("lcid").value_or(0);
-    std::stringstream ss;
-    ss << "stats: \n";
-
-    auto llc_it = llcs.find(lcid);
-    if (llcs.end() != llc_it)
-    {
-        auto& llc = llc_it->second;
-        auto& stats = llc->get_stats();
-        ss << "LLC STATS:";
-        ss << "\n  bytes_recv:    " << stats.bytes_recv.load();
-        ss << "\n  bytes_sent:    " << stats.bytes_sent.load();
-        ss << "\n  bytes_resent:  " << stats.bytes_resent.load();
-        ss << "\n  pkt_recv:      " << stats.pkt_recv.load();
-        ss << "\n  pkt_sent:      " << stats.pkt_sent.load();
-        ss << "\n  pkt_resent:    " << stats.pkt_resent.load();
-        ss << "\n";
-    }
-    else
-    {
-        ss << "llc lcid not found\n";
-    }
-
-    auto pdcp_it = pdcps.find(lcid);
-    if (pdcps.end() != pdcp_it)
-    {
-        auto& pdcp = pdcp_it->second;
-        auto& stats = pdcp->get_stats();
-        ss << "PDCP STATS:";
-        ss << "\n  tx_queue_size:      " << stats.tx_queue_size.load();
-        ss << "\n  rx_reorder_size:    " << stats.rx_reorder_size.load();
-        ss << "\n  rx_invalid_pdu:     " << stats.rx_invalid_pdu.load();
-        ss << "\n  rx_ignored_pdu:     " << stats.rx_ignored_pdu.load();
-        ss << "\n  rx_invalid_segment: " << stats.rx_invalid_segment.load();
-        ss << "\n  rx_segment_rcvd:    " << stats.rx_segment_rcvd.load();
-        ss << "\n";
-    }
-    else
-    {
-        ss << "pdcp lcid not found\n";
-    }
-
-    return ss.str();
 }
 
 void AppRRC::run()
@@ -291,7 +244,6 @@ void AppRRC::setup_console()
     cmdman.addCommand("pull", [this](bfc::ArgsMap&& args){return on_cmd_pull(std::move(args));});
     cmdman.addCommand("stop", [this](bfc::ArgsMap&& args){return on_cmd_stop(std::move(args));});
     cmdman.addCommand("log", [this](bfc::ArgsMap&& args){return on_cmd_log(std::move(args));});
-    cmdman.addCommand("stats", [this](bfc::ArgsMap&& args){return on_cmd_stats(std::move(args));});
 
     reactor.addReadHandler(console_sock.handle(), [this](){on_console_read();});
 }
@@ -446,7 +398,7 @@ void AppRRC::setup_rrc()
 {
     reactor.addReadHandler(rrc_event_fd, [this](){
             uint64_t one;
-            read(rrc_event_fd, &one, sizeof(0));
+            read(rrc_event_fd, &one, sizeof(one));
             on_rrc_event();
         });
 
@@ -589,12 +541,6 @@ void AppRRC::on_rrc_event()
     }
 }
 
-void AppRRC::notify_rrc_event()
-{
-    uint64_t one = 1;
-    write(rrc_event_fd, &one, sizeof(one));
-}
-
 void AppRRC::on_rrc(const RRC& rrc)
 {
     push_rrc_event(rrc_event_msg_t{rrc});
@@ -695,7 +641,8 @@ void AppRRC::push_rrc_event(T&& event)
 {
     std::unique_lock<std::mutex> lg(rrc_event_mutex);
     rrc_events.emplace_back(std::forward<T&&>(event));
-    notify_rrc_event();
+    uint64_t one = 1;
+    write(rrc_event_fd, &one, sizeof(one));
 }
 
 void AppRRC::stop()

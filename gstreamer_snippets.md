@@ -11,9 +11,9 @@ gst-launch-1.0 -v  v4l2src device="/dev/video0" ! video/x-raw,width=1920,height=
 gst-launch-1.0 -v v4l2src device=/dev/video0 ! jpegdec ! video/x-raw,width=1920,height=1080,framerate=30/1 ! x264enc qp-min=18 ! avimux ! filesink location=videotestsrc.avi
 
 # FROM UDP USERMODE
-gst-launch-1.0 -v v4l2src device=/dev/video0 ! jpegdec ! video/x-raw,width=1920,height=1080,framerate=30/1 ! x264enc tune=zerolatency bitrate=1024 ! rtph264pay ! udpsink host=127.0.0.1 port=21081
+gst-launch-1.0 -v v4l2src device=/dev/video0 ! jpegdec ! video/x-raw,width=1920,height=1080,framerate=30/1 ! x264enc tune=zerolatency bitrate=1024 ! rtph264pay ! udpsink host=127.0.0.1 port=22081
 
 # TO UDP USERMODE
-gst-launch-1.0 udpsrc port=22082 caps = "application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96" ! rtph264depay ! avdec_h264 ! autovideosink
+gst-launch-1.0 udpsrc port=21082 caps = "application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96" ! rtph264depay ! avdec_h264 ! autovideosink
 
 ```

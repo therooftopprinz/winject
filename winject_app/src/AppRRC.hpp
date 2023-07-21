@@ -57,7 +57,6 @@ private:
     std::string on_cmd_pull(bfc::ArgsMap&& args);
     std::string on_cmd_stop(bfc::ArgsMap&& args);
     std::string on_cmd_log(bfc::ArgsMap&& args);
-    std::string on_cmd_stats(bfc::ArgsMap&& args);
 
     void setup_80211_base_frame();
     void setup_console();
@@ -74,7 +73,6 @@ private:
 
     void run_rrc_rx();
     void on_rrc_event();
-    void notify_rrc_event();
     void on_rrc(const RRC& rrc);
 
     // template<typename T>

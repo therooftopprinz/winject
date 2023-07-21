@@ -103,7 +103,6 @@ private:
     std::shared_mutex rx_mutex;
 
     stats_t stats;
-    uint64_t last_stats_slot = -1;
 };
 
 #endif // __WINJECTUM_PDCP_HPP__

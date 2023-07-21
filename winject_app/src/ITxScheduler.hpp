@@ -28,6 +28,8 @@ struct ITxScheduler
     };
 
     ~ITxScheduler(){}
+
+    virtual void stop() = 0; 
 };
 
 #endif // __WINJECTUM_ITXSCHEDULER_HPP__

@@ -53,6 +53,7 @@ private:
     struct tx_ring_elem_t
     {
         size_t sent_index = -1;
+        size_t llc_tx_id = 0;
         size_t retry_count = 0;
         size_t pdcp_pdu_size = 0;
         buffer_t pdcp_pdu;
@@ -61,6 +62,7 @@ private:
 
     struct retx_elem_t
     {
+        size_t llc_tx_id = 0;
         size_t retry_count;
         size_t pdcp_pdu_size;
         buffer_t pdcp_pdu;
@@ -70,6 +72,8 @@ private:
     IRRC& rrc;
     // @brief Logical Channel Identifier
     lcid_t lcid;
+
+    size_t llc_tx_id = 0;
 
     // TX Data Structures ------------------------------------------------------
     std::mutex tx_mutex;

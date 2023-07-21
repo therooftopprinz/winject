@@ -14,6 +14,12 @@ LLC::LLC(
     , sn_to_tx_ring(llc_sn_size, -1)
     , rx_config(rx_config)
 {
+    stats.pkt_sent      = &main_monitor->getMetric(to_llc_stat("pkt_sent", lcid));
+    stats.pkt_resent    = &main_monitor->getMetric(to_llc_stat("pkt_resent", lcid));
+    stats.pkt_recv      = &main_monitor->getMetric(to_llc_stat("pkt_recv", lcid));
+    stats.bytes_sent    = &main_monitor->getMetric(to_llc_stat("bytes_sent", lcid));
+    stats.bytes_resent  = &main_monitor->getMetric(to_llc_stat("bytes_resent", lcid));
+    stats.bytes_recv    = &main_monitor->getMetric(to_llc_stat("bytes_recv", lcid));
 }
 
 lcid_t LLC::get_lcid()
@@ -191,7 +197,7 @@ void LLC::on_tx(tx_info_t& info)
 
                 n_acks++;
             }
-            
+
             llc.set_payload_size(n_acks*sizeof(llc_payload_ack_t));
             llc.set_SN(0);
             llc.set_A(true);
@@ -216,7 +222,6 @@ void LLC::on_tx(tx_info_t& info)
     }
 
     llc.set_LCID(lcid);
-    llc.set_R(false);
     llc.set_A(false);
     info.out_pdu.base = llc.payload();
     info.out_pdu.size -= llc.get_header_size();
@@ -240,6 +245,7 @@ void LLC::on_tx(tx_info_t& info)
 
     size_t init_alloc = info.out_allocated;
     size_t retx_count = 0;
+    size_t retx_llc_tx_id = 0;
     // @note Get PDCP from PDCP layer
     if (!has_retransmit)
     {
@@ -253,6 +259,7 @@ void LLC::on_tx(tx_info_t& info)
     {
         auto& retx_pdu = to_retx_list.front();
         retx_count = retx_pdu.retry_count + 1;
+        retx_llc_tx_id = retx_pdu.llc_tx_id;
 
         Logless(*main_logger, LLC_TRC,
             "TRC | LLCT#  | retx=#/# to_retx_list_sz=#",
@@ -325,6 +332,15 @@ void LLC::on_tx(tx_info_t& info)
 
     if (E_TX_MODE_AM == tx_config.mode)
     {
+        if (!has_retransmit)
+        {
+            tx_elem.llc_tx_id = llc_tx_id++;
+        }
+        else
+        {
+            tx_elem.llc_tx_id = retx_llc_tx_id;
+        }
+
         tx_elem.retry_count = retx_count;
         tx_elem.acknowledged = false;
         ack_elem.sent_index = tx_idx;
@@ -335,17 +351,18 @@ void LLC::on_tx(tx_info_t& info)
     }
     else
     {
-        stats.pkt_resent.fetch_add(1);
-        stats.bytes_resent.fetch_add(tx_elem.pdcp_pdu_size);
+        stats.pkt_resent->fetch_add(1);
+        stats.bytes_resent->fetch_add(tx_elem.pdcp_pdu_size);
     }
 
     tx_ring_lg.unlock();
     tx_lg.unlock();
 
     Logless(*main_logger, LLC_TRC,
-        "TRC | LLCT#  | pdu slot=# tx_idx=# expected_ack_idx=# sn=# pdu_sz=#",
+        "TRC | LLCT#  | pdu slot=# llc_tx_id=# tx_idx=# expected_ack_idx=# sn=# pdu_sz=#",
         (int) lcid,
         slot_number,
+        tx_elem.llc_tx_id,
         tx_idx,
         ack_ck_idx,
         (int) llc.get_SN(),
@@ -394,8 +411,8 @@ void LLC::on_rx(rx_info_t& info)
                 auto& sent_slot = tx_ring[sent_idx];
                 sent_slot.acknowledged = true;
 
-                stats.pkt_sent.fetch_add(1);
-                stats.bytes_sent.fetch_add(sent_slot.pdcp_pdu_size);
+                stats.pkt_sent->fetch_add(1);
+                stats.bytes_sent->fetch_add(sent_slot.pdcp_pdu_size);
 
                 Logless(*main_logger, LLC_TRC,
                     "TRC | LLCT#  | acked idx=# sn=#",
@@ -422,8 +439,8 @@ void LLC::on_rx(rx_info_t& info)
             (int) llc.get_SN(),
             info.in_pdu.size);
 
-        stats.bytes_recv.fetch_add(info.in_pdu.size);
-        stats.pkt_recv.fetch_add(1);
+        stats.bytes_recv->fetch_add(info.in_pdu.size);
+        stats.pkt_recv->fetch_add(1);
         pdcp.on_rx(info);
     }
 }
@@ -443,8 +460,9 @@ void LLC::check_retransmit(size_t slot_number)
     }
 
     Logless(*main_logger, LLC_TRC,
-        "TRC | LLCT#  | retxing current_slot=# sent_index=#",
+        "TRC | LLCT#  | retxing llc_tx_id=# current_slot=# sent_index=#",
         int(lcid),
+        sent_slot.llc_tx_id,
         slot_number,
         this_slot.sent_index);
 
@@ -453,12 +471,13 @@ void LLC::check_retransmit(size_t slot_number)
     // Queue back retx PDCP
     to_retx_list.emplace_back();
     auto& to_retx = to_retx_list.back();
+    to_retx.llc_tx_id = sent_slot.llc_tx_id;
     to_retx.retry_count = sent_slot.retry_count;
     to_retx.pdcp_pdu_size = sent_slot.pdcp_pdu_size;
     to_retx.pdcp_pdu = allocate_tx_buffer();
     sent_slot.pdcp_pdu.swap(to_retx.pdcp_pdu);
-    stats.pkt_resent.fetch_add(1);
-    stats.bytes_resent.fetch_add(sent_slot.pdcp_pdu_size);
+    stats.pkt_resent->fetch_add(1);
+    stats.bytes_resent->fetch_add(sent_slot.pdcp_pdu_size);
 }
 
 void LLC::to_acknowledge(llc_sn_t sn)
@@ -484,7 +503,7 @@ void LLC::to_acknowledge(llc_sn_t sn)
 
 void LLC::increment_sn()
 {
-    sn_counter = (sn_counter+1) & 0x3F;
+    sn_counter = (sn_counter+1) & llc_sn_mask;
 }
 
 size_t LLC::tx_ring_index(size_t slot)

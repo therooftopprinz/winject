@@ -12,13 +12,13 @@ using llc_sz_t = uint16_t;
 using pdcp_sn_t = uint16_t;
 using pdcp_segment_offset_t = uint16_t;
 
-constexpr llc_sn_t llc_sn_mask = 0b00111111;
+constexpr llc_sn_t llc_sn_mask = 0b11111111;
 constexpr size_t llc_sn_size = llc_sn_mask+1;
 
-//        +---+---+-----------------------+
-//     00 | D | R | LLC SN                |
-//        +---+---+-------+---+-----------+
-//     01 | LCID          | C | SIZEH     |
+//        +-------------------------------+
+//     00 | LLC SN                        |
+//        +---------------+---+-----------+
+//     01 | LCID          | A | SIZEH     |
 //        +---------------+---+-----------+
 //     02 | SIZEL                         |
 //        +-------------------------------+
@@ -34,15 +34,12 @@ struct llc_t
         , max_size(size)
     {}
 
-    // static constexpr uint8_t mask_D     = 0b10000000;
-    static constexpr uint8_t mask_R     = 0b01000000;
-    static constexpr uint8_t mask_SN    = 0b00111111;
+    static constexpr uint8_t mask_SN    = 0b11111111;
     static constexpr uint8_t mask_LCID  = 0b11110000;
     static constexpr uint8_t mask_A     = 0b00001000;
     static constexpr uint8_t mask_SIZEH = 0b00000111;
     static constexpr uint8_t mask_SIZEL = 0b11111111;
-    // static constexpr uint8_t shift_D     = 7;
-    static constexpr uint8_t shift_R     = 6;
+
     static constexpr uint8_t shift_SN    = 0;
     static constexpr uint8_t shift_LCID  = 4;
     static constexpr uint8_t shift_A     = 3;
@@ -59,26 +56,6 @@ struct llc_t
         uint8_t mv = base[index] & ~mask;
         mv |= ((val<<shift) & mask);
         base[index] = mv;
-    }
-
-    // void set_D(bool val)
-    // {
-    //     set(0, mask_D, shift_D, val);
-    // }
-
-    // bool get_D()
-    // {
-    //     return get(0, mask_D, shift_D);
-    // }
-
-    void set_R(bool val)
-    {
-        set(0, mask_R, shift_R, val);
-    }
-
-    bool get_R()
-    {
-        return get(0, mask_R, shift_R);
     }
 
     void set_SN(llc_sn_t sn)
@@ -226,7 +203,7 @@ struct pdcp_t
 //     +---+---------------------------+
 //  00 | L | SIZE                      | 02
 //     +---+---------------------------|
-//     | PACKET SN (OPTIONAL)          | 01
+//     | PACKET SN (OPTIONAL)          | 02
 //     +-------------------------------+
 //     | OFFSET (OPTIONAL)             | 02
 //     +-------------------------------+
