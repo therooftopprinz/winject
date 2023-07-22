@@ -48,7 +48,7 @@ struct ILLC
         bfc::IMetric* bytes_recv = nullptr;
     };
 
-    virtual ~ILLC(){} 
+    virtual ~ILLC(){}
 
     virtual void on_tx(tx_info_t&) = 0;
     virtual void on_rx(rx_info_t&) = 0;

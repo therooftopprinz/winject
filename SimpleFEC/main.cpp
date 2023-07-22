@@ -190,7 +190,7 @@ std::string buffer_str(uint8_t* buffer, size_t size)
         }
 
         bufferss << std::hex << std::setfill('0') << std::setw(2) << (int) buffer[i] << " ";
-        
+
         if (i%16 == 15)
         {
             bufferss << "\n";
@@ -356,7 +356,7 @@ int main(int argc, char* argv[])
                 packet_fragments_t fragment(data_current);
                 fragment.set_offset(udp_offset);
                 auto data_rem = data_size - si.offset - packet_fragments_t::header_size();
-                
+
                 LOG("udp[%3d : %3d]->data[%3d : %3d]: udp_rem=%3d data_rem=%3d",
                     udp_sn, udp_offset,
                     data_sn, si.offset,
@@ -598,7 +598,7 @@ int main(int argc, char* argv[])
                 LOG("    of: %d", fragment.get_offset());
                 LOG("    sz: %d", fragment.get_size());
                 LOG("    ed: %d", fragment.get_is_last());
-                
+
                 if (fragment.get_offset()+fragment.get_size() > sizeof(buffer))
                 {
                     LOG("  Unable to process fragment further, not enough buffer!");

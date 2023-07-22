@@ -27,9 +27,15 @@ struct ITxScheduler
         size_t nd_gpdu_max_size;
     };
 
+    struct stats_t
+    {
+        bfc::IMetric* tick_error = nullptr;
+        bfc::IMetric* tick_error_avg46 = nullptr;
+    };
+
     ~ITxScheduler(){}
 
-    virtual void stop() = 0; 
+    virtual void stop() = 0;
 };
 
 #endif // __WINJECTUM_ITXSCHEDULER_HPP__

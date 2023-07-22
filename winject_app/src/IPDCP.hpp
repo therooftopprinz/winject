@@ -72,7 +72,7 @@ struct IPDCP
         bfc::IMetric* rx_segment_rcvd = nullptr;
     };
 
-    virtual ~IPDCP(){} 
+    virtual ~IPDCP(){}
 
     virtual void on_tx(tx_info_t&) = 0;
     virtual void on_rx(rx_info_t&) = 0;

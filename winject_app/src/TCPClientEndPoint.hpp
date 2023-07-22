@@ -2,6 +2,7 @@
 #define __WINJECT_TCPCLIENT_ENDPOOINT_HPP__
 
 #include <string>
+#include <deque>
 #include <atomic>
 #include <mutex>
 
@@ -29,7 +30,7 @@ public:
         ep_event_fd = eventfd(0, EFD_SEMAPHORE);
         if (0 > ep_event_fd)
         {
-            Logless(*main_logger, TEP_ERR,
+            LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | Event FD error(_)",
                 (int)config.lcid,
                 strerror(errno));
@@ -112,7 +113,7 @@ private:
             "INF | TCPEP# | notify event=#",
             (int)config.lcid,
             event);
-        
+
         {
             std::unique_lock lg(ep_event_mutex);
             ep_event.push_back(event);
@@ -138,7 +139,7 @@ private:
         // RLF and client active
         if (is_rlf())
         {
-            Logless(*main_logger, TEP_ERR,
+            LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | RLF detected, target will be disconnected.",
                 (int)config.lcid,
                 strerror(errno));
@@ -149,14 +150,14 @@ private:
             targetSock = bfc::TcpSocket();
             if (targetSock.connect(target_addr) >= 0)
             {
-                Logless(*main_logger, TEP_ERR,
-                    "ERR | TCPEP# | connected to targetSock=#",
+                Logless(*main_logger, TEP_INF,
+                    "INF | TCPEP# | connected to targetSock=#",
                     (int)config.lcid,
                     targetSock.handle());
             }
             else
             {
-                Logless(*main_logger, TEP_ERR,
+                LoglessF(*main_logger, TEP_ERR,
                     "ERR | TCPEP# | connect error(#)",
                     (int)config.lcid,
                     strerror(errno));
@@ -173,7 +174,7 @@ private:
         pdcp_tx_running = true;
         fd_set recv_set;
         FD_ZERO(&recv_set);
-    
+
         while (pdcp_tx_running)
         {
             FD_SET(targetSock.handle(), &recv_set);
@@ -196,7 +197,7 @@ private:
 
             if ( rv < 0)
             {
-                Logless(*main_logger, TEP_ERR,
+                LoglessF(*main_logger, TEP_ERR,
                     "ERR | TCPEP# | select error(#)",
                     (int)config.lcid,
                     strerror(errno));
@@ -216,7 +217,7 @@ private:
                 }
                 else
                 {
-                    Logless(*main_logger, TEP_ERR,
+                    LoglessF(*main_logger, TEP_ERR,
                         "ERR | TCPEP# | RLF: target closed error=#",
                         (int)config.lcid,
                         strerror(errno));
@@ -240,13 +241,14 @@ private:
 
                 if (EVENTFD_STOP == val)
                 {
-                    Logless(*main_logger, TEP_ERR,
-                        "INF | TCPEP# | exiting tx",
-                        (int)config.lcid);
-                    return;
+                    break;
                 }
             }
         }
+        Logless(*main_logger, TEP_ERR,
+                "INF | TCPEP# | exiting tx",
+            (int)config.lcid);
+        pdcp_tx_running = false;
     }
 
     void run_pdcp_rx()

@@ -41,7 +41,7 @@ void runBM()
     uint64_t timeBase = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     constexpr int NTHREAD = 4;
     std::cout << NTHREAD << " threads " << NLOGS << " logs:\n";
-    
+
     std::vector<std::thread> logThread;
     for (int i=0; i<NTHREAD; i++) logThread.emplace_back(logtask, NTHREAD);
     for (int i=0; i<NTHREAD; i++) logThread[i].join();

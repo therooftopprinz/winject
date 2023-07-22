@@ -9,8 +9,8 @@ enum app_logbit_e {
               /****
                *  X - silent
                *  T - Tick
-               * 
-               * 
+               *
+               *
               */
               //    X D S T
     RRC_ERR,  //  0 0 1 1 1
@@ -57,7 +57,7 @@ inline std::string to_llc_stat(std::string statname, size_t lcid)
 {
     std::stringstream ss;
     ss << "llc_" << statname << "{"
-       << "lcid:\"" << lcid << "\""
+       << "lcid=\"" << lcid << "\""
        <<"}";
     return ss.str();
 }
@@ -66,7 +66,7 @@ inline std::string to_pdcp_stat(std::string statname, size_t lcid)
 {
     std::stringstream ss;
     ss << "pdcp_" << statname << "{"
-       << "lcid:\"" << lcid << "\""
+       << "lcid=\"" << lcid << "\""
        <<"}";
     return ss.str();
 }

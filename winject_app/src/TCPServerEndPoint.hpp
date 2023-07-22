@@ -2,6 +2,7 @@
 #define __WINJECT_TCPSERVER_ENDPOOINT_HPP__
 
 #include <string>
+#include <deque>
 #include <atomic>
 #include <mutex>
 
@@ -29,7 +30,7 @@ public:
         int one=1;
         if (0 > serverSock.setsockopt(SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)))
         {
-            Logless(*main_logger, TEP_ERR,
+            LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | ReUseAddr error(#)",
                 (int)config.lcid,
                 strerror(errno));
@@ -38,7 +39,7 @@ public:
 
         if (0 > serverSock.bind(bfc::toIp4Port(config.address1)))
         {
-            Logless(*main_logger, TEP_ERR,
+            LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | Bind error(#)",
                 (int)config.lcid,
                 strerror(errno));
@@ -48,7 +49,7 @@ public:
         ep_event_fd = eventfd(0, EFD_SEMAPHORE);
         if (0 > ep_event_fd)
         {
-            Logless(*main_logger, TEP_ERR,
+            LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | Event FD error(#)",
                 (int)config.lcid,
                 strerror(errno));
@@ -57,7 +58,7 @@ public:
 
         if (0 > listen(serverSock.handle(), 1))
         {
-            Logless(*main_logger, TEP_ERR,
+            LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | Listen error(#)",
                 (int)config.lcid,
                 strerror(errno));
@@ -140,7 +141,7 @@ private:
             "INF | TCPEP# | notify event=#",
             (int)config.lcid,
             event);
-        
+
         {
             std::unique_lock lg(ep_event_mutex);
             ep_event.push_back(event);
@@ -167,10 +168,10 @@ private:
         if (is_rlf()
             && clientSock)
         {
-            Logless(*main_logger, TEP_ERR,
+            LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | state RLF!",
                 (int)config.lcid);
-            
+
             clientSock = bfc::TcpSocket(-1);
         }
 
@@ -179,15 +180,15 @@ private:
 
     void on_new_connection()
     {
-        Logless(*main_logger, TEP_ERR,
-            "ERR | TCPEP# | on_new_connection",
+        Logless(*main_logger, TEP_INF,
+            "INF | TCPEP# | on_new_connection",
             (int)config.lcid);
 
         std::unique_lock lg(txrx_mutex);
         auto newSock = accept(serverSock.handle(), nullptr, nullptr);
 
-        Logless(*main_logger, TEP_ERR,
-            "ERR | TCPEP# | accepted clientSock=#",
+        Logless(*main_logger, TEP_INF,
+            "INF | TCPEP# | accepted clientSock=#",
             (int)config.lcid,
             newSock);
 
@@ -211,7 +212,7 @@ private:
         fd_set recv_set;
         FD_ZERO(&recv_set);
         auto fdmax0 = std::max(serverSock.handle(), ep_event_fd);
-    
+
         while (pdcp_tx_running)
         {
             FD_SET(serverSock.handle(), &recv_set);
@@ -234,11 +235,15 @@ private:
 
             if ( rv < 0)
             {
-                Logless(*main_logger, TEP_ERR,
+                LoglessF(*main_logger, TEP_ERR,
                     "ERR | TCPEP# | select error(_)",
                     (int)config.lcid,
                     strerror(errno));
-                return;
+                if (clientSock)
+                {
+                    clientSock = bfc::TcpSocket(-1);
+                }
+                continue;
             }
 
             if (FD_ISSET(clientSock.handle(), &recv_set))
@@ -254,7 +259,7 @@ private:
                 }
                 else
                 {
-                    Logless(*main_logger, TEP_ERR,
+                    LoglessF(*main_logger, TEP_ERR,
                         "ERR | TCPEP# | RLF: client closed error=#",
                         (int)config.lcid,
                         strerror(errno));
@@ -289,13 +294,15 @@ private:
 
                 if (EVENTFD_STOP == val)
                 {
-                    Logless(*main_logger, TEP_ERR,
-                        "INF | TCPEP# | exiting tx",
-                        (int)config.lcid);
-                    return;
+                    break;
                 }
             }
         }
+
+        pdcp_tx_running = false;
+        Logless(*main_logger, TEP_ERR,
+            "INF | TCPEP# | exiting tx",
+            (int)config.lcid);
     }
 
     void run_pdcp_rx()

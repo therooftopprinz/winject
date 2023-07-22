@@ -14,7 +14,7 @@ public:
         : wdev(device)
     {
     }
-    
+
     ssize_t send(const uint8_t* buff, size_t sz)
     {
         return sendto(wdev, buff, sz, 0, (sockaddr *) &wdev.address(), sizeof(struct sockaddr_ll));

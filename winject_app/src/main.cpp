@@ -27,7 +27,7 @@ const static std::string DEFAULT_LOGBIT = "1111111111111111111111111111111011111
 static const char* config_file = "config.json";
 
 
-template<> 
+template<>
 const char* LoggerType::LoggerRef = "LoggerRefXD";
 std::unique_ptr<LoggerType> main_logger;
 std::unique_ptr<bfc::IMonitor> main_monitor;

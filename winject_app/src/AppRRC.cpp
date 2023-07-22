@@ -70,7 +70,7 @@ AppRRC::~AppRRC()
 
     eps.clear();
 
-    close(rrc_event_fd); 
+    close(rrc_event_fd);
 }
 
 void AppRRC::on_console_read()
@@ -162,7 +162,7 @@ void AppRRC::on_rlf(lcid_t lcid)
 
 void AppRRC::on_init(lcid_t lcid)
 {
-    push_rrc_event(rrc_event_setup_t{lcid});   
+    push_rrc_event(rrc_event_setup_t{lcid});
 }
 
 void AppRRC::perform_tx(size_t payload_size)
@@ -236,7 +236,7 @@ void AppRRC::setup_console()
     if (console_sock.bind(bfc::toIp4Port(
         config.app_config.udp_console)) < 0)
     {
-        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | Bind error(_) console is now disabled!", strerror(errno));
+        LoglessF(*main_logger, RRC_ERR, "ERR | AppRRC | Bind error(_) console is now disabled!", strerror(errno));
         return;
     }
 
@@ -421,7 +421,7 @@ void AppRRC::on_wifi_rx()
 
     if (rv<0)
     {
-        Logless(*main_logger, RRC_ERR, "ERR | AppRRC | wifi recv failed! errno=# error=#", errno, strerror(errno));
+        LoglessF(*main_logger, RRC_ERR, "ERR | AppRRC | wifi recv failed! errno=# error=#", errno, strerror(errno));
         return;
     }
 
@@ -494,7 +494,7 @@ void AppRRC::process_rx_frame(uint8_t* start, size_t size)
 
         if (llc_pdu.get_SIZE() > frame_payload_remaining)
         {
-            Logless(*main_logger, RRC_ERR, "ERR | AppRRC | LLC truncated (not enough data).", (int)lcid);
+            LoglessF(*main_logger, RRC_ERR, "ERR | AppRRC | LLC truncated (not enough data).", (int)lcid);
             break;
         }
 
@@ -509,7 +509,7 @@ void AppRRC::run_rrc_rx()
     auto pdcp0 = pdcps.at(0);
 
     pdcp0->set_rx_enabled(true);
-    pdcp0->set_tx_enabled(true);    
+    pdcp0->set_tx_enabled(true);
     lcc0->set_rx_enabled(true);
     lcc0->set_tx_enabled(true);
 

@@ -19,7 +19,7 @@ public:
         tv.tv_usec = 1000*100;
         setsockopt(this->rx, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
     }
-    
+
     ssize_t send(const uint8_t* buff, size_t sz)
     {
         return sendto(tx, buff, sz, 0, (sockaddr *) &tx.address(), sizeof(struct sockaddr_ll));

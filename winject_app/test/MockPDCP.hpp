@@ -18,7 +18,6 @@ struct MockPDCP : public IPDCP
     MOCK_METHOD0(get_rx_config, rx_config_t());
     MOCK_METHOD0(get_tx_config, tx_config_t());
     MOCK_METHOD0(get_stats, const stats_t&());
-    
 };
 
 #endif // __WINJECTUMTST_MOCKPDCP_HPP__

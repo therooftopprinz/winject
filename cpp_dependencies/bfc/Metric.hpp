@@ -6,6 +6,7 @@
 #include <thread>
 #include <mutex>
 #include <fstream>
+#include <filesystem>
 
 #include "IMetric.hpp"
 
@@ -48,7 +49,7 @@ public:
         return old;
     }
 private:
-    std::atomic<double> value;
+    std::atomic<double> value = 0;
 };
 
 class Monitor : public IMonitor
@@ -61,6 +62,8 @@ public:
         , path(path)
 
     {
+        std::ofstream(path+".csv", std::fstream::out | std::fstream::trunc);
+
         monitor_thread = std::thread([this](){
                 run_monitor();
             });
@@ -110,7 +113,7 @@ private:
 
     void collect()
     {
-        std::ofstream fout(path, std::fstream::out | std::fstream::trunc);
+        std::ofstream fout(path+"_", std::fstream::out | std::fstream::trunc);
         std::ofstream fout2(path+".csv", std::fstream::out | std::fstream::app);
         std::unique_lock lg(this_mutex);
         auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -118,10 +121,13 @@ private:
         fout2 << now << ",";
         for (auto& [key, val] : metrics)
         {
+            fout.precision(20);
             fout << key << " " << val->load() << "\n";
             fout2 << val->load() << ",";
         }
         fout2 << "\n";
+
+        std::filesystem::rename(path+"_",path);
     }
 
     size_t interval_ms = 1000;

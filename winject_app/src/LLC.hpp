@@ -39,7 +39,7 @@ public:
 
     void on_tx(tx_info_t& info) override;
     void on_rx(rx_info_t& info) override;
- 
+
 private:
     void check_retransmit(size_t slot_number);
     void to_acknowledge(llc_sn_t sn);
@@ -89,7 +89,7 @@ private:
     std::vector<tx_ring_elem_t> tx_ring;
     std::vector<size_t> sn_to_tx_ring;
     std::mutex tx_ring_mutex;
-    
+
     std::list<std::pair<size_t,size_t>> to_ack_list;
     std::mutex to_ack_list_mutex;
 

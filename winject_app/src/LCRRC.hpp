@@ -53,13 +53,13 @@ public:
 
     void on_rrc_message(int req_id, const RRC_ExchangeRequest& req) override
     {
-        Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | on_exchg_req",
+        Logless(*main_logger, RRC_INF,
+            "INF | LCRRC# | on_exchg_req",
                 (int) llc.get_lcid());
 
         if (E_TXRX_STATE_ACTIVE == txrx_state)
         {
-            Logless(*main_logger, RRC_ERR,
+            LoglessF(*main_logger, RRC_ERR,
                 "ERR | LCRRC# | txrx already active, forcing rlf.",
                     (int) llc.get_lcid());
 
@@ -79,16 +79,8 @@ public:
     {
         check_response(req_id);
 
-        // if (E_TXRX_STATE_CONFIGURING != txrx_state)
-        // {
-        //     Logless(*main_logger, RRC_ERR,
-        //         "ERR | LCRRC# | on_exchg_rsp (ignored: unexpected)",
-        //         (int) llc.get_lcid());
-        //     return;
-        // }
-
-        Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | on_exchg_rsp",
+        Logless(*main_logger, RRC_INF,
+            "INF | LCRRC# | on_exchg_rsp",
             (int) llc.get_lcid());
 
         reconfigure_rx(msg);
@@ -106,8 +98,8 @@ public:
             return;
         }
 
-        Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | on_init_am (self init)",
+        Logless(*main_logger, RRC_INF,
+            "INF | LCRRC# | on_init_am (self init)",
             (int) llc.get_lcid());
 
         change_txrx_state(E_TXRX_STATE_CONFIGURING);
@@ -119,7 +111,7 @@ public:
     {
         auto lcid = llc.get_lcid();
 
-        Logless(*main_logger, RRC_ERR, "ERR | LCRRC# | RLF lcid=#",
+        LoglessF(*main_logger, RRC_ERR, "ERR | LCRRC# | RLF lcid=#",
             (int) llc.get_lcid(),
             (int) lcid);
 
@@ -145,12 +137,12 @@ private:
 
         activate_timer = timer.schedule(std::chrono::nanoseconds(1000*1000*100),
         [this](){
-            activate();   
+            activate();
         });
     }
     void activate()
     {
-        Logless(*main_logger, RRC_ERR, "ERR | LCRRC# | Activated lcid=#",
+        Logless(*main_logger, RRC_INF, "INF | LCRRC# | Activated lcid=#",
             (int) llc.get_lcid(),
             (int) llc.get_lcid());
 
@@ -163,7 +155,7 @@ private:
         llc.set_rx_enabled(true);
 
         ep.set_tx_enabled(true);
-        ep.set_rx_enabled(true);  
+        ep.set_rx_enabled(true);
     }
 
     void send_exchange_req()
@@ -179,7 +171,7 @@ private:
         fill_from_config(request);
 
         auto on_push_fail =  [this](){
-                Logless(*main_logger, RRC_ERR,
+                LoglessF(*main_logger, RRC_ERR,
                     "ERR | LCRRC# | exchange_req failed, forcing rlf!",
                     (int) llc.get_lcid(),
                     (int) llc.get_lcid());
@@ -202,21 +194,21 @@ private:
     }
 
     enum txrx_state_e {
-        E_TXRX_STATE_NOT_CONFIGURED, 
+        E_TXRX_STATE_NOT_CONFIGURED,
         E_TXRX_STATE_CONFIGURING,
         E_TXRX_STATE_CONFIGURED,
         E_TXRX_STATE_ACTIVE};
 
     const char* state_str[4] = {
-        "E_TXRX_STATE_NOT_CONFIGURED", 
+        "E_TXRX_STATE_NOT_CONFIGURED",
         "E_TXRX_STATE_CONFIGURING",
         "E_TXRX_STATE_CONFIGURED",
         "E_TXRX_STATE_ACTIVE"};
 
     void change_txrx_state(txrx_state_e new_state)
     {
-        Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | Change RX state old=# new=#",
+        Logless(*main_logger, RRC_INF,
+            "INF| LCRRC# | Change RX state old=# new=#",
             (int) llc.get_lcid(),
             state_str[txrx_state],
             state_str[new_state]);
@@ -289,8 +281,8 @@ private:
     void auto_send_rrc(size_t max_retry, const T& msg,
         std::function<void()> cb_fail)
     {
-        Logless(*main_logger, RRC_ERR,
-            "ERR | LCRRC# | auto send rrc req_id=# remain_retry=#",
+        Logless(*main_logger, RRC_INF,
+            "INF | LCRRC# | auto send rrc req_id=# remain_retry=#",
             (int) llc.get_lcid(),
             (int) msg.requestID,
             max_retry);
@@ -305,7 +297,7 @@ private:
         }
 
         auto expiry_handler = [this, max_retry, msg, cb_fail]() {
-                Logless(*main_logger, RRC_ERR,
+                LoglessF(*main_logger, RRC_ERR,
                     "ERR | LCRRC# | auto send expired id=# remain_retry=#",
                     (int) llc.get_lcid(),
                     (int) msg.requestID,
@@ -362,7 +354,7 @@ private:
     std::mutex rrc_requests_mutex;
 
     std::atomic<txrx_state_e> txrx_state = E_TXRX_STATE_NOT_CONFIGURED;
-    
+
     std::optional<uint64_t> activate_timer = 0;
     std::mutex activate_timer_mutex;
 
@@ -371,6 +363,6 @@ private:
     IRRC& rrc;
     IEndPoint& ep;
     bfc::ITimer& timer;
-}; 
+};
 
 #endif // __LCRRC_HPP__

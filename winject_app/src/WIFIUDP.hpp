@@ -16,11 +16,11 @@ public:
     {
         if (sock.bind(this->rx_address) < 0)
         {
-            Logless(*main_logger, TEP_ERR, "ERR | WIFIUDP | Bind error(_) can't setup WIFIUDP", strerror(errno));
+            LoglessF(*main_logger, TEP_ERR, "ERR | WIFIUDP | Bind error(_) can't setup WIFIUDP", strerror(errno));
             throw std::runtime_error("Can't setup WIFIUDP");
         }
     }
-    
+
     ssize_t send(const uint8_t* buff, size_t sz)
     {
         return sock.sendto(bfc::ConstBufferView(buff, sz+4), tx_address);

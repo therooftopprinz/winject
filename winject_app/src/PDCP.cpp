@@ -30,7 +30,7 @@ void PDCP::set_tx_enabled(bool value)
     std::unique_lock<std::shared_mutex> lg(tx_mutex);
     auto old_tx_enabled = is_tx_enabled;
 
-    Logless(*main_logger, PDCP_INF, 
+    Logless(*main_logger, PDCP_INF,
         "INF | PDCPT# | set_tx_enabled old=# new=#",
         (int) lcid,
         (int) old_tx_enabled,
@@ -181,7 +181,7 @@ void PDCP::on_tx(tx_info_t& info)
                     break;
                 }
 
-                // @note : wait for the allocation to increase 
+                // @note : wait for the allocation to increase
                 if (to_tx_queue.front().size() > available_for_data)
                 {
                     break;
@@ -298,7 +298,7 @@ void PDCP::update_rx_sn(pdcp_sn_t sn, bool fast_forward)
                     (int) lcid,
                     rx_sn,
                     current_rx_buffer.size());
-                
+
                 rx_sn++;
                 std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
                 to_rx_queue.emplace_back(std::move(current_rx_buffer));
@@ -401,7 +401,7 @@ void PDCP::on_rx(rx_info_t& info)
             bool fast_forward = false;
             if (sn_dist > rx_config.max_sn_distance)
             {
-                Logless(*main_logger, PDCP_ERR,
+                LoglessF(*main_logger, PDCP_ERR,
                     "ERR | PDCPR# | sn out of range! sn=# rx_sn=# distance=#",
                     (int) lcid,
                     sn,

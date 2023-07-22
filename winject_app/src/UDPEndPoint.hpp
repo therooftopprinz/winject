@@ -25,7 +25,7 @@ public:
     {
         if (0 > sock.bind(bfc::toIp4Port(config.address1)))
         {
-            Logless(*main_logger, TEP_ERR,
+            LoglessF(*main_logger, TEP_ERR,
                 "ERR | UDPEP# | Bind error(_)",
                 (int)config.lcid,
                 strerror(errno));
@@ -35,7 +35,7 @@ public:
         ep_event_fd = eventfd(0, 0);
         if (0 > ep_event_fd)
         {
-            Logless(*main_logger, TEP_ERR,
+            LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | Event FD error(_)",
                 (int)config.lcid,
                 strerror(errno));
@@ -97,7 +97,7 @@ private:
         fd_set recv_set;
         FD_ZERO(&recv_set);
         auto maxfd = std::max(sock.handle(), ep_event_fd)+1;
-    
+
         while (pdcp_tx_running)
         {
             FD_SET(sock.handle(), &recv_set);
@@ -112,7 +112,7 @@ private:
 
             if ( rv < 0)
             {
-                Logless(*main_logger, TEP_ERR,
+                LoglessF(*main_logger, TEP_ERR,
                     "ERR | UDPEP# | select error(_)",
                     (int)config.lcid,
                     strerror(errno));

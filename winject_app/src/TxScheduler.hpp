@@ -17,6 +17,8 @@ public:
         : timer(timer)
         , rrc(rrc)
     {
+        stats.tick_error        = &main_monitor->getMetric("txs_tick_error");
+        stats.tick_error_avg46  = &main_monitor->getMetric("txs_tick_error_avg46");
     }
 
     ~TxScheduler()
@@ -99,6 +101,7 @@ private:
         {
             tick();
         }
+
         Logless(*main_logger, TXS_INF, "INF | TxSchd | Scheduler tick has ended.");
     }
 
@@ -112,6 +115,13 @@ private:
 
         int64_t diff_time = now - last_tick;
         int64_t error = frame_info.slot_interval_us - diff_time;
+        auto aerror = std::abs(error);
+
+        stats.tick_error->fetch_add(last_tick ? aerror : 0);
+        stats.tick_error_avg46->store(
+                stats.tick_error_avg46->load()*0.6 +
+                aerror*0.4);
+
         last_tick = now;
 
         if (error!=0 && main_logger->get_logbit(TXS_TIC))
@@ -122,6 +132,7 @@ private:
                 error,
                 diff_time2);
         }
+
 
         auto until = now + frame_info.slot_interval_us;
         // auto wait_time = until-now;
@@ -135,7 +146,6 @@ private:
                 std::chrono::high_resolution_clock::now().time_since_epoch())
                 .count();
         }
-
     }
 
     void tick()
@@ -211,7 +221,7 @@ private:
             }
 
             tx_info.in_allow_data = true;
-            
+
             while (frame_payload_remaining)
             {
                 for (auto i : schedules_cache)
@@ -275,7 +285,7 @@ private:
                 if (schedule->has_data_allocated)
                 {
                     schedule->deficit -= schedule->current_alloc;
-                    schedule->current_alloc = 0; 
+                    schedule->current_alloc = 0;
                 }
             }
 
@@ -297,7 +307,7 @@ private:
         size_t quanta = 0;
         size_t nd_gpdu_max_size = 0;
         size_t current_alloc = 0;
-        bool has_schedulable = false; 
+        bool has_schedulable = false;
         bool has_data_allocated = false;
 
         bool operator>(const scheduling_ctx_t& other) const
@@ -326,6 +336,8 @@ private:
     size_t header_size = 0;
 
     std::mutex this_mutex;
+
+    stats_t stats;
 };
 
 #endif // schedules_info

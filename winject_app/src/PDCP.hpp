@@ -33,7 +33,7 @@ public:
 
     buffer_t to_rx(uint64_t timeout_us=-1) override;
     bool to_tx(buffer_t&& buffer) override;
-    
+
 
     const stats_t& get_stats() override;
 
@@ -91,7 +91,7 @@ private:
     std::deque<buffer_t> to_tx_queue;
     std::mutex to_tx_queue_mutex;
     std::condition_variable to_tx_queue_cv;
-    
+
     std::deque<buffer_t> to_rx_queue;
     std::mutex to_rx_queue_mutex;
 

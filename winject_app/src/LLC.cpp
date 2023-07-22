@@ -273,7 +273,7 @@ void LLC::on_tx(tx_info_t& info)
             to_retx_list.pop_front();
             if (tx_config.allow_rlf)
             {
-                Logless(*main_logger, LLC_ERR,
+                LoglessF(*main_logger, LLC_ERR,
                     "ERR | LLCT#  | RLF triggered",
                     int(lcid));
 
@@ -282,7 +282,7 @@ void LLC::on_tx(tx_info_t& info)
                 return;
             }
 
-            Logless(*main_logger, LLC_ERR,
+            LoglessF(*main_logger, LLC_ERR,
                 "ERR | LLCT#  | RLF inhibited",
                 int(lcid));
 
@@ -394,7 +394,7 @@ void LLC::on_rx(rx_info_t& info)
         {
             if (llc_header_size+i*sizeof(llc_payload_ack_t) > llc_size)
             {
-                Logless(*main_logger, LLC_ERR, "ERR | LLCT# | ack overrun, llc_size=# ack_idx=#",
+                LoglessF(*main_logger, LLC_ERR, "ERR | LLCT# | ack overrun, llc_size=# ack_idx=#",
                     int(lcid), llc_size, i);
                 break;
             }
@@ -427,7 +427,7 @@ void LLC::on_rx(rx_info_t& info)
     else
     {
         if (rx_config.mode == ILLC::E_TX_MODE_AM)
-        { 
+        {
             to_acknowledge(llc.get_SN());
         }
 

@@ -217,7 +217,7 @@ struct pdcp_segment_t
         , max_size(size)
     {
     }
-    
+
     void rescan()
     {
         uint8_t *ptr = base;

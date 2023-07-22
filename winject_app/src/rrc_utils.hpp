@@ -40,7 +40,7 @@ inline std::string buffer_str(uint8_t* buffer, size_t size)
         }
 
         bufferss << std::hex << std::setfill('0') << std::setw(2) << (int) buffer[i] << " ";
-        
+
         if (i%16 == 15)
         {
             bufferss << "\n";
