@@ -4,6 +4,8 @@
 #include <functional>
 #include <chrono>
 
+#include <bfc/IMetric.hpp>
+
 struct ITxScheduler
 {
     struct buffer_config_t

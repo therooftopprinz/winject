@@ -27,6 +27,9 @@ public:
         , rrc(rrc)
         , pdcp(pdcp)
     {
+        stats.tx_enabled = &main_monitor->getMetric(to_ep_stat("tx_enabled", config.lcid));
+        stats.rx_enabled = &main_monitor->getMetric(to_ep_stat("rx_enabled", config.lcid));
+
         int one=1;
         if (0 > serverSock.setsockopt(SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)))
         {
@@ -82,6 +85,7 @@ public:
 
     void set_tx_enabled(bool value) override
     {
+        stats.tx_enabled->store(value);
         {
             std::unique_lock lg(txrx_mutex);
             auto old_tx_enabled = is_tx_enabled;
@@ -98,6 +102,7 @@ public:
 
     void set_rx_enabled(bool value) override
     {
+        stats.rx_enabled->store(value);
         {
             std::unique_lock lg(txrx_mutex);
             auto old_rx_enabled = is_tx_enabled;
@@ -339,6 +344,8 @@ private:
     int ep_event_fd;
     std::deque<uint64_t> ep_event;
     std::shared_mutex ep_event_mutex;
+
+    stats_t stats;
 };
 
 #endif // __WINJECT_TCPSERVER_ENDPOOINT_HPP__

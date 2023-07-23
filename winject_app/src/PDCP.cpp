@@ -13,6 +13,8 @@ PDCP::PDCP(IRRC& rrc, lcid_t lcid, const tx_config_t& tx_config, const rx_config
     stats.rx_ignored_pdu      = &main_monitor->getMetric(to_pdcp_stat("rx_ignored_pdu", lcid));
     stats.rx_invalid_segment  = &main_monitor->getMetric(to_pdcp_stat("rx_invalid_segment", lcid));
     stats.rx_segment_rcvd     = &main_monitor->getMetric(to_pdcp_stat("rx_segment_rcvd", lcid));
+    stats.tx_enabled          = &main_monitor->getMetric(to_pdcp_stat("tx_enabled", lcid));
+    stats.rx_enabled          = &main_monitor->getMetric(to_pdcp_stat("rx_enabled", lcid));
 }
 
 lcid_t PDCP::get_attached_lcid()
@@ -22,6 +24,8 @@ lcid_t PDCP::get_attached_lcid()
 
 void PDCP::set_tx_enabled(bool value)
 {
+    stats.tx_enabled->store(value);
+
     {
         std::unique_lock lg(to_tx_queue_mutex);
         to_tx_queue.clear();
@@ -46,6 +50,8 @@ void PDCP::set_tx_enabled(bool value)
 
 void PDCP::set_rx_enabled(bool value)
 {
+    stats.rx_enabled->store(value);
+
     std::unique_lock<std::shared_mutex> lg(rx_mutex);
     // std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
     auto old_rx_enabled = is_rx_enabled;

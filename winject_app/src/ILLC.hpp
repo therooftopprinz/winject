@@ -46,6 +46,8 @@ struct ILLC
         bfc::IMetric* bytes_sent = nullptr;
         bfc::IMetric* bytes_resent = nullptr;
         bfc::IMetric* bytes_recv = nullptr;
+        bfc::IMetric* tx_enabled = nullptr;
+        bfc::IMetric* rx_enabled = nullptr;
     };
 
     virtual ~ILLC(){}

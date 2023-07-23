@@ -23,6 +23,9 @@ public:
         : config(config)
         , pdcp(pdcp)
     {
+        stats.tx_enabled = &main_monitor->getMetric(to_ep_stat("tx_enabled", config.lcid));
+        stats.rx_enabled = &main_monitor->getMetric(to_ep_stat("rx_enabled", config.lcid));
+
         if (0 > sock.bind(bfc::toIp4Port(config.address1)))
         {
             LoglessF(*main_logger, TEP_ERR,
@@ -60,12 +63,14 @@ public:
 
     void set_tx_enabled(bool value) override
     {
+        stats.tx_enabled->store(value);
         std::unique_lock lg(txrx_mutex);
         is_tx_enabled = value;
     }
 
     void set_rx_enabled(bool value) override
     {
+        stats.rx_enabled->store(value);
         std::unique_lock lg(txrx_mutex);
         is_rx_enabled = value;
     }
@@ -172,6 +177,8 @@ private:
     bool is_rx_enabled = false;
 
     int ep_event_fd;
+
+    stats_t stats;
 };
 
 #endif // __WINJECT_UDPENDPOINT_HPP__

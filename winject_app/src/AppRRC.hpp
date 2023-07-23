@@ -164,6 +164,8 @@ private:
     int rrc_event_fd;
 
     std::map<lcid_t, std::shared_ptr<LCRRC>> channel_rrc_contexts;
+
+    stats_t stats;
 };
 
 #endif // __WINJECTUM_APPRRC_HPP__

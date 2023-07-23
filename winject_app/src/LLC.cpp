@@ -20,6 +20,8 @@ LLC::LLC(
     stats.bytes_sent    = &main_monitor->getMetric(to_llc_stat("bytes_sent", lcid));
     stats.bytes_resent  = &main_monitor->getMetric(to_llc_stat("bytes_resent", lcid));
     stats.bytes_recv    = &main_monitor->getMetric(to_llc_stat("bytes_recv", lcid));
+    stats.tx_enabled    = &main_monitor->getMetric(to_llc_stat("tx_enabled", lcid));
+    stats.rx_enabled    = &main_monitor->getMetric(to_llc_stat("rx_enabled", lcid));
 }
 
 lcid_t LLC::get_lcid()
@@ -29,6 +31,8 @@ lcid_t LLC::get_lcid()
 
 void LLC::set_tx_enabled(bool value)
 {
+    stats.tx_enabled->store(value);
+
     std::unique_lock<std::mutex> lg(tx_mutex);
     auto old_tx_enabled = is_tx_enabled;
     is_tx_enabled = value;
@@ -72,6 +76,8 @@ void LLC::set_tx_enabled(bool value)
 
 void LLC::set_rx_enabled(bool value)
 {
+    stats.rx_enabled->store(value);
+
     std::unique_lock<std::mutex> lg(rx_mutex);
     auto old_rx_enabled = is_rx_enabled;
     is_rx_enabled = value;

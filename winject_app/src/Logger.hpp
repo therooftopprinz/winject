@@ -71,6 +71,15 @@ inline std::string to_pdcp_stat(std::string statname, size_t lcid)
     return ss.str();
 }
 
+inline std::string to_ep_stat(std::string statname, size_t lcid)
+{
+    std::stringstream ss;
+    ss << "ep_" << statname << "{"
+       << "lcid=\"" << lcid << "\""
+       <<"}";
+    return ss.str();
+}
+
 using LoggerType = Logger<unsigned(app_logbit_e::MAX)>;
 extern std::unique_ptr<LoggerType> main_logger;
 extern std::unique_ptr<bfc::IMonitor> main_monitor;

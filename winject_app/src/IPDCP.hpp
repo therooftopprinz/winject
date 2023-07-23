@@ -70,6 +70,8 @@ struct IPDCP
         bfc::IMetric* rx_ignored_pdu = nullptr;
         bfc::IMetric* rx_invalid_segment = nullptr;
         bfc::IMetric* rx_segment_rcvd = nullptr;
+        bfc::IMetric* tx_enabled = nullptr;
+        bfc::IMetric* rx_enabled = nullptr;
     };
 
     virtual ~IPDCP(){}

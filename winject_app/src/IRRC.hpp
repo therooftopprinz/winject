@@ -4,6 +4,8 @@
 #include <map>
 #include <string>
 
+#include <bfc/IMetric.hpp>
+
 #include "frame_defs.hpp"
 
 #include "IPDCP.hpp"
@@ -62,6 +64,11 @@ struct IRRC
         std::map<uint8_t, IPDCP::tx_config_t> pdcp_configs;
         std::map<uint8_t, IEndPoint::config_t> ep_configs;
         app_config_t app_config;
+    };
+
+    struct stats_t
+    {
+        bfc::IMetric* rx_antenna_dbm_avg46 = nullptr;
     };
 
     virtual ~IRRC(){};

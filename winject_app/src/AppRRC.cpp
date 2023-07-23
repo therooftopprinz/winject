@@ -36,6 +36,8 @@ AppRRC::AppRRC(const config_t& config)
             config.app_config.woudp_rx);
     }
 
+    stats.rx_antenna_dbm_avg46 = &main_monitor->getMetric("wifi_rx_antenna_dbm_avg46");
+
     setup_80211_base_frame();
     setup_console();
     setup_pdcps();
@@ -172,18 +174,18 @@ void AppRRC::perform_tx(size_t payload_size)
 
     if (main_logger->get_logbit(WTX_BUF))
     {
-        Logless(*main_logger, RRC_TRC, "TRC | AppRRC | wifi send buffer[#]:\n#", sz, buffer_str(tx_buff, sz).c_str());
-        Logless(*main_logger, RRC_TRC, "TRC | AppRRC | send size #", sz);
+        Logless(*main_logger, WTX_BUF, "TRC | AppRRC | wifi send buffer[#]:\n#", sz, buffer_str(tx_buff, sz).c_str());
+        Logless(*main_logger, WTX_BUF, "TRC | AppRRC | send size #", sz);
     }
     if (main_logger->get_logbit(WTX_RAD))
     {
-        Logless(*main_logger, RRC_TRC, "TRC | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
+        Logless(*main_logger, WTX_RAD, "TRC | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
     }
     if (main_logger->get_logbit(WTX_802))
     {
-        Logless(*main_logger, RRC_TRC, "TRC | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
-        Logless(*main_logger, RRC_TRC, "TRC | AppRRC |   frame body size: #", payload_size);
-        Logless(*main_logger, RRC_TRC, "TRC | AppRRC | -----------------------");
+        Logless(*main_logger, WTX_802, "TRC | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(tx_frame).c_str());
+        Logless(*main_logger, WTX_802, "TRC | AppRRC |   frame body size: #", payload_size);
+        Logless(*main_logger, WTX_802, "TRC | AppRRC | -----------------------");
     }
     wifi->send(tx_buff, sz);
 }
@@ -426,6 +428,15 @@ void AppRRC::on_wifi_rx()
     }
 
     winject::radiotap::radiotap_t radiotap(rx_buff);
+
+    if (radiotap.antenna_signal)
+    {
+        stats.rx_antenna_dbm_avg46->store(
+                radiotap.antenna_signal->dbm_value * 0.4 +
+                stats.rx_antenna_dbm_avg46->load() * 0.6
+            );
+    }
+
     winject::ieee_802_11::frame_t frame80211(radiotap.end(), rx_buff+sizeof(rx_buff));
 
     auto frame80211end = rx_buff+rv;
@@ -433,18 +444,18 @@ void AppRRC::on_wifi_rx()
 
     if (main_logger->get_logbit(WRX_BUF))
     {
-        Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
+        Logless(*main_logger, WRX_BUF, "TR2 | AppRRC | wifi recv buffer[#]:\n#", rv, buffer_str(rx_buff, rv).c_str());
     }
     Logless(*main_logger, RRC_TRC, "TRC | AppRRC | recv size #", rv);
     if (main_logger->get_logbit(WRX_RAD))
     {
-        Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
+        Logless(*main_logger, WRX_RAD, "TR2 | AppRRC | --- radiotap info ---\n#", winject::radiotap::to_string(radiotap).c_str());
     }
     if (main_logger->get_logbit(WRX_802))
     {
-        Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
-        Logless(*main_logger, RRC_TRC, "TR2 | AppRRC |   frame body size: #", size);
-        Logless(*main_logger, RRC_TRC, "TR2 | AppRRC | -----------------------");
+        Logless(*main_logger, WRX_802, "TR2 | AppRRC | --- 802.11 info ---\n#", winject::ieee_802_11::to_string(frame80211).c_str());
+        Logless(*main_logger, WRX_802, "TR2 | AppRRC |   frame body size: #", size);
+        Logless(*main_logger, WRX_802, "TR2 | AppRRC | -----------------------");
     }
 
     if (!frame80211.frame_body)
@@ -486,6 +497,7 @@ void AppRRC::process_rx_frame(uint8_t* start, size_t size)
             advance_cursor(llc_pdu.get_SIZE());
             continue;
         }
+
         auto llc = llc_it->second;
 
         rx_info_t info{};
