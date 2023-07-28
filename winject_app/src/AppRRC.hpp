@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #ifndef __WINJECTUM_APPRRC_HPP__
 #define __WINJECTUM_APPRRC_HPP__
 
@@ -53,8 +70,7 @@ public:
 private:
     void on_console_read();
 
-    std::string on_cmd_push(bfc::ArgsMap&& args);
-    std::string on_cmd_pull(bfc::ArgsMap&& args);
+    std::string on_cmd_init(bfc::ArgsMap&& args);
     std::string on_cmd_stop(bfc::ArgsMap&& args);
     std::string on_cmd_log(bfc::ArgsMap&& args);
 
@@ -107,6 +123,7 @@ private:
     struct rrc_event_setup_t
     {
         lcid_t lcid;
+        bool forced = false;
     };
 
     struct rrc_event_msg_t

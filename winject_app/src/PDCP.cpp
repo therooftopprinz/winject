@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "PDCP.hpp"
 
 PDCP::PDCP(IRRC& rrc, lcid_t lcid, const tx_config_t& tx_config, const rx_config_t& rx_config)
@@ -15,6 +32,7 @@ PDCP::PDCP(IRRC& rrc, lcid_t lcid, const tx_config_t& tx_config, const rx_config
     stats.rx_segment_rcvd     = &main_monitor->getMetric(to_pdcp_stat("rx_segment_rcvd", lcid));
     stats.tx_enabled          = &main_monitor->getMetric(to_pdcp_stat("tx_enabled", lcid));
     stats.rx_enabled          = &main_monitor->getMetric(to_pdcp_stat("rx_enabled", lcid));
+    reset_stats();
 }
 
 lcid_t PDCP::get_attached_lcid()
@@ -24,6 +42,7 @@ lcid_t PDCP::get_attached_lcid()
 
 void PDCP::set_tx_enabled(bool value)
 {
+    reset_stats();
     stats.tx_enabled->store(value);
 
     {
@@ -33,6 +52,7 @@ void PDCP::set_tx_enabled(bool value)
 
     std::unique_lock<std::shared_mutex> lg(tx_mutex);
     auto old_tx_enabled = is_tx_enabled;
+    is_tx_enabled = value;
 
     Logless(*main_logger, PDCP_INF,
         "INF | PDCPT# | set_tx_enabled old=# new=#",
@@ -42,14 +62,13 @@ void PDCP::set_tx_enabled(bool value)
 
     current_tx_offset = 0;
     current_tx_buffer.clear();
-    is_tx_enabled = value;
-
 
     lg.unlock();
 }
 
 void PDCP::set_rx_enabled(bool value)
 {
+    reset_stats();
     stats.rx_enabled->store(value);
 
     std::unique_lock<std::shared_mutex> lg(rx_mutex);
@@ -123,425 +142,425 @@ IPDCP::rx_config_t PDCP::get_rx_config()
 }
 
 void PDCP::on_tx(tx_info_t& info)
+{
+    auto slot_number = info.in_frame_info.slot_number;
+
+    std::unique_lock<std::shared_mutex> lg(tx_mutex);
+
+    if (!is_tx_enabled)
     {
-        auto slot_number = info.in_frame_info.slot_number;
+        return;
+    }
 
-        std::unique_lock<std::shared_mutex> lg(tx_mutex);
+    {
+        std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
+        info.out_tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
+    }
 
-        if (!is_tx_enabled)
+    if (info.out_pdu.size == 0 || !info.out_tx_available)
+    {
+        return;
+    }
+
+    pdcp_t pdcp(info.out_pdu.base, info.out_pdu.size);
+    pdcp.iv_size = tx_cipher_iv_size;
+    pdcp.hmac_size = tx_hmac_size;
+    pdcp.rescan();
+
+    // @note : wait for the allocation to increase
+    // current_tx_buffer.size()
+
+    if (tx_config.min_commit_size > info.out_pdu.size ||
+        pdcp.get_header_size() >= info.out_pdu.size)
+    {
+        Logless(*main_logger, PDCP_TRC, "TRC | PDCPT# | not enough allocation", (int)lcid);
+        return;
+    }
+
+    size_t available_for_data = pdcp.pdu_size - pdcp.get_header_size();
+    uint8_t* payload = pdcp.payload;
+    size_t allocated_segments = 0;
+
+    while (true)
+    {
+        pdcp_segment_t segment(payload, available_for_data);
+        segment.has_offset = tx_config.allow_segmentation;
+        segment.has_sn = tx_config.allow_reordering;
+        segment.rescan();
+
+        if (segment.get_header_size() >= available_for_data)
         {
-            return;
+            break;
         }
 
+        available_for_data -= segment.get_header_size();
+
+        segment.set_SN(tx_sn);
+
+        if (!segment.has_offset)
         {
             std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
-            info.out_tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
-        }
 
-        if (info.out_pdu.size == 0 || !info.out_tx_available)
-        {
-            return;
-        }
-
-        pdcp_t pdcp(info.out_pdu.base, info.out_pdu.size);
-        pdcp.iv_size = tx_cipher_iv_size;
-        pdcp.hmac_size = tx_hmac_size;
-        pdcp.rescan();
-
-        // @note : wait for the allocation to increase
-        // current_tx_buffer.size()
-
-        if (tx_config.min_commit_size > info.out_pdu.size ||
-            pdcp.get_header_size() >= info.out_pdu.size)
-        {
-            Logless(*main_logger, PDCP_TRC, "TRC | PDCPT# | not enough allocation", (int)lcid);
-            return;
-        }
-
-        size_t available_for_data = pdcp.pdu_size - pdcp.get_header_size();
-        uint8_t* payload = pdcp.payload;
-        size_t allocated_segments = 0;
-
-        while (true)
-        {
-            pdcp_segment_t segment(payload, available_for_data);
-            segment.has_offset = tx_config.allow_segmentation;
-            segment.has_sn = tx_config.allow_reordering;
-            segment.rescan();
-
-            if (segment.get_header_size() >= available_for_data)
+            if (!to_tx_queue.size())
             {
                 break;
             }
 
-            available_for_data -= segment.get_header_size();
+            // @note : wait for the allocation to increase
+            if (to_tx_queue.front().size() > available_for_data)
+            {
+                break;
+            }
 
-            segment.set_SN(tx_sn);
+            buffer_t pdu = std::move(to_tx_queue.front());
+            stats.tx_queue_size->store(to_tx_queue.size());
+            Logless(*main_logger, PDCP_TRC, "TRC | PDCPT# | allocated data sn=# data_sz=# to_tx_queue_sz=#",
+                (int) lcid,
+                (int) tx_sn,
+                pdu.size(),
+                to_tx_queue.size());
 
-            if (!segment.has_offset)
+            to_tx_queue.pop_front();
+            to_tx_queue_cv.notify_one();
+            std::memcpy(segment.payload, pdu.data(), pdu.size());
+            segment.set_payload_size(pdu.size());
+            segment.set_LAST(true);
+
+            tx_sn++;
+        }
+        else
+        {
+            // @note : end of current tx buffer
+            if (current_tx_offset >= current_tx_buffer.size())
             {
                 std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
-
                 if (!to_tx_queue.size())
                 {
                     break;
                 }
 
-                // @note : wait for the allocation to increase
-                if (to_tx_queue.front().size() > available_for_data)
-                {
-                    break;
-                }
-
-                buffer_t pdu = std::move(to_tx_queue.front());
-                stats.tx_queue_size->store(to_tx_queue.size());
-                Logless(*main_logger, PDCP_TRC, "TRC | PDCPT# | allocated data sn=# data_sz=# to_tx_queue_sz=#",
-                    (int) lcid,
-                    (int) tx_sn,
-                    pdu.size(),
-                    to_tx_queue.size());
-
+                current_tx_buffer = std::move(to_tx_queue.front());
+                current_tx_offset = 0;
                 to_tx_queue.pop_front();
                 to_tx_queue_cv.notify_one();
-                std::memcpy(segment.payload, pdu.data(), pdu.size());
-                segment.set_payload_size(pdu.size());
-                segment.set_LAST(true);
-
-                tx_sn++;
-            }
-            else
-            {
-                // @note : end of current tx buffer
-                if (current_tx_offset >= current_tx_buffer.size())
-                {
-                    std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
-                    if (!to_tx_queue.size())
-                    {
-                        break;
-                    }
-
-                    current_tx_buffer = std::move(to_tx_queue.front());
-                    current_tx_offset = 0;
-                    to_tx_queue.pop_front();
-                    to_tx_queue_cv.notify_one();
-                }
-
-                size_t remaining_size = current_tx_buffer.size() - current_tx_offset;
-                size_t alloc_size = std::min(remaining_size, available_for_data);
-
-                std::memcpy(segment.payload, current_tx_buffer.data() + current_tx_offset, alloc_size);
-
-                segment.set_OFFSET(current_tx_offset);
-                segment.set_payload_size(alloc_size);
-
-                auto old_offset = current_tx_offset;
-                current_tx_offset += alloc_size;
-                bool is_last = current_tx_offset >= current_tx_buffer.size();
-
-                Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCPT# | allocated data sn=# seg_off=# seg_size=# is_last=# to_tx_queue_sz=#",
-                    (int)lcid,
-                    (int) tx_sn,
-                    old_offset,
-                    alloc_size,
-                    (int) is_last,
-                    to_tx_queue.size());
-
-                segment.set_LAST(is_last);
-                if (is_last)
-                {
-                    tx_sn++;
-                }
             }
 
-            payload += segment.get_SIZE();
-            available_for_data -= segment.get_payload_size();
-            info.out_allocated += segment.get_SIZE();
-            allocated_segments++;
+            size_t remaining_size = current_tx_buffer.size() - current_tx_offset;
+            size_t alloc_size = std::min(remaining_size, available_for_data);
 
-            // @todo: Implement PDCP encryption
-            // @todo: Implement PDCP integrity
-        }
+            std::memcpy(segment.payload, current_tx_buffer.data() + current_tx_offset, alloc_size);
 
-        if (allocated_segments)
-        {
-            info.out_allocated += pdcp.get_header_size();
-        }
+            segment.set_OFFSET(current_tx_offset);
+            segment.set_payload_size(alloc_size);
 
-        info.out_tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
-    }
-
-void PDCP::update_rx_sn(pdcp_sn_t sn, bool fast_forward)
-    {
-        if (!rx_config.allow_reordering)
-        {
-            auto& current_rx_buffer_el = rx_buffer_ring[0];
-            current_rx_buffer_el.reset();
-            stats.rx_reorder_size->fetch_sub(1);
-            std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
-            to_rx_queue.emplace_back(std::move(rx_buffer_ring[0].buffer));
-            to_rx_queue_cv.notify_one();
-            return;
-        }
-
-        while (true)
-        {
-
-            pdcp_sn_t max_sn = std::numeric_limits<pdcp_sn_t>::max();
-            size_t sn_dist = sn >= rx_sn ? (sn - rx_sn) :
-                (max_sn - rx_sn + sn + 1);
-
-            auto current_rx_buffer_idx = rx_buffer_ring_index(rx_sn);
-            auto& current_rx_buffer_el = rx_buffer_ring[current_rx_buffer_idx];
-            auto& current_rx_buffer = current_rx_buffer_el.buffer;
-
-            if (current_rx_buffer_el.is_complete())
-            {
-                current_rx_buffer_el.reset();
-                stats.rx_reorder_size->fetch_sub(1);
-                Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCPR# | transported packet sn=# size=#",
-                    (int) lcid,
-                    rx_sn,
-                    current_rx_buffer.size());
-
-                rx_sn++;
-                std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
-                to_rx_queue.emplace_back(std::move(current_rx_buffer));
-                to_rx_queue_cv.notify_one();
-            }
-            else if (fast_forward)
-            {
-                if (current_rx_buffer_el.recvd_offsets.size())
-                {
-                    stats.rx_reorder_size->fetch_sub(1);
-                }
-
-                current_rx_buffer_el.reset();
-
-                Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCPR# | Dropped packet sn=# dist=#",
-                    (int) lcid,
-                    rx_sn,
-                    sn_dist);
-
-                rx_sn++;
-                if (rx_sn == sn || rx_config.max_sn_distance > sn_dist)
-                {
-                    break;
-                }
-            }
-            else
-            {
-                break;
-            }
-        }
-    }
-
-void PDCP::on_rx(rx_info_t& info)
-    {
-        std::unique_lock<std::shared_mutex> lg(rx_mutex);
-        if (!is_rx_enabled)
-        {
-            stats.rx_ignored_pdu->fetch_add(1);
-            return;
-        }
-
-        pdcp_t pdcp(info.in_pdu.base, info.in_pdu.size);
-        pdcp.iv_size = rx_cipher_iv_size;
-        pdcp.hmac_size = rx_hmac_size;
-        pdcp.rescan();
-
-        uint8_t *payload = pdcp.payload;
-
-        if (pdcp.get_header_size() >= info.in_pdu.size)
-        {
-            stats.rx_invalid_pdu->fetch_add(1);
-            return;
-        }
-
-        size_t available_data = info.in_pdu.size - pdcp.get_header_size();
-
-        while (true)
-        {
-            pdcp_segment_t segment(payload, available_data);
-            segment.has_offset = rx_config.allow_segmentation;
-            segment.has_sn = rx_config.allow_reordering;
-            segment.rescan();
-
-            if (segment.get_header_size() >= available_data)
-            {
-                if (available_data) stats.rx_invalid_segment->fetch_add(1);
-                break;
-            }
-
-            stats.rx_segment_rcvd->fetch_add(1);
-
-            pdcp_sn_t sn = segment.get_SN().value_or(0u);
-
-            payload += segment.get_SIZE();
-            available_data -= segment.get_SIZE();
-
-            pdcp_segment_offset_t offset = segment.get_OFFSET().value_or(0);
-            pdcp_segment_offset_t size = segment.get_payload_size();
-
-            if (!rx_sn_synced)
-            {
-                rx_sn_synced = true;
-                rx_sn = sn;
-            }
-
-            pdcp_sn_t max_sn = std::numeric_limits<pdcp_sn_t>::max();
-            size_t sn_dist = sn >= rx_sn ? (sn - rx_sn) :
-                (max_sn - rx_sn + sn + 1);
-
-            if (sn_dist && (max_sn - sn_dist) <= rx_config.max_sn_distance)
-            {
-                Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCPR# | Ignored completed (before) sn=#",
-                    (int) lcid,
-                    sn);
-                continue;
-            }
-
-            bool fast_forward = false;
-            if (sn_dist > rx_config.max_sn_distance)
-            {
-                LoglessF(*main_logger, PDCP_ERR,
-                    "ERR | PDCPR# | sn out of range! sn=# rx_sn=# distance=#",
-                    (int) lcid,
-                    sn,
-                    rx_sn,
-                    sn_dist);
-
-                if (rx_config.allow_rlf)
-                {
-                    rrc.on_rlf(lcid);
-                    break;
-                }
-
-                fast_forward = true;
-            }
-
-            auto current_rx_buffer_idx = rx_buffer_ring_index(sn);
-            auto& current_rx_buffer_el = rx_buffer_ring[current_rx_buffer_idx];
-            auto& current_rx_buffer = current_rx_buffer_el.buffer;
-
-            if (current_rx_buffer_el.is_complete())
-            {
-                Logless(*main_logger, PDCP_TRC,
-                    "TRC | PDCPR# | Ignored completed (after) sn=#",
-                    (int) lcid,
-                    sn);
-                continue;
-            }
-
-            if (offset + size > current_rx_buffer.size())
-            {
-                current_rx_buffer.resize(offset + size);
-            }
-
-            // @todo : Implement PDCP encryption
-            // @todo : Implement PDCP integrity
-
-            if (segment.is_LAST())
-            {
-                current_rx_buffer_el.expected_size = offset+size;
-                current_rx_buffer_el.has_expected_size = true;
-            }
-
-            // Only copy not yet received offset
-            if (!current_rx_buffer_el.recvd_offsets.count(offset))
-            {
-                std::memcpy(current_rx_buffer.data() + offset, segment.payload, size);
-                current_rx_buffer_el.recvd_offsets.emplace(offset);
-                current_rx_buffer_el.accumulated_size += size;
-            }
+            auto old_offset = current_tx_offset;
+            current_tx_offset += alloc_size;
+            bool is_last = current_tx_offset >= current_tx_buffer.size();
 
             Logless(*main_logger, PDCP_TRC,
-                "TRC | PDCPR# | segment complete=# sn=# rx_sn=# is_last=# seg_off=# seg_sz=#",
-                (int) lcid,
-                (int) current_rx_buffer_el.is_complete(),
-                sn,
-                rx_sn,
-                (int) segment.is_LAST(),
-                offset,
-                size);
+                "TRC | PDCPT# | allocated data sn=# seg_off=# seg_size=# is_last=# to_tx_queue_sz=#",
+                (int)lcid,
+                (int) tx_sn,
+                old_offset,
+                alloc_size,
+                (int) is_last,
+                to_tx_queue.size());
 
-            if (current_rx_buffer_el.is_complete())
+            segment.set_LAST(is_last);
+            if (is_last)
             {
-                stats.rx_reorder_size->fetch_add(1);
-                update_rx_sn(sn, fast_forward);
+                tx_sn++;
             }
         }
+
+        payload += segment.get_SIZE();
+        available_for_data -= segment.get_payload_size();
+        info.out_allocated += segment.get_SIZE();
+        allocated_segments++;
+
+        // @todo: Implement PDCP encryption
+        // @todo: Implement PDCP integrity
     }
 
-buffer_t PDCP::to_rx(uint64_t timeout_us)
+    if (allocated_segments)
     {
-        auto pred = [this]() -> bool {
-                return to_rx_queue.size();
-            };
+        info.out_allocated += pdcp.get_header_size();
+    }
 
+    info.out_tx_available = to_tx_queue.size() || (current_tx_buffer.size() > current_tx_offset);
+}
+
+void PDCP::update_rx_sn(pdcp_sn_t sn, bool fast_forward)
+{
+    if (!rx_config.allow_reordering)
+    {
+        auto& current_rx_buffer_el = rx_buffer_ring[0];
+        current_rx_buffer_el.reset();
+        stats.rx_reorder_size->fetch_sub(1);
         std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
+        to_rx_queue.emplace_back(std::move(rx_buffer_ring[0].buffer));
+        to_rx_queue_cv.notify_one();
+        return;
+    }
 
-        if (to_rx_queue.size())
+    while (true)
+    {
+
+        pdcp_sn_t max_sn = std::numeric_limits<pdcp_sn_t>::max();
+        size_t sn_dist = sn >= rx_sn ? (sn - rx_sn) :
+            (max_sn - rx_sn + sn + 1);
+
+        auto current_rx_buffer_idx = rx_buffer_ring_index(rx_sn);
+        auto& current_rx_buffer_el = rx_buffer_ring[current_rx_buffer_idx];
+        auto& current_rx_buffer = current_rx_buffer_el.buffer;
+
+        if (current_rx_buffer_el.is_complete())
         {
-            auto rv = std::move(to_rx_queue.front());
-            to_rx_queue.pop_front();
-            // @todo: Implement PDCP compression
-            return rv;
+            current_rx_buffer_el.reset();
+            stats.rx_reorder_size->fetch_sub(1);
+            Logless(*main_logger, PDCP_TRC,
+                "TRC | PDCPR# | transported packet sn=# size=#",
+                (int) lcid,
+                rx_sn,
+                current_rx_buffer.size());
+
+            rx_sn++;
+            std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
+            to_rx_queue.emplace_back(std::move(current_rx_buffer));
+            to_rx_queue_cv.notify_one();
         }
-
-        if (timeout_us==-1)
+        else if (fast_forward)
         {
-            to_rx_queue_cv.wait(lg, pred);
+            if (current_rx_buffer_el.recvd_offsets.size())
+            {
+                stats.rx_reorder_size->fetch_sub(1);
+            }
+
+            current_rx_buffer_el.reset();
+
+            Logless(*main_logger, PDCP_TRC,
+                "TRC | PDCPR# | Dropped packet sn=# dist=#",
+                (int) lcid,
+                rx_sn,
+                sn_dist);
+
+            rx_sn++;
+            if (rx_sn == sn || rx_config.max_sn_distance > sn_dist)
+            {
+                break;
+            }
         }
         else
         {
-            to_rx_queue_cv.wait_for(lg,
-                std::chrono::microseconds(timeout_us), pred);
+            break;
         }
+    }
+}
 
-        if (to_rx_queue.size())
-        {
-            auto rv = std::move(to_rx_queue.front());
-            to_rx_queue.pop_front();
-            // @todo: Implement PDCP compression
-            return rv;
-        }
-
-        return {};
+void PDCP::on_rx(rx_info_t& info)
+{
+    std::unique_lock<std::shared_mutex> lg(rx_mutex);
+    if (!is_rx_enabled)
+    {
+        stats.rx_ignored_pdu->fetch_add(1);
+        return;
     }
 
-bool PDCP::to_tx(buffer_t&& buffer)
-    {
-        std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
+    pdcp_t pdcp(info.in_pdu.base, info.in_pdu.size);
+    pdcp.iv_size = rx_cipher_iv_size;
+    pdcp.hmac_size = rx_hmac_size;
+    pdcp.rescan();
 
-        if (!is_tx_enabled && tx_config.auto_init_on_tx)
+    uint8_t *payload = pdcp.payload;
+
+    if (pdcp.get_header_size() >= info.in_pdu.size)
+    {
+        stats.rx_invalid_pdu->fetch_add(1);
+        return;
+    }
+
+    size_t available_data = info.in_pdu.size - pdcp.get_header_size();
+
+    while (true)
+    {
+        pdcp_segment_t segment(payload, available_data);
+        segment.has_offset = rx_config.allow_segmentation;
+        segment.has_sn = rx_config.allow_reordering;
+        segment.rescan();
+
+        if (segment.get_header_size() >= available_data)
         {
-            rrc.on_init(lcid);
+            if (available_data) stats.rx_invalid_segment->fetch_add(1);
+            break;
         }
 
-        to_tx_queue_cv.wait_for(lg, std::chrono::milliseconds(100),
-            [this](){
-                return tx_config.max_tx_queue_size >= to_tx_queue.size();
-            });
+        stats.rx_segment_rcvd->fetch_add(1);
 
-        if (to_tx_queue.size() >= tx_config.max_tx_queue_size)
+        pdcp_sn_t sn = segment.get_SN().value_or(0u);
+
+        payload += segment.get_SIZE();
+        available_data -= segment.get_SIZE();
+
+        pdcp_segment_offset_t offset = segment.get_OFFSET().value_or(0);
+        pdcp_segment_offset_t size = segment.get_payload_size();
+
+        if (!rx_sn_synced)
         {
-            return false;
+            rx_sn_synced = true;
+            rx_sn = sn;
+        }
+
+        pdcp_sn_t max_sn = std::numeric_limits<pdcp_sn_t>::max();
+        size_t sn_dist = sn >= rx_sn ? (sn - rx_sn) :
+            (max_sn - rx_sn + sn + 1);
+
+        if (sn_dist && (max_sn - sn_dist) <= rx_config.max_sn_distance)
+        {
+            Logless(*main_logger, PDCP_TRC,
+                "TRC | PDCPR# | Ignored completed (before) sn=#",
+                (int) lcid,
+                sn);
+            continue;
+        }
+
+        bool fast_forward = false;
+        if (sn_dist > rx_config.max_sn_distance)
+        {
+            LoglessF(*main_logger, PDCP_ERR,
+                "ERR | PDCPR# | sn out of range! sn=# rx_sn=# distance=#",
+                (int) lcid,
+                sn,
+                rx_sn,
+                sn_dist);
+
+            if (rx_config.allow_rlf)
+            {
+                rrc.on_rlf(lcid);
+                break;
+            }
+
+            fast_forward = true;
+        }
+
+        auto current_rx_buffer_idx = rx_buffer_ring_index(sn);
+        auto& current_rx_buffer_el = rx_buffer_ring[current_rx_buffer_idx];
+        auto& current_rx_buffer = current_rx_buffer_el.buffer;
+
+        if (current_rx_buffer_el.is_complete())
+        {
+            Logless(*main_logger, PDCP_TRC,
+                "TRC | PDCPR# | Ignored completed (after) sn=#",
+                (int) lcid,
+                sn);
+            continue;
+        }
+
+        if (offset + size > current_rx_buffer.size())
+        {
+            current_rx_buffer.resize(offset + size);
+        }
+
+        // @todo : Implement PDCP encryption
+        // @todo : Implement PDCP integrity
+
+        if (segment.is_LAST())
+        {
+            current_rx_buffer_el.expected_size = offset+size;
+            current_rx_buffer_el.has_expected_size = true;
+        }
+
+        // Only copy not yet received offset
+        if (!current_rx_buffer_el.recvd_offsets.count(offset))
+        {
+            std::memcpy(current_rx_buffer.data() + offset, segment.payload, size);
+            current_rx_buffer_el.recvd_offsets.emplace(offset);
+            current_rx_buffer_el.accumulated_size += size;
         }
 
         Logless(*main_logger, PDCP_TRC,
-            "TRC | PDCPT# | to_tx msg_sz=# queue_sz=#",
+            "TRC | PDCPR# | segment complete=# sn=# rx_sn=# is_last=# seg_off=# seg_sz=#",
             (int) lcid,
-            buffer.size(),
-            to_tx_queue.size());
+            (int) current_rx_buffer_el.is_complete(),
+            sn,
+            rx_sn,
+            (int) segment.is_LAST(),
+            offset,
+            size);
 
-        // @todo: Implement PDCP compression
-        to_tx_queue.emplace_back(std::move(buffer));
-        return true;
+        if (current_rx_buffer_el.is_complete())
+        {
+            stats.rx_reorder_size->fetch_add(1);
+            update_rx_sn(sn, fast_forward);
+        }
     }
+}
+
+buffer_t PDCP::to_rx(uint64_t timeout_us)
+{
+    auto pred = [this]() -> bool {
+            return to_rx_queue.size();
+        };
+
+    std::unique_lock<std::mutex> lg(to_rx_queue_mutex);
+
+    if (to_rx_queue.size())
+    {
+        auto rv = std::move(to_rx_queue.front());
+        to_rx_queue.pop_front();
+        // @todo: Implement PDCP compression
+        return rv;
+    }
+
+    if (timeout_us==-1)
+    {
+        to_rx_queue_cv.wait(lg, pred);
+    }
+    else
+    {
+        to_rx_queue_cv.wait_for(lg,
+            std::chrono::microseconds(timeout_us), pred);
+    }
+
+    if (to_rx_queue.size())
+    {
+        auto rv = std::move(to_rx_queue.front());
+        to_rx_queue.pop_front();
+        // @todo: Implement PDCP compression
+        return rv;
+    }
+
+    return {};
+}
+
+bool PDCP::to_tx(buffer_t&& buffer)
+{
+    std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
+
+    if (!is_tx_enabled && tx_config.auto_init_on_tx)
+    {
+        rrc.on_init(lcid);
+    }
+
+    to_tx_queue_cv.wait_for(lg, std::chrono::milliseconds(100),
+        [this](){
+            return tx_config.max_tx_queue_size >= to_tx_queue.size();
+        });
+
+    if (to_tx_queue.size() >= tx_config.max_tx_queue_size)
+    {
+        return false;
+    }
+
+    Logless(*main_logger, PDCP_TRC,
+        "TRC | PDCPT# | to_tx msg_sz=# queue_sz=#",
+        (int) lcid,
+        buffer.size(),
+        to_tx_queue.size());
+
+    // @todo: Implement PDCP compression
+    to_tx_queue.emplace_back(std::move(buffer));
+    return true;
+}
 
 const PDCP::stats_t& PDCP::get_stats()
 {
@@ -551,4 +570,12 @@ const PDCP::stats_t& PDCP::get_stats()
 size_t PDCP::rx_buffer_ring_index(pdcp_sn_t sn)
 {
     return sn % rx_buffer_ring.size();
+}
+
+void PDCP::reset_stats()
+{
+    stats.rx_invalid_pdu->store(0);
+    stats.rx_ignored_pdu->store(0);
+    stats.rx_invalid_segment->store(0);
+    stats.rx_segment_rcvd->store(0);
 }

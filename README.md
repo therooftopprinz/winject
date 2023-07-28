@@ -227,75 +227,35 @@ ppWIFI RRC:
 
 # RRC Procedures
 
-## Unidirectional RX LLC Establishment
-```
-AL3                AL0                    BL0                BL3
- |                  |                      |                  |
- |                  | PullReq(LC3)         |                  |
- |                  +--------------------->| - - > disable tx |
- |                  |                      |                  |
- | reconfig_rx      | PullResp(LC3)        |                  |
- |<- - - - - - - - -+<---------------------+                  |
- | enable_rx        |                      |                  |
- |                  |                      |                  |
- |                    << LLC ACTIVATED <<                     |
- |< - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-```
-
-## Unidirectional TX LLC Establishment
-```
-AL3                AL0                    BL0                BL3
- |                  |                      |                  |
- |                  | PushReq(LC3)         | reconfig_rx      |
- | disable tx       +--------------------->+- - - - - - - - ->|
- |                  |                      | enable_rx        |
- |                  | PushResp(LC3)        |                  |
- | enabled tx       |<---------------------+                  |
- |                  |                      |                  |
- |                     >> LLC ACTIVATED >>                    |
- +- - - - - - - - - - - - - - - - - - - - - - - - - - - - - ->|
-```
-
-## Bidirectional LLC Establishment
+## AM LLC Establishment
 ```
 AL3                AL0                    BL0                BL3
  |                  |                      |                  |
  |                  | ExchangeRequest(LC3) | reconfig_rx      |
  |                  +--------------------->|- - - - - - - - ->|
- |                  |                      | enable_rx        |
+ |                  |                      |                  |
  | reconfig_rx      | ExchangeResponse(LC3)|                  |
  |<- - - - - - - - -+<---------------------+                  |
- | enable_rx        |                      |                  |
+ |                  |          ^           |                  |
+ |                  |          |           |                  |
+ |                  |    activate_delay    |                  |
+ |                  |          |           |                  |
+ |                  |          v           |                  |
+ | enable_tx        |                      |enable_tx         |
+ | enable_rx        |                      |enable_rx         |
  |                  |                      |                  |
  |                  |                      |                  |
- |                    << LLC ACTIVATED  <<                    |
- |< - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
+ |                    << LLC ACTIVATED  >>                    |
+ |< - - - - - - - - - - - - traffic  - - - - - - - - - - - - >|
  |                  |                      |                  |
- | enable_tx        | ActivateResp         |                  |
- |<- - - - - - - - -+<---------------------+                  |
  |                  |                      |                  |
- |                    >> LLC ACTIVATED  >>                    |
- +- - - - - - - - - - - - - - - - - - - - - - - - - - - - - ->|
-```
-
-## LLC Reconfiguration
-```
- AL3                AL0             BL0                BL3
- |                  |               |                  |
- |                   << LLC ACTIVE <<                  |
- |< - - - - - - - - - - - - - - - - - - - - - - - - - >|
- |                  |               |                  |
- |                  | PushReq(LC3)  | reconfig_rx      |
- |                  +-------------->+- - - - - - - - ->|
- |                  |               | enable_rx        |
- |                  | PushResp(LC3) |                  |
- |                  |<--------------+                  |
- |                  |               |                  |
 ```
 
 ## LLC Fault
 ```
  AL3                AL0             BL0                BL3
+ |                  |               |                  |
+ |< - - - - - - - - - - traffic  - - - - - - - - - - ->|
  |                  |               |                  |
  | DATA 0           |               |                  |
  +-------------------------> X      |                  |
@@ -304,16 +264,17 @@ AL3                AL0                    BL0                BL3
  |                  |               |                  |
                           . . .
  |                  |               |                  |
- | DATA 0 MAXRTX    |               |                  |
+ | DATA 0 MAX_RTX   |               |                  |
  +-------------------------> X      |                  |
  |                  |               |                  |
- | on_rlf           | FaultRequest  | disable_rx       |
+ | on_rlf           | FaultRequest  |                  |
  + - - - - - - - -->+---------------+- - - - - - - - ->|
- | disable_tx       |               | reset_pdcp       |
- | reset_pdcp       | FaultResponse |                  |
+ | disable_tx       |               | disable_tx       |
+ | disable_rx       |               | disable_rx       |
+ | reset_pdcp       | FaultResponse | reset_pdcp       |
  |                  |<--------------+                  |
  |                  |               |                  |
- |                   >> LLC FAULT >>                   |
- +- - - - - - - - - - - - - - -> X  |                  |
+ |                   << LLC FAULT >>                   |
+ |X<- - - - - - - - - - - - - - - - - - - - - - - - ->X|
  ```
  

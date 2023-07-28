@@ -54,12 +54,12 @@
           "tx_mode" : "AM",
           "scheduling_config" : {
             "nd_pdu_size" : 64,
-            "quanta" : 128
+            "quanta" : 512
           },
           "am_tx_config": {
             "allow_rlf" : true,
             "arq_window_size" : 30,
-            "max_retx_count" : 100
+            "max_retx_count" : 200
           },
           "common_tx_config" : {},
           "common_rx_config" : {}
@@ -79,37 +79,29 @@
         }
       },
       {
-        "lcid" : 2,
-        "description" : "vpn2",
+        "lcid" : 6,
+        "description" : "video6",
         "llc_config" : {
-          "tx_mode" : "AM",
+          "lcid" : 0,
+          "tx_mode" : "TM",
           "scheduling_config" : {
-            "nd_pdu_size" : 64,
-            "quanta" : 1000
-          },
-          "am_tx_config": {
-            "allow_rlf" : true,
-            "arq_window_size" : 30,
-            "max_retx_count" : 100
+            "nd_pdu_size" : 0,
+            "quanta" : 1450
           },
           "common_tx_config" : {},
-          "common_rx_config": {
+          "common_rx_config" : {
             "auto_init_on_rx" : true
           }
         },
         "pdcp_config" : {
-          "tx_config" : {
+          "tx_config": {
             "auto_init_on_tx" : true,
-            "allow_rlf" : true,
-            "allow_segmentation" : true,
-            "allow_reordering" : true,
-            "max_sn_distance" : 3000,
-            "min_commit_size" : 0
+            "allow_rlf" : false
           },
           "endpoint_config" : {
             "type" : "UDP",
-            "udp_tx_address" : "0.0.0.0:1194",
-            "udp_rx_address" : "127.0.0.1:21022"
+            "udp_tx_address" : "127.0.0.1:21061",
+            "udp_rx_address" : "127.0.0.1:21062"
           }
         }
       },
@@ -140,7 +132,7 @@
             "allow_rlf" : false,
             "allow_segmentation" : true,
             "allow_reordering" : true,
-            "max_sn_distance" : 1000,
+            "max_sn_distance" : 500,
             "min_commit_size" : 0
           },
           "endpoint_config" : {

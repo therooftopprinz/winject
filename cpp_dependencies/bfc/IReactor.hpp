@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * MIT License 
+ * 
+ */
+
 #ifndef __BFC_IREACTOR_HPP__
 #define __BFC_IREACTOR_HPP__
 

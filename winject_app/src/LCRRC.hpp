@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #ifndef __LCRRC_HPP__
 #define __LCRRC_HPP__
 
@@ -89,18 +106,19 @@ public:
         schedule_activate();
     }
 
-    void on_init() override
+    void on_init(bool forced=false) override
     {
-        if (E_TXRX_STATE_CONFIGURING == txrx_state ||
+        if (!forced && (E_TXRX_STATE_CONFIGURING == txrx_state ||
             E_TXRX_STATE_CONFIGURED  == txrx_state ||
-            E_TXRX_STATE_ACTIVE == txrx_state)
+            E_TXRX_STATE_ACTIVE == txrx_state))
         {
             return;
         }
 
         Logless(*main_logger, RRC_INF,
-            "INF | LCRRC# | on_init_am (self init)",
-            (int) llc.get_lcid());
+            "INF | LCRRC# | on_init_am (self init) forced=#",
+            (int) llc.get_lcid(),
+            (int) forced);
 
         change_txrx_state(E_TXRX_STATE_CONFIGURING);
 
@@ -208,7 +226,7 @@ private:
     void change_txrx_state(txrx_state_e new_state)
     {
         Logless(*main_logger, RRC_INF,
-            "INF| LCRRC# | Change RX state old=# new=#",
+            "INF | LCRRC# | Change TXRX state old=# new=#",
             (int) llc.get_lcid(),
             state_str[txrx_state],
             state_str[new_state]);

@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #ifndef __WINJECTUM_PDCP_HPP__
 #define __WINJECTUM_PDCP_HPP__
 
@@ -41,6 +58,7 @@ private:
     size_t rx_buffer_ring_index(pdcp_sn_t sn);
     void print_stats();
     void update_rx_sn(pdcp_sn_t sn, bool fast_forward);
+    void reset_stats();
 
     IRRC& rrc;
     lcid_t lcid;

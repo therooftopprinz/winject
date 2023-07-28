@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "AppRRC.hpp"
 
 AppRRC::AppRRC(const config_t& config)
@@ -97,32 +114,11 @@ void AppRRC::on_console_read()
     }
 }
 
-std::string AppRRC::on_cmd_push(bfc::ArgsMap&& args)
+std::string AppRRC::on_cmd_init(bfc::ArgsMap&& args)
 {
-    // RRC rrc;
-    // rrc.requestID = rrc_req_id.fetch_add(1);
-    // rrc.message = RRC_PushRequest{};
-    // auto& message = std::get<RRC_PushRequest>(rrc.message);
-
-    // fill_from_config(args.argAs<int>("lcid").value_or(0xF),
-    //     true, true, message);
-
-    // auto_send_rrc(10, rrc);
+    lcid_t lcid = args.argAs<int>("lcid").value();
+    push_rrc_event(rrc_event_setup_t{lcid, true});
     return "pushing...\n";
-}
-
-std::string AppRRC::on_cmd_pull(bfc::ArgsMap&& args)
-{
-    // RRC rrc;
-    // rrc.requestID = rrc_req_id.fetch_add(1);
-    // rrc.message = RRC_PullRequest{};
-    // auto& pull_request = std::get<RRC_PullRequest>(rrc.message);
-    // pull_request.lcid = args.argAs<int>("lcid").value_or(0);
-    // pull_request.includeLLCConfig = true;
-    // pull_request.includePDCPConfig = true;
-
-    // auto_send_rrc(10, rrc);
-    return "pulling...\n";
 }
 
 std::string AppRRC::on_cmd_stop(bfc::ArgsMap&& args)
@@ -242,9 +238,7 @@ void AppRRC::setup_console()
         return;
     }
 
-    cmdman.addCommand("push", [this](bfc::ArgsMap&& args){return on_cmd_push(std::move(args));});
-    cmdman.addCommand("pull", [this](bfc::ArgsMap&& args){return on_cmd_pull(std::move(args));});
-    cmdman.addCommand("stop", [this](bfc::ArgsMap&& args){return on_cmd_stop(std::move(args));});
+    cmdman.addCommand("init", [this](bfc::ArgsMap&& args){return on_cmd_init(std::move(args));});
     cmdman.addCommand("log", [this](bfc::ArgsMap&& args){return on_cmd_log(std::move(args));});
 
     reactor.addReadHandler(console_sock.handle(), [this](){on_console_read();});
@@ -644,7 +638,7 @@ void AppRRC::on_rrc_event(const rrc_event_setup_t& setup)
     if (channel_rrc_contexts.count(setup.lcid))
     {
         auto& lcrrc = channel_rrc_contexts.at(lcid);
-        lcrrc->on_init();
+        lcrrc->on_init(setup.forced);
     }
 }
 

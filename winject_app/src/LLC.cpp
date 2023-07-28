@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "LLC.hpp"
 
 LLC::LLC(
@@ -22,6 +39,8 @@ LLC::LLC(
     stats.bytes_recv    = &main_monitor->getMetric(to_llc_stat("bytes_recv", lcid));
     stats.tx_enabled    = &main_monitor->getMetric(to_llc_stat("tx_enabled", lcid));
     stats.rx_enabled    = &main_monitor->getMetric(to_llc_stat("rx_enabled", lcid));
+
+    reset_stats();
 }
 
 lcid_t LLC::get_lcid()
@@ -31,6 +50,7 @@ lcid_t LLC::get_lcid()
 
 void LLC::set_tx_enabled(bool value)
 {
+    reset_stats();
     stats.tx_enabled->store(value);
 
     std::unique_lock<std::mutex> lg(tx_mutex);
@@ -76,6 +96,7 @@ void LLC::set_tx_enabled(bool value)
 
 void LLC::set_rx_enabled(bool value)
 {
+    reset_stats();
     stats.rx_enabled->store(value);
 
     std::unique_lock<std::mutex> lg(rx_mutex);
@@ -289,8 +310,9 @@ void LLC::on_tx(tx_info_t& info)
             }
 
             LoglessF(*main_logger, LLC_ERR,
-                "ERR | LLCT#  | RLF inhibited",
-                int(lcid));
+                "ERR | LLCT#  | RLF inhibited llc_tx_id=#",
+                int(lcid),
+                retx_llc_tx_id);
 
             // RETX dropped, aquire new PDCP PDU
 
@@ -357,8 +379,9 @@ void LLC::on_tx(tx_info_t& info)
     }
     else
     {
-        stats.pkt_resent->fetch_add(1);
-        stats.bytes_resent->fetch_add(tx_elem.pdcp_pdu_size);
+        tx_elem.pdcp_pdu_size = llc.get_payload_size();
+        stats.pkt_sent->fetch_add(1);
+        stats.bytes_sent->fetch_add(tx_elem.pdcp_pdu_size);
     }
 
     tx_ring_lg.unlock();
@@ -537,4 +560,14 @@ void LLC::free_tx_buffer(buffer_t&& buffer)
 const LLC::stats_t& LLC::get_stats()
 {
     return stats;
+}
+
+void LLC::reset_stats()
+{
+    stats.pkt_sent->store(0);
+    stats.pkt_resent->store(0);
+    stats.pkt_recv->store(0);
+    stats.bytes_sent->store(0);
+    stats.bytes_resent->store(0);
+    stats.bytes_recv->store(0);
 }

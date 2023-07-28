@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * MIT License 
+ * 
+ */
+
 #ifndef __BFC_METRIC_HPP__
 #define __BFC_METRIC_HPP__
 
@@ -6,6 +13,7 @@
 #include <thread>
 #include <mutex>
 #include <fstream>
+#include <cstdio>
 #include <filesystem>
 
 #include "IMetric.hpp"
@@ -122,6 +130,7 @@ private:
         for (auto& [key, val] : metrics)
         {
             fout.precision(20);
+            fout2.precision(20);
             fout << key << " " << val->load() << "\n";
             fout2 << val->load() << ",";
         }

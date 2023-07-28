@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #ifndef __WINJECTUM_TXSCHEDULER_HPP__
 #define __WINJECTUM_TXSCHEDULER_HPP__
 
@@ -19,6 +36,8 @@ public:
     {
         stats.tick_error        = &main_monitor->getMetric("txs_tick_error");
         stats.tick_error_avg46  = &main_monitor->getMetric("txs_tick_error_avg46");
+        stats.tick              = &main_monitor->getMetric("txs_tick");
+        stats.tick->store(0);
     }
 
     ~TxScheduler()
@@ -115,9 +134,15 @@ private:
 
         int64_t diff_time = now - last_tick;
         int64_t error = frame_info.slot_interval_us - diff_time;
-        auto aerror = std::abs(error);
 
-        stats.tick_error->fetch_add(last_tick ? aerror : 0);
+        auto aerror = last_tick ? std::abs(error) : 0;
+        auto eerror = last_tick ? error : 0;
+
+        stats.tick->fetch_add(
+                (last_tick ? diff_time : 0)
+            );
+
+        stats.tick_error->fetch_add(aerror);
         stats.tick_error_avg46->store(
                 stats.tick_error_avg46->load()*0.6 +
                 aerror*0.4);

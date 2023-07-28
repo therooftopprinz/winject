@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * MIT License 
+ * 
+ */
+
 #ifndef __EpollReactor_HPP__
 #define __EpollReactor_HPP__
 
