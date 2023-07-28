@@ -28,6 +28,7 @@ struct IEndPoint
         std::string type;
         std::string address1;
         std::string address2;
+        bool reply_to_last = false;
     };
 
     struct stats_t

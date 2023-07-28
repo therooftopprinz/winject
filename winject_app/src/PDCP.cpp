@@ -381,7 +381,7 @@ void PDCP::on_rx(rx_info_t& info)
 
     size_t available_data = info.in_pdu.size - pdcp.get_header_size();
 
-    while (true)
+    while (available_data)
     {
         pdcp_segment_t segment(payload, available_data);
         segment.has_offset = rx_config.allow_segmentation;
@@ -399,6 +399,10 @@ void PDCP::on_rx(rx_info_t& info)
         pdcp_sn_t sn = segment.get_SN().value_or(0u);
 
         payload += segment.get_SIZE();
+        if (segment.get_SIZE() > available_data)
+        {
+            break;
+        }
         available_data -= segment.get_SIZE();
 
         pdcp_segment_offset_t offset = segment.get_OFFSET().value_or(0);

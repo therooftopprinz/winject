@@ -149,7 +149,10 @@ private:
 
                 if (rv>0)
                 {
-                    target_addr = sender_addr;
+                    if (config.reply_to_last)
+                    {
+                        target_addr = sender_addr;
+                    }
                     buffer_t b(rv);
                     std::memcpy(b.data(), bv.data(), rv);
                     while (pdcp_tx_running & !pdcp.to_tx(std::move(b)));

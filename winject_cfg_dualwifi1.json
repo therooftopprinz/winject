@@ -90,7 +90,7 @@
           },
           "common_tx_config" : {},
           "common_rx_config" : {
-            "auto_init_on_rx" : true
+            "auto_init_on_rx" : false
           }
         },
         "pdcp_config" : {
@@ -123,7 +123,7 @@
             "crc_type" : "NONE"
           },
           "common_rx_config": {
-            "auto_init_on_rx" : true
+            "auto_init_on_rx" : false
           }
         },
         "pdcp_config" : {
@@ -160,7 +160,7 @@
             "crc_type" : "NONE"
           },
           "common_rx_config" : {
-            "auto_init_on_rx" : true
+            "auto_init_on_rx" : false
           }
         },
         "pdcp_config" : {
@@ -191,7 +191,8 @@
       "tx_device_"   : "wlx24ec998bee93",
       "rx_device_"   : "wlx24ec999b30f3",
       "udp_console" : "127.0.0.1:21000",
-      "logbit" : "1110000000011100111001111111100111100"
+      "logbit" : "1110000000011100111001111111100111100",
+      "logbitx" : "1111111111111111111111111111111111111"
     }
   }
 }

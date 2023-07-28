@@ -41,6 +41,7 @@ constexpr static size_t DEFAULT_MAX_SN_DISTANCE = 1000;
 constexpr static bool DEFAULT_AUTO_INIT_ON_TX = false;
 constexpr static bool DEFAULT_AUTO_INIT_ON_RX = false;
 const static std::string DEFAULT_LOGBIT = "1111111111111111111111111111111011111";
+constexpr static bool DEFAULT_REPLY_TO_LAST = false;
 static const char* config_file = "config.json";
 
 
@@ -191,6 +192,7 @@ int main()
             auto& ep_config = rrc_config.ep_configs[lcid];
             ep_config.lcid = lcid;
             ep_config.type = endpoint_config.at("type");
+            ep_config.reply_to_last = value_or(endpoint_config,"reply_to_last", DEFAULT_REPLY_TO_LAST);
 
             Logless(*main_logger, MAN_INF, "INF | main | lcid: # #", (int) lcid, desc.c_str());
             Logless(*main_logger, MAN_INF, "INF | main |   mode: #", (int) llc_tx_config.mode);
