@@ -34,8 +34,12 @@
             "nd_pdu_size" : 0,
             "quanta" : 4294967295
           },
-          "common_tx_config" : {},
-          "common_rx_config" : {}
+          "common_tx_config" : {
+            "crc_type" : "CRC32(04C11DB7)"
+          },
+          "common_rx_config" : {
+            "crc_type" : "CRC32(04C11DB7)"
+          }
         },
         "pdcp_config" : {
           "description" : "rrc0-pdcp",
@@ -62,8 +66,12 @@
             "arq_window_size" : 30,
             "max_retx_count" : 200
           },
-          "common_tx_config" : {},
-          "common_rx_config" : {}
+          "common_tx_config" : {
+            "crc_type" : "CRC32(04C11DB7)"
+          },
+          "common_rx_config" : {
+            "crc_type" : "CRC32(04C11DB7)"
+          }
         },
         "pdcp_config" : {
           "tx_config" : {
@@ -191,8 +199,8 @@
       "tx_device_" : "wlx24ec99ca8bd1",
       "rx_device_" : "wlx24ec99cab775",
       "udp_console" : "127.0.0.1:22000",
-      "logbit" : "1110000000011100111001111111100111100",
-      "logbitx" : "1111111111111111111111111111111111111"
+      "logbit" : "1111111111111111111111111111111011111",
+      "logbitx" : "1110000000011100111001111111100111100"
     }
   }
 }

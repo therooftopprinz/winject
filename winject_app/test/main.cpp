@@ -9,6 +9,7 @@ std::unique_ptr<bfc::IMonitor> main_monitor;
 
 int main(int argc, char **argv)
 {
+    main_monitor = std::make_unique<bfc::Monitor>(500, "test_metrics");
     main_logger = std::make_unique<LoggerType>("test.log");
     main_logger->logful();
 

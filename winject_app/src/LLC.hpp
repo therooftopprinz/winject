@@ -58,6 +58,7 @@ public:
     void on_rx(rx_info_t& info) override;
 
 private:
+    void configure_crc_size();
     void check_retransmit(size_t slot_number);
     void to_acknowledge(llc_sn_t sn);
     void increment_sn();

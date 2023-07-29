@@ -260,7 +260,7 @@ TEST_F(Test_LLC, should_RLF_on_max_retry)
         };
 
     EXPECT_CALL(*mock_pdcp, on_tx(testing::_))
-        .Times(9)
+        .Times(10)
         .WillOnce(testing::Invoke(pdcp_writer))
         .WillRepeatedly(testing::Return());
     EXPECT_CALL(*mock_rrc, on_rlf(0))
@@ -275,7 +275,6 @@ TEST_F(Test_LLC, should_RLF_on_max_retry)
     trigger_tx(6, buffer, sizeof(buffer));
     trigger_tx(7, buffer, 0);
     trigger_tx(8, buffer, 0);
-    trigger_tx(9, buffer, sizeof(buffer));
 }
 
 // @todo : should report out_tx_available when there's to ack

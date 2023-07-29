@@ -175,9 +175,6 @@ int main()
             auto& common_rx_config = llc.at("common_rx_config");
             llc_rx_config.auto_init_on_rx = value_or(common_rx_config, "auto_init_on_rx", DEFAULT_AUTO_INIT_ON_RX);
 
-            llc_rx_config.mode = llc_rx_config.mode;
-            llc_rx_config.crc_type = llc_rx_config.crc_type;
-
             auto& pdcp_config = rrc_config.pdcp_configs[lcid];
 
             auto& pdcp_tx_config = pdcp.at("tx_config");

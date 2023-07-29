@@ -15,7 +15,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
+#include <arpa/inet.h>
+
 #include "LLC.hpp"
+#include "crc.hpp"
 
 LLC::LLC(
     IPDCP& pdcp,
@@ -26,10 +30,8 @@ LLC::LLC(
     : pdcp(pdcp)
     , rrc(rrc)
     , lcid(lcid)
-    , tx_config(tx_config)
     , tx_ring(1024)
     , sn_to_tx_ring(llc_sn_size, -1)
-    , rx_config(rx_config)
 {
     stats.pkt_sent      = &main_monitor->getMetric(to_llc_stat("pkt_sent", lcid));
     stats.pkt_resent    = &main_monitor->getMetric(to_llc_stat("pkt_resent", lcid));
@@ -41,6 +43,22 @@ LLC::LLC(
     stats.rx_enabled    = &main_monitor->getMetric(to_llc_stat("rx_enabled", lcid));
 
     reset_stats();
+
+    reconfigure(tx_config);
+    reconfigure(rx_config);
+}
+
+void LLC::configure_crc_size()
+{
+    if (tx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
+    {
+        tx_crc_size = 4;
+    }
+
+    if (rx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
+    {
+        rx_crc_size = 4;
+    }
 }
 
 lcid_t LLC::get_lcid()
@@ -123,10 +141,7 @@ void LLC::reconfigure(const tx_config_t& config)
         std::unique_lock<std::mutex> lg(tx_mutex);
         tx_config = config;
         status = is_tx_enabled;
-        if (tx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
-        {
-            tx_crc_size = 4;
-        }
+        configure_crc_size();
 
         Logless(*main_logger, LLC_INF, "INF | LLCT#  | reconfigure tx:", (int)lcid);
         Logless(*main_logger, LLC_INF, "INF | LLCT#  |   mode: #", (int)lcid, (int)tx_config.mode);
@@ -149,13 +164,13 @@ void LLC::reconfigure(const rx_config_t& config)
     bool status;
     {
         std::unique_lock<std::mutex> lg(rx_mutex);
+        auto old_rx_config = rx_config;
         rx_config = config;
+        rx_config.auto_init_on_rx = old_rx_config.auto_init_on_rx;
+
         status = is_rx_enabled;
 
-        if (rx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
-        {
-            rx_crc_size = 4;
-        }
+        configure_crc_size();
 
         Logless(*main_logger, LLC_INF, "INF | LLCR#  | reconfigure rx:", (int) lcid);
         Logless(*main_logger, LLC_INF, "INF | LLCR#  |   mode: #", (int) lcid, (int) rx_config.mode);
@@ -229,10 +244,23 @@ void LLC::on_tx(tx_info_t& info)
             llc.set_SN(0);
             llc.set_A(true);
             llc.set_LCID(lcid);
-            if (tx_crc_size)
+
+            size_t crc = 0;
+            if (tx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
             {
-                // @todo : Calculate CRC for this LLC
+                auto& crc_actual = *(uint32_t*)(llc.CRC());
+                crc_actual= 0;
+                crc = crc32_04C11DB7()(llc.base, llc.get_SIZE());
+                crc_actual = htonl(crc);
             }
+
+            Logless(*main_logger, LLC_TRC,
+                "TRC | LLCT#  | nd-pdu slot=# n_acks=# crc=#",
+                (int) lcid,
+                slot_number,
+                n_acks,
+                crc);
+
             info.out_allocated += llc.get_SIZE();
             llc.base = llc.base + llc.get_SIZE();
         }
@@ -350,6 +378,15 @@ void LLC::on_tx(tx_info_t& info)
     }
     increment_sn();
 
+    size_t crc = 0;
+    if (tx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
+    {
+        auto& crc_actual = *(uint32_t*)(llc.CRC());
+        crc_actual= 0;
+        crc_actual = htonl(crc32_04C11DB7()(llc.base, llc.get_SIZE()));
+        crc = crc_actual;
+    }
+
     std::unique_lock<std::mutex> tx_ring_lg(tx_ring_mutex);
 
     // @note Setup tx_ring element index for retransmit check
@@ -388,14 +425,15 @@ void LLC::on_tx(tx_info_t& info)
     tx_lg.unlock();
 
     Logless(*main_logger, LLC_TRC,
-        "TRC | LLCT#  | pdu slot=# llc_tx_id=# tx_idx=# expected_ack_idx=# sn=# pdu_sz=#",
+        "TRC | LLCT#  | pdu slot=# llc_tx_id=# tx_idx=# expected_ack_idx=# sn=# pdu_sz=# crc=#",
         (int) lcid,
         slot_number,
         tx_elem.llc_tx_id,
         tx_idx,
         ack_ck_idx,
         (int) llc.get_SN(),
-        tx_elem.pdcp_pdu_size);
+        tx_elem.pdcp_pdu_size,
+        crc);
 }
 
 void LLC::on_rx(rx_info_t& info)
@@ -411,6 +449,37 @@ void LLC::on_rx(rx_info_t& info)
     llc_t llc(info.in_pdu.base, info.in_pdu.size);
     llc.crc_size = rx_crc_size;
 
+    if (llc.get_SIZE() > info.in_pdu.size)
+    {
+        LoglessF(*main_logger, LLC_ERR, "ERR | LLCT# | invalid llc_size=#, pdu_size=#",
+            int(lcid),
+            llc.get_SIZE(),
+            info.in_pdu.size);
+        return;
+    }
+
+    size_t crc_expected = 0;
+    size_t crc_actual = 0;
+
+    if (rx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
+    {
+        auto& crc = *(uint32_t*)(llc.CRC());
+        crc_expected = ntohl(crc);
+        crc = 0;
+        crc_actual = crc32_04C11DB7()(llc.base, llc.get_SIZE());
+    }
+
+    if (crc_actual != crc_expected)
+    {
+        LoglessF(*main_logger, LLC_ERR, "ERR | LLCT# | CRC failed sn=# llc_sz=# expected=# actual=#",
+            (int) lcid,
+            (int) llc.get_SN(),
+            llc.get_SIZE(),
+            crc_expected,
+            crc_actual);
+        return;
+    }
+
     // @note Handle ack
     if (llc.get_A())
     {
@@ -423,7 +492,7 @@ void LLC::on_rx(rx_info_t& info)
         {
             if (llc_header_size+i*sizeof(llc_payload_ack_t) > llc_size)
             {
-                LoglessF(*main_logger, LLC_ERR, "ERR | LLCT# | ack overrun, llc_size=# ack_idx=#",
+                LoglessF(*main_logger, LLC_ERR, "ERR | LLCT#  | ack overrun, llc_size=# ack_idx=#",
                     int(lcid), llc_size, i);
                 break;
             }
@@ -463,10 +532,11 @@ void LLC::on_rx(rx_info_t& info)
         info.in_pdu.base += llc.get_header_size();
         info.in_pdu.size -= llc.get_header_size();
 
-        Logless(*main_logger, LLC_TRC, "TRC | LLCR#  | llc_rx sn=# pdu_sz=#",
+        Logless(*main_logger, LLC_TRC, "TRC | LLCR#  | llc_rx sn=# pdu_sz=# crc=#",
             (int) lcid,
             (int) llc.get_SN(),
-            info.in_pdu.size);
+            info.in_pdu.size,
+            crc_actual);
 
         stats.bytes_recv->fetch_add(info.in_pdu.size);
         stats.pkt_recv->fetch_add(1);
