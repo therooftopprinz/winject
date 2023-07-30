@@ -58,12 +58,9 @@ struct crc{
                         auto currbit =  (size_t(1) << ((N - 1) - bit));
                         reflection |= currbit;
                     }
-
                     data >>= 1;
                 }
-
                 return reflection;
-
             };
 
         crc_t crcv = INITIAL;

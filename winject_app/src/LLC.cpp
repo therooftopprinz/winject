@@ -323,7 +323,7 @@ void LLC::on_tx(tx_info_t& info)
             tx_config.max_retx_count,
             to_retx_list.size());
 
-        if (retx_count >= tx_config.max_retx_count)
+        if (retx_count > tx_config.max_retx_count)
         {
             to_retx_list.pop_front();
             if (tx_config.allow_rlf)
@@ -381,9 +381,9 @@ void LLC::on_tx(tx_info_t& info)
     size_t crc = 0;
     if (tx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
     {
-        auto& crc_actual = *(uint32_t*)(llc.CRC());
+        auto& crc_actual = *(winject::BEU32UA*)(llc.CRC());
         crc_actual= 0;
-        crc_actual = htonl(crc32_04C11DB7()(llc.base, llc.get_SIZE()));
+        crc_actual = crc32_04C11DB7()(llc.base, llc.get_SIZE());
         crc = crc_actual;
     }
 
@@ -463,8 +463,8 @@ void LLC::on_rx(rx_info_t& info)
 
     if (rx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
     {
-        auto& crc = *(uint32_t*)(llc.CRC());
-        crc_expected = ntohl(crc);
+        auto& crc = *(winject::BEU32UA*)(llc.CRC());
+        crc_expected = crc;
         crc = 0;
         crc_actual = crc32_04C11DB7()(llc.base, llc.get_SIZE());
     }

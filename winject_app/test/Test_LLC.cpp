@@ -13,6 +13,7 @@ struct Test_LLC : public testing::Test
     {
         tx_config.arq_window_size = 3;
         tx_config.max_retx_count = 3;
+        tx_config.allow_rlf = true;
         tx_config.mode = ILLC::E_TX_MODE_AM;
         rx_config.mode = ILLC::E_TX_MODE_AM;
         tx_config.crc_type = ILLC::E_CRC_TYPE_NONE;
@@ -260,21 +261,25 @@ TEST_F(Test_LLC, should_RLF_on_max_retry)
         };
 
     EXPECT_CALL(*mock_pdcp, on_tx(testing::_))
-        .Times(10)
+        .Times(12)
         .WillOnce(testing::Invoke(pdcp_writer))
         .WillRepeatedly(testing::Return());
     EXPECT_CALL(*mock_rrc, on_rlf(0))
         .Times(1);
 
-    trigger_tx(0, buffer, sizeof(buffer));
+    trigger_tx(0, buffer, sizeof(buffer)); // TX
     trigger_tx(1, buffer, 0);
     trigger_tx(2, buffer, 0);
-    trigger_tx(3, buffer, sizeof(buffer));
+    trigger_tx(3, buffer, sizeof(buffer)); // RETX 1
     trigger_tx(4, buffer, 0);
     trigger_tx(5, buffer, 0);
-    trigger_tx(6, buffer, sizeof(buffer));
+    trigger_tx(6, buffer, sizeof(buffer)); // RETX 2
     trigger_tx(7, buffer, 0);
     trigger_tx(8, buffer, 0);
+    trigger_tx(9, buffer, sizeof(buffer)); // RETX 3
+    trigger_tx(10, buffer, 0);
+    trigger_tx(11, buffer, 0);
+    trigger_tx(12, buffer, sizeof(buffer)); // RLF
 }
 
 // @todo : should report out_tx_available when there's to ack
