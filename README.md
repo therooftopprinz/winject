@@ -7,7 +7,6 @@ Dependencies:
 * [bfc](https://github.com/therooftopprinz/bfc)
 * [cum](https://github.com/therooftopprinz/cum)
 * [logless](https://github.com/therooftopprinz/logless)
-* [schifra](https://github.com/ArashPartow/schifra)
 
 Folder structure:
 * bpf - ppWiFi paclet filter scratch pad
@@ -17,12 +16,9 @@ Folder structure:
   * googletest - GTest & GMock
   * json - JSON C++
   * Logless - Logger
-  * schifra - Reed-Solomon FEC C++ 
-* SimpleFEC - WInject with RS Error Correction
 * udp_channeler - UDP channel simulation and limiter
 * udp_checker - create patterns and send over channel and verify
-* winject - 802.11 headers and filters, radiotap, and wifi injector
-* winject_app - complete WInject ppWiFi implementation
+* winject - complete WInject ppWiFi implementation
 
 ## Abstract
 ppWiFi is an extension to the 802.xx protocols to support robust 

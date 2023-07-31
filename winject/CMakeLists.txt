@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(winject_app)
+project(winject)
 
 set(CMAKE_VERBOSE_MAKEFILE on)
 
@@ -71,9 +71,9 @@ if(BUILD_COVERAGE)
     )
 endif()
 
-file(GLOB_RECURSE winject_app_src src/*.cpp)
-add_executable(winject_app ${winject_app_src})
-target_include_directories(winject_app PRIVATE
+file(GLOB_RECURSE winject_src src/*.cpp)
+add_executable(winject ${winject_src})
+target_include_directories(winject PRIVATE
     src
     .
     ..
@@ -81,4 +81,3 @@ target_include_directories(winject_app PRIVATE
     ../cpp_dependencies/Logless/src
     ../cpp_dependencies/cum/src)
 target_link_libraries(test PRIVATE pthread)
-

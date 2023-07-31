@@ -21,7 +21,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <optional>
-#include <winject/safeint.hpp>
+#include "safeint.hpp"
 
 using llc_sn_t = uint8_t;
 using lcid_t = uint8_t;

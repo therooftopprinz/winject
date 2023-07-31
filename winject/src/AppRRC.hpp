@@ -26,9 +26,9 @@
 #include <bfc/EpollReactor.hpp>
 #include <bfc/Timer.hpp>
 
-#include <winject/802_11.hpp>
-#include <winject/802_11_filters.hpp>
-#include <winject/radiotap.hpp>
+#include "802_11.hpp"
+#include "802_11_filters.hpp"
+#include "radiotap.hpp"
 
 #include "Logger.hpp"
 #include "WIFI.hpp"
