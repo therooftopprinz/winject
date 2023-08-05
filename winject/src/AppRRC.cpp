@@ -434,6 +434,7 @@ void AppRRC::on_wifi_rx()
     }
 
     winject::ieee_802_11::frame_t frame80211(radiotap.end(), rx_buff+sizeof(rx_buff));
+    frame80211.rescan();
 
     auto frame80211end = rx_buff+rv;
     size_t size =  frame80211end-frame80211.frame_body-4;
@@ -473,8 +474,13 @@ void AppRRC::process_rx_frame(uint8_t* start, size_t size)
         frame_payload_remaining -= size;
     };
 
-    uint8_t fec = *cursor;
-    advance_cursor(sizeof(fec));
+    fec_t fec_frame(cursor, frame_payload_remaining);
+    fec_frame.rescan();
+
+    // @todo : check and fix fec errors
+
+    cursor = fec_frame.data_blocks;
+    frame_payload_remaining = fec_frame.data_sz;
 
     while (frame_payload_remaining > 0)
     {

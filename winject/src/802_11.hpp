@@ -173,8 +173,6 @@ public:
 
         frame_control = (frame_control_t*) buffer;
         duration = (LEU16UA*)(buffer + sizeof(frame_control_t));
-
-        rescan();
     }
 
     void reset()

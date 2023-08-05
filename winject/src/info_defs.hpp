@@ -21,6 +21,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "pdu.hpp"
+
 enum fec_type_e
 {
     E_FEC_TYPE_NONE,

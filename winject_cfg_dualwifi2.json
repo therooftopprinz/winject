@@ -162,7 +162,7 @@
           "am_tx_config": {
             "allow_rlf" : false,
             "arq_window_size" : 30,
-            "max_retx_count" : 50
+            "max_retx_count" : 30
           },
           "common_tx_config": {
             "crc_type" : "NONE"

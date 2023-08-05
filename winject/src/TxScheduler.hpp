@@ -179,7 +179,6 @@ private:
                 std::chrono::high_resolution_clock::now().time_since_epoch())
                 .count();
         {
-
             // schedule_tick();
 
             std::unique_lock<std::mutex> lg(this_mutex);
@@ -195,11 +194,12 @@ private:
                 frame_payload_remaining -= size;
             };
 
-            uint8_t *fec_type = cursor;
-            *fec_type = frame_info.fec_type;
-            advance_cursor (sizeof(*fec_type));
+            fec_t fec_frame(cursor, frame_payload_remaining);
+            fec_frame.init(0, 0);
+            // @todo : setup fec
 
-            // @todo : setup fec structure
+            cursor = fec_frame.data_blocks;
+            frame_payload_remaining = fec_frame.data_sz;
 
             schedules_cache.clear();
             schedules_cache.reserve(llcs.size());

@@ -411,7 +411,6 @@ public:
         }
 
         header = (header_t*) buffer;
-        rescan();
     }
 
     size_t size()

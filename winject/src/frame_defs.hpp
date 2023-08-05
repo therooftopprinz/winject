@@ -22,12 +22,136 @@
 #include <cstddef>
 #include <optional>
 #include "safeint.hpp"
+#include "info_defs.hpp"
 
 using llc_sn_t = uint8_t;
 using lcid_t = uint8_t;
 using llc_sz_t = uint16_t;
 using pdcp_sn_t = uint16_t;
 using pdcp_segment_offset_t = uint16_t;
+
+//     +-------------------------------+
+//  01 | FEC_TYPE                      | 01
+//     +-------------------------------+
+//  02 | N (FEC_TYPE != 0)             | 01 * (FEC_TYPE!=0)
+//     +-------------------------------+
+//  03 | REDUNDANCY                    | FEC_R_SZ * N
+//     +-------------------------------+
+//     | DATA                          | FEC_D_SZ * N
+//     +-------------------------------+
+
+
+struct fec_t
+{
+    fec_t(uint8_t* base, size_t size)
+        : base(base)
+        , max_size(size)
+    {
+    }
+
+    void reset()
+    {
+        fec_type = nullptr;
+        n = nullptr;
+        data_blocks = nullptr;
+        redu_blocks = nullptr;
+        fec_d_sz = 0;
+        fec_r_sz = 0;
+        header_sz = 0;
+        data_sz = 0;
+    }
+
+    void init(uint8_t fec, uint8_t n_)
+    {
+        if (max_size < 2)
+        {
+            return;
+        }
+
+        uint8_t *cursor = base;
+        fec_type = cursor++;
+        n = cursor++;
+        *fec_type = fec;
+        *n = n_;
+        rescan();
+    }
+
+    void rescan()
+    {
+        reset();
+
+        if (max_size < 2)
+        {
+            return;
+        }
+
+        uint8_t *cursor = base;
+        fec_type = cursor++;
+        n = cursor++;
+
+        auto ft = (fec_type_e)(*fec_type);
+        if      ( E_FEC_TYPE_NONE == ft)
+        {
+            fec_d_sz = 0;
+            fec_r_sz = 0;
+            data_blocks = n;
+            n = nullptr;
+            header_sz = 1;
+            data_sz = max_size - header_sz;
+            return;
+        }
+        else if (E_FEC_TYPE_RS_255_247 == ft)
+        {
+            fec_d_sz = 247;
+            fec_r_sz = 255-247;
+        }
+        else if (E_FEC_TYPE_RS_255_239 == ft)
+        {
+            fec_d_sz = 239;
+            fec_r_sz = 255-239;
+        }
+        else if (E_FEC_TYPE_RS_255_223 == ft)
+        {
+            fec_d_sz = 223;
+            fec_r_sz = 255-223;
+        }
+        else if (E_FEC_TYPE_RS_255_191 == ft)
+        {
+            fec_d_sz = 191;
+            fec_r_sz = 255-191;
+        }
+        else if (E_FEC_TYPE_RS_255_127  == ft)
+        {
+            fec_d_sz = 127;
+            fec_r_sz = 255-127;
+        }
+
+        header_sz = 2;
+        data_sz = *n*fec_d_sz;
+
+        redu_blocks = cursor;
+        if (*n*fec_d_sz + *n*fec_r_sz + 2 > max_size)
+        {
+            reset();
+            return;
+        }
+
+        cursor += *n * fec_r_sz;
+        data_blocks = cursor;
+    }
+
+    uint8_t* base = nullptr;
+    llc_sz_t max_size = 0;
+    size_t fec_d_sz = 0;
+    size_t fec_r_sz = 0;
+    size_t header_sz = 0;
+    size_t data_sz = 0;
+
+    uint8_t* fec_type = nullptr;
+    uint8_t* n = nullptr;
+    uint8_t* data_blocks = nullptr;
+    uint8_t* redu_blocks = nullptr;
+};
 
 constexpr llc_sn_t llc_sn_mask = 0b11111111;
 constexpr size_t llc_sn_size = llc_sn_mask+1;

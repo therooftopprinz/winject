@@ -24,8 +24,8 @@ python2 -m SimpleHTTPServer 21001
 python2 -m SimpleHTTPServer 22001
 
 WIFI1 > WIFI2
-./udp_checker/udp_checker --host=127.0.0.1 --port=21021 --mode=send --size=1250 --rate=5000
-./udp_checker/udp_checker --host=127.0.0.1 --port=22022 --mode=recv --stats=1
+./udp_checker/udp_checker --host=127.0.0.1 --port=21081 --mode=send --size=1250 --rate=5000
+./udp_checker/udp_checker --host=127.0.0.1 --port=22082 --mode=recv --stats=1
 
 WIFI2 > WIFI1
 ./udp_checker/udp_checker --host=127.0.0.1 --port=22081 --mode=send --size=1250 --rate=1000
