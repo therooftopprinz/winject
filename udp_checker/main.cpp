@@ -1,21 +1,29 @@
-#include <winject/wifi.hpp>
-#include <winject/radiotap.hpp>
-#include <winject/802_11.hpp>
-#include <winject/802_11_filters.hpp>
-
 #include <regex>
 #include <thread>
 #include <chrono>
+#include <iomanip>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 
 using options_t = std::map<std::string, std::string>;
+
+uint64_t now_us()
+{
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+}
+
 
 template<typename... Ts>
 void LOG(const char* msg, Ts&&... args)
 {
     char buffer[1024*64];
     snprintf(buffer,sizeof(buffer), msg, args...);
-    uint64_t ts = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-    printf("[%lu] %s\n", ts, buffer);
+    printf("[%lu] %s\n", now_us(), buffer);
     fflush(stdout);
 }
 
@@ -65,6 +73,7 @@ std::string buffer_str(uint8_t* buffer, size_t size)
     return bufferss.str();
 }
 
+// based on RTP
 struct checker_frame_t
 {
     checker_frame_t (uint8_t* base, size_t size)
@@ -77,10 +86,21 @@ struct checker_frame_t
     void rescan()
     {
         auto ptr = base;
-        id = (uint64_t*)ptr;
-        ptr += sizeof(*id);
-        expected_size = (uint16_t*)ptr;
-        ptr += sizeof(*expected_size);
+        auto advance = [&ptr](size_t sz) {
+                ptr += sz;
+            };
+        v_p_x_cc = (uint8_t*)ptr;
+        advance(sizeof(*v_p_x_cc));
+        m_pt = (uint8_t*)ptr;
+        advance(sizeof(*m_pt));
+        sn = (uint16_t*)ptr;
+        advance(sizeof(*sn));
+        ts = (uint32_t*)ptr;
+        advance(sizeof(*ts));
+        ts_ext = (uint64_t*)ptr;
+        advance(sizeof(*ts_ext));
+        expected_size = (uint32_t*)ptr;
+        advance(sizeof(*expected_size));
         data = ptr;
     }
 
@@ -91,18 +111,38 @@ struct checker_frame_t
 
     size_t payload_size()
     {
-        return frame_size()-sizeof(*id)-sizeof(*expected_size);
+        return frame_size()
+            -sizeof(*v_p_x_cc)
+            -sizeof(*m_pt)
+            -sizeof(*sn)
+            -sizeof(*ts)
+            -sizeof(*ts_ext)
+            -sizeof(*expected_size);
     }
 
     uint8_t* base;
 
-    uint64_t* id;
-    uint16_t* expected_size;
+    uint8_t* v_p_x_cc;
+    uint8_t* m_pt;
+    uint16_t* sn;
+    uint32_t* ts;
+    uint64_t* ts_ext;
+    uint32_t* expected_size;
     uint8_t* data;
 
 private:
     size_t actual_size;
 };
+
+template<typename T, typename U, typename V>
+const V value_or(const T& t, const U& u, const V& v)
+{
+    if (!t.count(u))
+    {
+        return v;
+    }
+    return t.at(u);
+}
 
 int main(int argc, char* argv[])
 {
@@ -132,6 +172,18 @@ int main(int argc, char* argv[])
 
     if (options.at("mode")=="recv")
     {
+        bool check_data = options.count("data");
+        if (check_data)
+        {
+            check_data = std::stol(options.at("data")); 
+        }
+
+        bool show_packet = options.count("show");
+        if (show_packet)
+        {
+            show_packet = std::stol(options.at("show")); 
+        }
+
         int stats_int = std::stol(options.at("stats"));
         sockaddr_in bindaddr;
         std::memset(&bindaddr, 0, sizeof(bindaddr));
@@ -148,17 +200,19 @@ int main(int argc, char* argv[])
         }
 
         int sn = 0;
-        uint64_t last_id=-1;
+        uint16_t last_id=-1;
+        bool has_last_id = false;
 
         int stats_pkt_rcv = 0;
         int stats_byt_rcv = 0;
         int stats_ebt_rcv = 0;
         int stats_pkt_mis = 0;
-        uint64_t stats_time = std::chrono::high_resolution_clock::now().time_since_epoch().count()/(1000*1000*1000);
+        uint64_t stats_time = now_us()/(1000*1000*1000);
 
         while (true)
         {
             auto rv = recv(sd, buffer, sizeof(buffer), 0);
+            auto rcvts = now_us();
             if (rv<0)
             {
                 LOG("recv failed! errno=%d error=%s\n", errno, strerror(errno));
@@ -169,9 +223,16 @@ int main(int argc, char* argv[])
                 continue;
             }
 
+            checker_frame_t checker(buffer, rv);
+
+            if (show_packet)
+            {
+                LOG("PACKET: %lu,%lu",*checker.ts_ext, rcvts);
+            }
+
             stats_pkt_rcv++;
             stats_byt_rcv += rv;
-            uint64_t this_time = std::chrono::high_resolution_clock::now().time_since_epoch().count()/(1000*1000*1000);
+            uint64_t this_time = now_us()/(1000*1000);
             if (this_time > (stats_time+stats_int-1))
             {
                 stats_time = this_time;
@@ -186,37 +247,45 @@ int main(int argc, char* argv[])
                 stats_ebt_rcv = 0;
             }
 
-            checker_frame_t checker(buffer, rv);
-            auto& current_id = *(checker.id);
+            auto current_id = ntohs(*checker.sn);
 
             int errors=0;
-            for (size_t i=0; i<checker.payload_size(); i++)
+            if (check_data)
             {
-                errors += (checker.data[i] != (i&0xFF)) ? 1 : 0;
+                for (size_t i=0; i<checker.payload_size(); i++)
+                {
+                    errors += (checker.data[i] != (i&0xFF)) ? 1 : 0;
+                
+                }
             }
 
             uint64_t diff = 0;
-            if (last_id > current_id)
+            if (has_last_id)
             {
-                diff = 0xFFFFFFFFFFFFFFFF;
-                diff -= last_id;
-                diff += current_id;
+                if (last_id > current_id)
+                {
+                    diff = 0xFFFF;
+                    diff -= last_id;
+                    diff += current_id;
+                }
+                else
+                {
+                    diff = current_id - last_id; 
+                }
             }
             else
             {
-                diff = current_id - last_id; 
+                has_last_id = true;
             }
 
             if (diff>1 || errors)
             {
-
-
                 stats_pkt_mis += (diff-1);
                 stats_ebt_rcv += errors;
                 LOG("ERROR: prev=%6lu curr=%6lu diff=%6lu errors=%3lu", last_id, current_id, diff, errors);
             }
 
-            last_id = *(checker.id);   
+            last_id = ntohs(*checker.sn);   
         }
     }
     else if (options.at("mode")=="send")
@@ -239,12 +308,13 @@ int main(int argc, char* argv[])
         sendaddr.sin_port = htons(port);
         inet_pton(AF_INET, host.c_str(), &(sendaddr.sin_addr));
     
-        uint64_t id=0;
+        uint16_t sn=0;
         while (true)
         {
             checker_frame_t checker(buffer, size);
-            *(checker.id)=id++;
-            *(checker.expected_size) = checker.payload_size();
+            *checker.sn=htons(sn++);
+            *checker.expected_size = checker.payload_size();
+            *checker.ts_ext = now_us();
 
             for (size_t i=0; i<checker.payload_size(); i++)
             {

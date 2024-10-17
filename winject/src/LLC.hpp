@@ -68,6 +68,11 @@ private:
     const stats_t& get_stats();
     void reset_stats();
 
+
+    llc_sn_t sn_distance(llc_sn_t high, llc_sn_t low);
+    llc_sn_t sn_ring_index(llc_sn_t sn);
+    void ack_sn_window(llc_sn_t sn);
+
     // @brief Used to indicated retransmit slot
     struct tx_ring_elem_t
     {
@@ -77,6 +82,12 @@ private:
         size_t pdcp_pdu_size = 0;
         buffer_t pdcp_pdu;
         bool acknowledged = true;
+    };
+
+    struct sn_ring_elem_t
+    {
+        size_t ring_idx = 0;
+        bool is_acked = false;
     };
 
     struct retx_elem_t
@@ -106,11 +117,15 @@ private:
 
     // Common Data Structures --------------------------------------------------
     std::vector<tx_ring_elem_t> tx_ring;
-    std::vector<size_t> sn_to_tx_ring;
+    std::vector<sn_ring_elem_t> sn_ring;
+    llc_sn_t sn_ring_low = 0;
+    llc_sn_t sn_ring_high = 0;
     std::mutex tx_ring_mutex;
 
+    // sn, retry_count
     std::list<std::pair<size_t,size_t>> to_ack_list;
     std::mutex to_ack_list_mutex;
+
 
     // RX Data Structures ------------------------------------------------------
     std::mutex rx_mutex;

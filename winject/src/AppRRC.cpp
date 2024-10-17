@@ -424,6 +424,7 @@ void AppRRC::on_wifi_rx()
     }
 
     winject::radiotap::radiotap_t radiotap(rx_buff);
+    radiotap.rescan();
 
     if (radiotap.antenna_signal)
     {
@@ -487,6 +488,12 @@ void AppRRC::process_rx_frame(uint8_t* start, size_t size)
         llc_t llc_pdu(cursor, frame_payload_remaining);
         if (llc_pdu.get_header_size() > frame_payload_remaining)
         {
+            break;
+        }
+
+        if (llc_pdu.get_SIZE() == 0 )
+        {
+            LoglessF(*main_logger, RRC_ERR, "ERR | AppRRC | LLC zero (can't continue).");
             break;
         }
 

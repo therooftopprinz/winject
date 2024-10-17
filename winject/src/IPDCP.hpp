@@ -61,7 +61,7 @@ struct IPDCP
         bool auto_init_on_tx = false;
         size_t max_sn_distance = 20;
         size_t min_commit_size = 1000;
-        size_t max_tx_queue_size = 512;
+        size_t max_tx_queue_size = 1024;
     };
 
     struct rx_config_t

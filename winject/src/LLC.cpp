@@ -31,7 +31,7 @@ LLC::LLC(
     , rrc(rrc)
     , lcid(lcid)
     , tx_ring(1024)
-    , sn_to_tx_ring(llc_sn_size, -1)
+    , sn_ring(tx_config.arq_window_size)
 {
     stats.pkt_sent      = &main_monitor->getMetric(to_llc_stat("pkt_sent", lcid));
     stats.pkt_resent    = &main_monitor->getMetric(to_llc_stat("pkt_resent", lcid));
@@ -105,7 +105,18 @@ void LLC::set_tx_enabled(bool value)
         to_ack_list.clear();
     }
 
-    Logless(*main_logger, LLC_INF,
+    // {
+    //     std::unique_lock lg(sn_window_acks_mutex);
+    //     sn_window_acks.resize(tx_config.arq_window_size);
+    //     sn_window_acks_low = 0;
+    //     sn_window_acks_high = 0;
+    //     for (auto& i : sn_window_acks)
+    //     {
+    //         i = 0;
+    //     }
+    // }
+
+     Logless(*main_logger, LLC_INF,
         "INF | LLCT#  | set_tx_enabled old=# new=#",
         (int) lcid,
         (int) old_tx_enabled,
@@ -276,6 +287,8 @@ void LLC::on_tx(tx_info_t& info)
         return;
     }
 
+    // todo: check if sn_window_acks is full 
+
     llc.set_LCID(lcid);
     llc.set_A(false);
     info.out_pdu.base = llc.payload();
@@ -371,11 +384,9 @@ void LLC::on_tx(tx_info_t& info)
 
     info.out_allocated += llc.get_header_size();
 
+    auto current_sn = sn_counter;
     llc.set_SN(sn_counter);
-    if (tx_crc_size)
-    {
-        // @todo : Calculate CRC for this LLC
-    }
+
     increment_sn();
 
     size_t crc = 0;
@@ -387,11 +398,11 @@ void LLC::on_tx(tx_info_t& info)
         crc = crc_actual;
     }
 
-    std::unique_lock<std::mutex> tx_ring_lg(tx_ring_mutex);
-
     // @note Setup tx_ring element index for retransmit check
     auto ack_ck_idx = tx_ring_index(slot_number + tx_config.arq_window_size);
     auto tx_idx = tx_ring_index(slot_number);
+
+    std::unique_lock<std::mutex> tx_ring_lg(tx_ring_mutex);
     auto& ack_elem = tx_ring[ack_ck_idx];
     auto& tx_elem = tx_ring[tx_idx];
 
@@ -412,7 +423,20 @@ void LLC::on_tx(tx_info_t& info)
         std::memcpy(tx_elem.pdcp_pdu.data(), llc.payload(), llc.get_payload_size());
         // @note copy PDCP to tx_ring elem needed when retransmitting
         tx_elem.pdcp_pdu_size = llc.get_payload_size();
-        sn_to_tx_ring[llc.get_SN()] = ack_ck_idx;
+        sn_ring[sn_ring_index(llc.get_SN())].ring_idx = ack_ck_idx;
+        
+        // std::unique_lock<std::mutex> sn_window_acks_lg(sn_window_acks_mutex);
+        // auto sn_win_ack_idx = sn_window_acks_index(current_sn);
+        // auto& sn_window_acks_index = sn_window_acks[sn_win_ack_idx];
+        // auto current_distance = sn_distance(sn_window_acks_high, sn_window_acks_low);
+        // if (0 == current_distance)
+        // {
+        //     sn_window_acks_low = current_sn;
+        //     sn_window_acks_high = llc_sn_mask & (current_sn+1);
+        // }
+        // else
+        // {
+        // }
     }
     else
     {
@@ -502,12 +526,13 @@ void LLC::on_rx(rx_info_t& info)
             for (size_t i=0; i<ack.count; i++)
             {
                 std::unique_lock<std::mutex> lg(tx_ring_mutex);
-                size_t idx_ = sn_to_tx_ring[sn];
+                size_t idx_ = sn_ring[sn_ring_index(sn)].ring_idx;
                 auto idx = tx_ring_index(idx_);
                 auto& ack_slot = tx_ring[idx];
                 auto sent_idx = tx_ring_index(ack_slot.sent_index);
                 auto& sent_slot = tx_ring[sent_idx];
                 sent_slot.acknowledged = true;
+
 
                 stats.pkt_sent->fetch_add(1);
                 stats.bytes_sent->fetch_add(sent_slot.pdcp_pdu_size);
@@ -517,6 +542,9 @@ void LLC::on_rx(rx_info_t& info)
                     (int) lcid, ack_slot.sent_index,
                     (int) sn);
 
+                lg.unlock();
+
+                ack_sn_window(sn);
                 sn = llc_sn_mask & (sn+1);
             }
         }
@@ -640,4 +668,26 @@ void LLC::reset_stats()
     stats.bytes_sent->store(0);
     stats.bytes_resent->store(0);
     stats.bytes_recv->store(0);
+}
+
+llc_sn_t LLC::sn_distance(llc_sn_t high, llc_sn_t low)
+{
+    if (high >= low)
+    {
+        return high-low;
+    }
+
+    return high + llc_sn_mask - low;
+}
+
+llc_sn_t LLC::sn_ring_index(llc_sn_t sn)
+{
+    return sn % tx_config.arq_window_size;
+}
+
+void LLC::ack_sn_window(llc_sn_t sn)
+{
+    // std::unique_lock<std::mutex> lg(sn_window_acks_mutex);
+    // auto& sn_window_ack = sn_window_acks[sn_window_acks_index(sn)];
+    // sn_window_ack = true;
 }

@@ -82,7 +82,75 @@
           },
           "endpoint_config" : {
             "type" : "TCPC",
-            "tcp_address" : "127.0.0.1:22012"
+            "tcp_address" : "127.0.0.1:22"
+          }
+        }
+      },
+      {
+        "lcid" : 2,
+        "description" : "ssh2",
+        "llc_config" : {
+          "tx_mode" : "AM",
+          "scheduling_config" : {
+            "nd_pdu_size" : 64,
+            "quanta" : 512
+          },
+          "am_tx_config": {
+            "allow_rlf" : true,
+            "arq_window_size" : 30,
+            "max_retx_count" : 200
+          },
+          "common_tx_config" : {
+            "crc_type" : "CRC32(04C11DB7)"
+          },
+          "common_rx_config" : {
+            "crc_type" : "CRC32(04C11DB7)"
+          }
+        },
+        "pdcp_config" : {
+          "tx_config" : {
+            "allow_rlf" : true,
+            "allow_segmentation" : true,
+            "allow_reordering" : true,
+            "max_sn_distance" : 3000
+          },
+          "endpoint_config" : {
+            "type" : "TCPC",
+            "tcp_address" : "127.0.0.1:22"
+          }
+        }
+      },
+      {
+        "lcid" : 3,
+        "description" : "ssh3",
+        "llc_config" : {
+          "tx_mode" : "AM",
+          "scheduling_config" : {
+            "nd_pdu_size" : 64,
+            "quanta" : 1450
+          },
+          "am_tx_config": {
+            "allow_rlf" : true,
+            "arq_window_size" : 30,
+            "max_retx_count" : 200
+          },
+          "common_tx_config" : {
+            "crc_type" : "CRC32(04C11DB7)"
+          },
+          "common_rx_config" : {
+            "crc_type" : "CRC32(04C11DB7)"
+          }
+        },
+        "pdcp_config" : {
+          "tx_config" : {
+            "allow_rlf" : true,
+            "allow_segmentation" : true,
+            "allow_reordering" : true,
+            "max_sn_distance" : 3000
+          },
+          "endpoint_config" : {
+            "type" : "TCPC",
+            "tcp_address" : "127.0.0.1:22"
           }
         }
       },
@@ -128,9 +196,10 @@
             "max_retx_count" : 50
           },
           "common_tx_config": {
-            "crc_type" : "NONE"
+            "crc_type" : "CRC32(04C11DB7)"
           },
           "common_rx_config" : {
+            "crc_type" : "CRC32(04C11DB7)",
             "auto_init_on_rx" : true
           }
         },
@@ -151,43 +220,41 @@
         }
       },
       {
-        "description" : "video8",
         "lcid" : 8,
+        "description" : "video8",
         "llc_config" : {
           "tx_mode" : "AM",
           "scheduling_config" : {
-            "nd_pdu_size" : 50,
-            "quanta" : 1450
+            "nd_pdu_size" : 64,
+            "quanta" : 512
           },
           "am_tx_config": {
-            "allow_rlf" : false,
+            "allow_rlf" : true, 
             "arq_window_size" : 30,
-            "max_retx_count" : 30
+            "max_retx_count" : 200
           },
-          "common_tx_config": {
-            "crc_type" : "NONE"
+          "common_tx_config" : {
+            "crc_type" : "CRC32(04C11DB7)"
           },
           "common_rx_config" : {
-            "auto_init_on_rx" : true
+            "crc_type" : "CRC32(04C11DB7)"
           }
         },
         "pdcp_config" : {
-          "tx_config" : {
-            "auto_init_on_tx" : true,
-            "allow_rlf" : false,
+          "tx_config" : { 
+            "allow_rlf" : true,
             "allow_segmentation" : true,
             "allow_reordering" : true,
-            "max_sn_distance" : 500,
-            "min_commit_size" : 0
+            "max_sn_distance" : 3000
           },
           "endpoint_config" : {
-            "type" : "UDP",
-            "udp_tx_address" : "127.0.0.1:22081",
-            "udp_rx_address" : "127.0.0.1:22082"
+            "type" : "TCPC",
+            "tcp_address" : "127.0.0.1:8888"
           }
         }
       }
     ],
+
     "app_config" :
     {
       "wifi_over_udp_" :
