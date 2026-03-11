@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <condition_variable>
 
-#include <bfc/Udp.hpp>
+#include <bfc/socket.hpp>
 
 using options_t = std::map<std::string, std::string>;
 
@@ -61,8 +61,8 @@ int main(int argc, char* argv[])
 
     using std::string_literals::operator""s;
 
-    auto from = bfc::toIp4Port(options.at("rx"));
-    auto to = bfc::toIp4Port(options.at("tx"));
+    auto from = bfc::ip4_port_to_sockaddr(options.at("rx"), 0); // port from string
+    auto to = bfc::ip4_port_to_sockaddr(options.at("tx"), 0);
     auto packrate_s = std::stoul(value_or(options,"rate","0"s));
     auto failrate_pct = std::stold(value_or(options,"fail","0"s));
     auto jitter_us    = std::stoul(value_or(options,"jitter","0"s));
@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
 
     std::srand(seed);
 
-    bfc::UdpSocket sock;
+    bfc::socket sock(bfc::create_udp4());
     if (0 > sock.bind(from))
     {
         std::stringstream ss;
@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
                     auto tosend = std::move(buffer_list.front());
                     buffer_list.pop_front();
                     lg.unlock();
-                    bfc::ConstBufferView bv(tosend.data(), tosend.size());
+                    bfc::const_buffer_view bv(tosend.data(), tosend.size());
 
                     bool fail = false;
 
@@ -123,7 +123,11 @@ int main(int argc, char* argv[])
                     log("sending fail=%d q_sz= %3lu sz= %3li", fail, buffer_list.size(), bv.size());
                     if (!fail)
                     {
-                        auto rv = sock.sendto(bv, to);
+                        auto rv = sock.send(
+                            bv,
+                            0,
+                            (const sockaddr*)&to,
+                            sizeof(to));
 
                         if (0>rv)
                         {
@@ -153,9 +157,10 @@ int main(int argc, char* argv[])
     while (true)
     {
         uint8_t btmp[1024*64];
-        bfc::BufferView bv(btmp, sizeof(btmp));
-        bfc::Ip4Port from;
-        auto rv = sock.recvfrom(bv, from);
+        bfc::buffer_view bv(btmp, sizeof(btmp));
+        sockaddr_in from_addr;
+        socklen_t from_sz = sizeof(from_addr);
+        auto rv = sock.recv(bv, 0, (sockaddr*)&from_addr, &from_sz);
         if (0>rv)
         {
             std::stringstream ss;

@@ -25,13 +25,28 @@
 
 #include <sys/eventfd.h>
 
-#include <bfc/IReactor.hpp>
-#include <bfc/Tcp.hpp>
+#include <sstream>
+#include <bfc/socket.hpp>
 
 #include "IPDCP.hpp"
 #include "IRRC.hpp"
 #include "IEndPoint.hpp"
 #include "Logger.hpp"
+
+inline sockaddr_in tcp_client_to_sockaddr4(const std::string& hostport)
+{
+    std::stringstream ss(hostport);
+    std::string host;
+    std::string port_str;
+
+    if (!std::getline(ss, host, ':') || !std::getline(ss, port_str))
+    {
+        return {};
+    }
+
+    uint16_t port = static_cast<uint16_t>(std::stoul(port_str));
+    return bfc::ip4_port_to_sockaddr(host, port);
+}
 
 class TCPClientEndPoint : public IEndPoint
 {
@@ -44,8 +59,8 @@ public:
         , rrc(rrc)
         , pdcp(pdcp)
     {
-        stats.tx_enabled = &main_monitor->getMetric(to_ep_stat("tx_enabled", config.lcid));
-        stats.rx_enabled = &main_monitor->getMetric(to_ep_stat("rx_enabled", config.lcid));
+        stats.tx_enabled = &main_monitor->get_metric(to_ep_stat("tx_enabled", config.lcid));
+        stats.rx_enabled = &main_monitor->get_metric(to_ep_stat("rx_enabled", config.lcid));
 
         ep_event_fd = eventfd(0, EFD_SEMAPHORE);
         if (0 > ep_event_fd)
@@ -57,7 +72,7 @@ public:
             throw std::runtime_error("TCPEndPoint: failed");
         }
 
-        target_addr = bfc::toIp4Port(config.address1);
+        target_addr = tcp_client_to_sockaddr4(config.address1);
 
         pdcp_tx_thread = std::thread([this, lcid = config.lcid](){
             std::string name = "PDCP_";
@@ -165,17 +180,16 @@ private:
                 "ERR | TCPEP# | RLF detected, target will be disconnected.",
                 (int)config.lcid,
                 strerror(errno));
-            targetSock = bfc::TcpSocket(-1);
+            targetSock = bfc::socket();
         }
         else if (is_active())
         {
-            targetSock = bfc::TcpSocket();
+            targetSock = bfc::socket(bfc::create_tcp4());
             if (targetSock.connect(target_addr) >= 0)
             {
                 Logless(*main_logger, TEP_INF,
-                    "INF | TCPEP# | connected to targetSock=#",
-                    (int)config.lcid,
-                    targetSock.handle());
+                    "INF | TCPEP# | connected",
+                    (int)config.lcid);
             }
             else
             {
@@ -183,7 +197,7 @@ private:
                     "ERR | TCPEP# | connect error(#)",
                     (int)config.lcid,
                     strerror(errno));
-                targetSock = bfc::TcpSocket(-1);
+                targetSock = bfc::socket();
                 rrc.on_rlf(pdcp.get_attached_lcid());
             }
         }
@@ -199,15 +213,18 @@ private:
 
         while (pdcp_tx_running)
         {
-            FD_SET(targetSock.handle(), &recv_set);
+            if (targetSock.fd() != -1)
+            {
+                FD_SET(targetSock.fd(), &recv_set);
+            }
             FD_SET(ep_event_fd, &recv_set);
 
-            if (is_active() && targetSock)
+            if (is_active() && targetSock.fd() != -1)
             {
-                FD_SET(targetSock.handle(), &recv_set);
+                FD_SET(targetSock.fd(), &recv_set);
             }
 
-            auto fdmax1 = std::max(targetSock.handle(), ep_event_fd);
+            auto fdmax1 = std::max(targetSock.fd(), ep_event_fd);
             auto maxfd = fdmax1+1;
 
             auto rv = select(maxfd, &recv_set, nullptr, nullptr, nullptr);
@@ -226,10 +243,10 @@ private:
                 continue;
             }
 
-            if (FD_ISSET(targetSock.handle(), &recv_set))
+            if (targetSock.fd() != -1 && FD_ISSET(targetSock.fd(), &recv_set))
             {
-                bfc::BufferView bv{buffer_read, sizeof(buffer_read)};
-                auto rv = targetSock.recv(bv);
+                bfc::buffer_view bv{buffer_read, sizeof(buffer_read)};
+                auto rv = targetSock.recv(bv, 0);
 
                 if (rv>0)
                 {
@@ -243,7 +260,7 @@ private:
                         "ERR | TCPEP# | RLF: target closed error=#",
                         (int)config.lcid,
                         strerror(errno));
-                    targetSock = bfc::TcpSocket(-1);
+                    targetSock = bfc::socket();
                     rrc.on_rlf(config.lcid);
                 }
             }
@@ -290,17 +307,19 @@ private:
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
 
-            if (pending.size() && is_active() && targetSock)
+            if (pending.size() && is_active() && targetSock.fd() != -1)
             {
-                targetSock.send(bfc::BufferView((uint8_t*)pending.data(), pending.size()));
+                targetSock.send(
+                    bfc::buffer_view((uint8_t*)pending.data(), pending.size()),
+                    0);
                 pending.resize(0);
             }
         }
     }
 
     config_t config;
-    bfc::TcpSocket targetSock = bfc::TcpSocket(-1);
-    bfc::Ip4Port target_addr;
+    bfc::socket targetSock;
+    sockaddr_in target_addr;
     IRRC& rrc;
     IPDCP& pdcp;
 

@@ -33,14 +33,14 @@ LLC::LLC(
     , tx_ring(1024)
     , sn_ring(tx_config.arq_window_size)
 {
-    stats.pkt_sent      = &main_monitor->getMetric(to_llc_stat("pkt_sent", lcid));
-    stats.pkt_resent    = &main_monitor->getMetric(to_llc_stat("pkt_resent", lcid));
-    stats.pkt_recv      = &main_monitor->getMetric(to_llc_stat("pkt_recv", lcid));
-    stats.bytes_sent    = &main_monitor->getMetric(to_llc_stat("bytes_sent", lcid));
-    stats.bytes_resent  = &main_monitor->getMetric(to_llc_stat("bytes_resent", lcid));
-    stats.bytes_recv    = &main_monitor->getMetric(to_llc_stat("bytes_recv", lcid));
-    stats.tx_enabled    = &main_monitor->getMetric(to_llc_stat("tx_enabled", lcid));
-    stats.rx_enabled    = &main_monitor->getMetric(to_llc_stat("rx_enabled", lcid));
+    stats.pkt_sent      = &main_monitor->get_metric(to_llc_stat("pkt_sent", lcid));
+    stats.pkt_resent    = &main_monitor->get_metric(to_llc_stat("pkt_resent", lcid));
+    stats.pkt_recv      = &main_monitor->get_metric(to_llc_stat("pkt_recv", lcid));
+    stats.bytes_sent    = &main_monitor->get_metric(to_llc_stat("bytes_sent", lcid));
+    stats.bytes_resent  = &main_monitor->get_metric(to_llc_stat("bytes_resent", lcid));
+    stats.bytes_recv    = &main_monitor->get_metric(to_llc_stat("bytes_recv", lcid));
+    stats.tx_enabled    = &main_monitor->get_metric(to_llc_stat("tx_enabled", lcid));
+    stats.rx_enabled    = &main_monitor->get_metric(to_llc_stat("rx_enabled", lcid));
 
     reset_stats();
 

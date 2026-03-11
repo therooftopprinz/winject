@@ -15,8 +15,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __WINJECTUM_PDU_HPP__
-#define __WINJECTUM_PDU_HPP__
+#ifndef __WINJECT_PDU_HPP__
+#define __WINJECT_PDU_HPP__
 
 #include <vector>
 #include <cstdint>
@@ -30,4 +30,4 @@ struct pdu_t
     size_t size = 0;
 };
 
-#endif // __WINJECTUM_PDU_HPP__
+#endif // __WINJECT_PDU_HPP__

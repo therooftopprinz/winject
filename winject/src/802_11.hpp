@@ -183,7 +183,7 @@ public:
         seq_ctl = nullptr;
         address4 = nullptr;
         frame_body = nullptr;
-        fcs = (LEU32UA*)last-sizeof(*fcs);
+        fcs = (LEU32UA*)(last-sizeof(*fcs));
     }
 
     void rescan()

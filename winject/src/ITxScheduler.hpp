@@ -21,7 +21,7 @@
 #include <functional>
 #include <chrono>
 
-#include <bfc/IMetric.hpp>
+#include <bfc/metric.hpp>
 
 struct ITxScheduler
 {
@@ -48,9 +48,9 @@ struct ITxScheduler
 
     struct stats_t
     {
-        bfc::IMetric* tick_error = nullptr;
-        bfc::IMetric* tick_error_avg46 = nullptr;
-        bfc::IMetric* tick = nullptr;
+        bfc::metric* tick_error = nullptr;
+        bfc::metric* tick_error_avg46 = nullptr;
+        bfc::metric* tick = nullptr;
     };
 
     ~ITxScheduler(){}

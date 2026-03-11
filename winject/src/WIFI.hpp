@@ -15,8 +15,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __WINJECTUM_WIFI_HPP__
-#define __WINJECTUM_WIFI_HPP__
+#ifndef __WINJECT_WIFI_HPP__
+#define __WINJECT_WIFI_HPP__
 
 #include <sstream>
 #include "wifi.hpp"
@@ -51,4 +51,4 @@ private:
     winject::wifi wdev;
 };
 
-#endif // __WINJECTUM_WIFI_HPP__
+#endif // __WINJECT_WIFI_HPP__

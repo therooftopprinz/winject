@@ -1,21 +1,17 @@
 #ifndef __WINJECTUM_STUBTIMER_HPP__
 #define __WINJECTUM_STUBTIMER_HPP__
 
-#include "ITimer.hpp"
+#include <bfc/timer.hpp>
 
-struct StubMockTimer : ITimer
+struct StubMockTimer : bfc::timer<>
 {
-    int schedule(std::chrono::nanoseconds pDiff, std::function<void()> pCb)
+    using base_t = bfc::timer<>;
+
+    // Expose a helper to trigger the next ready callbacks in tests
+    void run_once(int64_t now_us = base_t::current_time_us())
     {
-        last_cb = pCb;
-        return id_ctr++;
+        schedule(now_us);
     }
-
-    void cancel(int)
-    {}
-
-    std::function<void()> last_cb;
-    int id_ctr = 0;
 };
 
 #endif // __WINJECTUM_STUBTIMER_HPP__

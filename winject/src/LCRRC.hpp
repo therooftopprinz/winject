@@ -21,7 +21,7 @@
 #include <mutex>
 #include "Logger.hpp"
 
-#include "bfc/ITimer.hpp"
+#include <bfc/timer.hpp>
 
 
 #include "ILCRRC.hpp"
@@ -36,7 +36,7 @@ public:
         IPDCP& pdcp,
         IRRC& rrc,
         IEndPoint& ep,
-        bfc::ITimer& timer
+        bfc::timer<>& timer
     )
         :llc(llc)
         ,pdcp(pdcp)
@@ -61,9 +61,8 @@ public:
 
         timer.cancel(rrc_request.exp_timer);
         Logless(*main_logger, RRC_TRC,
-            "TRC | LCRRC# | auto send timer cancel id=#, req_id=#",
+            "TRC | LCRRC# | auto send timer cancel, req_id=#",
             (int) llc.get_lcid(),
-            rrc_request.exp_timer,
             (int) req_id);
     }
 
@@ -153,8 +152,8 @@ private:
             timer.cancel(*activate_timer);
         }
 
-        activate_timer = timer.schedule(std::chrono::nanoseconds(1000*1000*100),
-        [this](){
+        // 100 ms delay, same as old nanoseconds value
+        activate_timer = timer.wait_ms(100, [this](){
             activate();
         });
     }
@@ -188,15 +187,7 @@ private:
 
         fill_from_config(request);
 
-        auto on_push_fail =  [this](){
-                LoglessF(*main_logger, RRC_ERR,
-                    "ERR | LCRRC# | exchange_req failed, forcing rlf!",
-                    (int) llc.get_lcid(),
-                    (int) llc.get_lcid());
-                on_rlf();
-            };
-
-        auto_send_rrc(3, msg, on_push_fail);
+        auto_send_rrc(3, msg);
     }
 
     void send_exchange_resp(uint8_t req_id)
@@ -296,8 +287,7 @@ private:
     }
 
     template <typename T>
-    void auto_send_rrc(size_t max_retry, const T& msg,
-        std::function<void()> cb_fail)
+    void auto_send_rrc(size_t max_retry, const T& msg)
     {
         Logless(*main_logger, RRC_INF,
             "INF | LCRRC# | auto send rrc req_id=# remain_retry=#",
@@ -307,49 +297,51 @@ private:
 
         if (!max_retry)
         {
-            if (cb_fail)
-            {
-                cb_fail();
-            }
+            LoglessF(*main_logger, RRC_ERR,
+                "ERR | LCRRC# | auto send failed after retries, forcing rlf!",
+                (int) llc.get_lcid(),
+                (int) msg.requestID);
+            on_rlf();
             return;
         }
 
-        auto expiry_handler = [this, max_retry, msg, cb_fail]() {
+        auto req_id = msg.requestID;
+        auto expiry_handler = [this, max_retry, req_id]() {
                 LoglessF(*main_logger, RRC_ERR,
                     "ERR | LCRRC# | auto send expired id=# remain_retry=#",
                     (int) llc.get_lcid(),
-                    (int) msg.requestID,
+                    (int) req_id,
                     max_retry);
 
                 std::unique_lock lg(rrc_requests_mutex);
-                auto rrc_requests_it = rrc_requests.find(msg.requestID);
+                auto rrc_requests_it = rrc_requests.find(req_id);
                 if (rrc_requests.end() == rrc_requests_it)
                 {
                     Logless(*main_logger, RRC_WRN,
                         "WRN | LCRRC# | auto send rrc req_id=# remain_retry=#",
                         (int) llc.get_lcid(),
-                        (int) msg.requestID,
+                        (int) req_id,
                         max_retry);
 
                     return;
                 }
 
-                rrc_requests.erase(msg.requestID);
+                rrc_requests.erase(req_id);
                 lg.unlock();
 
-                auto new_rrc = msg;
+                auto new_rrc = rrc_requests_it->second.request;
                 new_rrc.requestID = rrc.allocate_req_id();
-                auto_send_rrc(max_retry-1, new_rrc, cb_fail);
+                auto_send_rrc(max_retry-1, new_rrc);
             };
 
         // @todo configurable rrc timeout
-        auto exp_id = timer.schedule(std::chrono::nanoseconds(1000*1000*100),
-            expiry_handler);
+        // 100 ms timeout for RRC response
+        auto exp_id = timer.wait_ms(100, expiry_handler);
 
         Logless(*main_logger, RRC_TRC,
             "TRC | LCRRC# | auto send timer scheduled id=#, req_id=#",
             (int) llc.get_lcid(),
-            exp_id,
+            (int) exp_id.second,
             (int) msg.requestID);
 
         std::unique_lock lg(rrc_requests_mutex);
@@ -364,7 +356,7 @@ private:
 
     struct rrc_request_context_t
     {
-        uint64_t exp_timer;
+        bfc::timer<>::timer_id_t exp_timer;
         RRC request;
     };
 
@@ -373,14 +365,14 @@ private:
 
     std::atomic<txrx_state_e> txrx_state = E_TXRX_STATE_NOT_CONFIGURED;
 
-    std::optional<uint64_t> activate_timer = 0;
+    std::optional<bfc::timer<>::timer_id_t> activate_timer = std::nullopt;
     std::mutex activate_timer_mutex;
 
     ILLC& llc;
     IPDCP& pdcp;
     IRRC& rrc;
     IEndPoint& ep;
-    bfc::ITimer& timer;
+    bfc::timer<>& timer;
 };
 
 #endif // __LCRRC_HPP__

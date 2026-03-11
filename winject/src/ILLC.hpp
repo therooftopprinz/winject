@@ -19,7 +19,7 @@
 #define __WINJECTUM_ILLC_HPP__
 
 #include <atomic>
-#include <bfc/Metric.hpp>
+#include <bfc/metric.hpp>
 
 #include "pdu.hpp"
 #include "frame_defs.hpp"
@@ -57,14 +57,14 @@ struct ILLC
 
     struct stats_t
     {
-        bfc::IMetric* pkt_sent = nullptr;
-        bfc::IMetric* pkt_resent = nullptr;
-        bfc::IMetric* pkt_recv = nullptr;
-        bfc::IMetric* bytes_sent = nullptr;
-        bfc::IMetric* bytes_resent = nullptr;
-        bfc::IMetric* bytes_recv = nullptr;
-        bfc::IMetric* tx_enabled = nullptr;
-        bfc::IMetric* rx_enabled = nullptr;
+        bfc::metric* pkt_sent = nullptr;
+        bfc::metric* pkt_resent = nullptr;
+        bfc::metric* pkt_recv = nullptr;
+        bfc::metric* bytes_sent = nullptr;
+        bfc::metric* bytes_resent = nullptr;
+        bfc::metric* bytes_recv = nullptr;
+        bfc::metric* tx_enabled = nullptr;
+        bfc::metric* rx_enabled = nullptr;
     };
 
     virtual ~ILLC(){}

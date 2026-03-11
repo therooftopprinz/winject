@@ -48,7 +48,7 @@ static const char* config_file = "config.json";
 template<>
 const char* LoggerType::LoggerRef = "LoggerRefXD";
 std::unique_ptr<LoggerType> main_logger;
-std::unique_ptr<bfc::IMonitor> main_monitor;
+std::unique_ptr<bfc::monitor> main_monitor;
 
 fec_type_e to_fec_type_e(std::string s)
 {
@@ -92,7 +92,7 @@ int main()
     main_logger = std::make_unique<LoggerType>("main.log");
     main_logger->logful();
 
-    main_monitor = std::make_unique<bfc::Monitor>(500, "metrics");
+    main_monitor = std::make_unique<bfc::monitor>(500, "metrics");
 
     for (auto i=0u; i<app_logbit_e::MAX; i++)
     {

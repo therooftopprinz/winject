@@ -21,7 +21,7 @@
 #include <map>
 #include <string>
 
-#include <bfc/IMetric.hpp>
+#include <bfc/metric.hpp>
 
 #include "frame_defs.hpp"
 
@@ -85,7 +85,7 @@ struct IRRC
 
     struct stats_t
     {
-        bfc::IMetric* rx_antenna_dbm_avg46 = nullptr;
+        bfc::metric* rx_antenna_dbm_avg46 = nullptr;
     };
 
     virtual ~IRRC(){};

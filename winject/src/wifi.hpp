@@ -15,8 +15,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __WINJECT_WIFI_HPP__
-#define __WINJECT_WIFI_HPP__
+#ifndef __WINJECT_WIFIDEV_HPP__
+#define __WINJECT_WIFIDEV_HPP__
 
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -99,4 +99,4 @@ private:
 
 } // namespace winject
 
-#endif // __WINJECT_WIFI_HPP__
+#endif // __WINJECT_WIFIDEV_HPP__

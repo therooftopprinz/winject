@@ -19,7 +19,7 @@
 #define __APP_LOGGER_HPP__
 
 #include <logless/Logger.hpp>
-#include <bfc/Metric.hpp>
+#include <bfc/metric.hpp>
 #include <memory>
 
 enum app_logbit_e {
@@ -99,6 +99,6 @@ inline std::string to_ep_stat(std::string statname, size_t lcid)
 
 using LoggerType = Logger<unsigned(app_logbit_e::MAX)>;
 extern std::unique_ptr<LoggerType> main_logger;
-extern std::unique_ptr<bfc::IMonitor> main_monitor;
+extern std::unique_ptr<bfc::monitor> main_monitor;
 
 #endif //__APP_LOGGER_HPP__

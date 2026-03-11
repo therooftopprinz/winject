@@ -19,17 +19,33 @@
 #define __WINJECTUM_WIFIUDP_HPP__
 
 #include <sstream>
-#include <bfc/Udp.hpp>
+#include <bfc/socket.hpp>
 #include "IWIFI.hpp"
 #include "Logger.hpp"
+
+inline sockaddr_in wifiudp_to_sockaddr4(const std::string& hostport)
+{
+    std::stringstream ss(hostport);
+    std::string host;
+    std::string port_str;
+
+    if (!std::getline(ss, host, ':') || !std::getline(ss, port_str))
+    {
+        return {};
+    }
+
+    uint16_t port = static_cast<uint16_t>(std::stoul(port_str));
+    return bfc::ip4_port_to_sockaddr(host, port);
+}
 
 class WIFIUDP : public IWIFI
 {
 public:
     WIFIUDP() = delete;
     WIFIUDP(std::string tx_address, std::string rx_address)
-        : tx_address(bfc::toIp4Port(tx_address))
-        , rx_address(bfc::toIp4Port(rx_address))
+        : tx_address(wifiudp_to_sockaddr4(tx_address))
+        , rx_address(wifiudp_to_sockaddr4(rx_address))
+        , sock(bfc::create_udp4())
     {
         if (sock.bind(this->rx_address) < 0)
         {
@@ -40,25 +56,30 @@ public:
 
     ssize_t send(const uint8_t* buff, size_t sz)
     {
-        return sock.sendto(bfc::ConstBufferView(buff, sz+4), tx_address);
+        return sock.send(
+            bfc::const_buffer_view(buff, sz+4),
+            0,
+            (const sockaddr*)&tx_address,
+            sizeof(tx_address));
     }
 
     ssize_t recv(uint8_t* buffer, size_t sz)
     {
-        bfc::Ip4Port from;
-        bfc::BufferView bv(buffer, sz);
-        return sock.recvfrom(bv, from);
+        bfc::buffer_view bv(buffer, sz);
+        sockaddr_in from;
+        socklen_t from_sz = sizeof(from);
+        return sock.recv(bv, 0, (sockaddr*)&from, &from_sz);
     }
 
     int handle()
     {
-        return sock.handle();
+        return sock.fd();
     }
 
 private:
-    bfc::Ip4Port tx_address;
-    bfc::Ip4Port rx_address;
-    bfc::UdpSocket sock;
+    sockaddr_in tx_address;
+    sockaddr_in rx_address;
+    bfc::socket sock;
 
 };
 

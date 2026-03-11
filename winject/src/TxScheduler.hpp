@@ -15,13 +15,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __WINJECTUM_TXSCHEDULER_HPP__
-#define __WINJECTUM_TXSCHEDULER_HPP__
+#ifndef __WINJECT_TXSCHEDULER_HPP__
+#define __WINJECT_TXSCHEDULER_HPP__
 
 #include <memory>
 #include <mutex>
 
-#include <bfc/ITimer.hpp>
 #include "ITxScheduler.hpp"
 #include "ILLC.hpp"
 #include "IRRC.hpp"
@@ -30,13 +29,13 @@
 class TxScheduler : public ITxScheduler
 {
 public:
-    TxScheduler(bfc::ITimer& timer, IRRC& rrc)
+    TxScheduler(bfc::timer<>& timer, IRRC& rrc)
         : timer(timer)
         , rrc(rrc)
     {
-        stats.tick_error        = &main_monitor->getMetric("txs_tick_error");
-        stats.tick_error_avg46  = &main_monitor->getMetric("txs_tick_error_avg46");
-        stats.tick              = &main_monitor->getMetric("txs_tick");
+        stats.tick_error        = &main_monitor->get_metric("txs_tick_error");
+        stats.tick_error_avg46  = &main_monitor->get_metric("txs_tick_error_avg46");
+        stats.tick              = &main_monitor->get_metric("txs_tick");
         stats.tick->store(0);
     }
 
@@ -345,7 +344,7 @@ private:
     std::thread ticker;
     std::atomic_bool ticker_running = false;
 
-    bfc::ITimer& timer;
+    bfc::timer<>& timer;
     IRRC& rrc;
     frame_info_t frame_info;
     int64_t last_tick = 0;

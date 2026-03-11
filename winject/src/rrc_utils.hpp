@@ -15,8 +15,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __WINJECTUM_RRC_UTILS_HPP__
-#define __WINJECTUM_RRC_UTILS_HPP__
+#ifndef __WINJECT_RRC_UTILS_HPP__
+#define __WINJECT_RRC_UTILS_HPP__
 
 #include "interface/rrc.hpp"
 #include "IRRC.hpp"
@@ -94,4 +94,4 @@ inline ILLC::crc_type_e to_config(RRC_LLCCRCType crc_type)
     return ILLC::E_CRC_TYPE_NONE;
 }
 
-#endif // __WINJECTUM_RRC_UTILS_HPP__
+#endif // __WINJECT_RRC_UTILS_HPP__

@@ -5,11 +5,11 @@
 template<>
 const char* LoggerType::LoggerRef = "LoggerRefXD";
 std::unique_ptr<LoggerType> main_logger;
-std::unique_ptr<bfc::IMonitor> main_monitor;
+std::unique_ptr<bfc::monitor> main_monitor;
 
 int main(int argc, char **argv)
 {
-    main_monitor = std::make_unique<bfc::Monitor>(500, "test_metrics");
+    main_monitor = std::make_unique<bfc::monitor>(500, "test_metrics");
     main_logger = std::make_unique<LoggerType>("test.log");
     main_logger->logful();
 

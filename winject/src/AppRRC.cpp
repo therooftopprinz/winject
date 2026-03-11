@@ -17,9 +17,25 @@
 
 #include "AppRRC.hpp"
 
+inline sockaddr_in console_to_sockaddr4(const std::string& hostport)
+{
+    std::stringstream ss(hostport);
+    std::string host;
+    std::string port_str;
+
+    if (!std::getline(ss, host, ':') || !std::getline(ss, port_str))
+    {
+        return {};
+    }
+
+    uint16_t port = static_cast<uint16_t>(std::stoul(port_str));
+    return bfc::ip4_port_to_sockaddr(host, port);
+}
+
 AppRRC::AppRRC(const config_t& config)
     : config(config)
     , tx_scheduler(timer, *this)
+    , console_sock(bfc::create_udp4())
 {
     rrc_event_fd = eventfd(0, 0);
 
@@ -53,7 +69,7 @@ AppRRC::AppRRC(const config_t& config)
             config.app_config.woudp_rx);
     }
 
-    stats.rx_antenna_dbm_avg46 = &main_monitor->getMetric("wifi_rx_antenna_dbm_avg46");
+    stats.rx_antenna_dbm_avg46 = &main_monitor->get_metric("wifi_rx_antenna_dbm_avg46");
 
     setup_80211_base_frame();
     setup_console();
@@ -94,40 +110,41 @@ AppRRC::~AppRRC()
 
 void AppRRC::on_console_read()
 {
-    bfc::BufferView bv{console_buff, sizeof(console_buff)};
-    bfc::Ip4Port sender_addr;
-    auto rv = console_sock.recvfrom(bv, sender_addr);
+    bfc::buffer_view bv{console_buff, sizeof(console_buff)};
+    sockaddr_in sender_addr;
+    socklen_t sender_addr_sz = sizeof(sender_addr);
+    auto rv = console_sock.recv(bv, 0, (sockaddr*)&sender_addr, &sender_addr_sz);
     if (rv>0)
     {
         console_buff[rv] = 0;
-        int pFd = console_sock.handle();
-        std::string result = cmdman.executeCommand(std::string_view((char*)console_buff, rv));
+        int pFd = console_sock.fd();
+        std::string result = cmdman.execute(std::string((char*)console_buff, (size_t)rv));
         auto res_copy = result;
         res_copy.pop_back();
         Logless(*main_logger, RRC_DBG, "DBG | AppRRC | console: #", res_copy.c_str());
 
-        reactor.addWriteHandler(console_sock.handle(), [pFd, this, result, sender_addr]()
-            {
-                console_sock.sendto(bfc::BufferView((uint8_t*)result.data(), result.size()), sender_addr);
-                reactor.removeWriteHandler(pFd);
-            });
+        console_sock.send(
+            bfc::const_buffer_view((uint8_t*)result.data(), result.size()),
+            0,
+            (const sockaddr*)&sender_addr,
+            sizeof(sender_addr));
     }
 }
 
-std::string AppRRC::on_cmd_init(bfc::ArgsMap&& args)
+std::string AppRRC::on_cmd_init(bfc::args_map&& args)
 {
-    lcid_t lcid = args.argAs<int>("lcid").value();
+    lcid_t lcid = args.as<int>("lcid").value();
     push_rrc_event(rrc_event_setup_t{lcid, true});
     return "pushing...\n";
 }
 
-std::string AppRRC::on_cmd_stop(bfc::ArgsMap&& args)
+std::string AppRRC::on_cmd_stop(bfc::args_map&& args)
 {
     stop();
     return "stop:\n";
 }
 
-std::string AppRRC::on_cmd_log(bfc::ArgsMap&& args)
+std::string AppRRC::on_cmd_log(bfc::args_map&& args)
 {
     auto logbit_str = args.arg("bit").value_or("");
     if (!logbit_str.empty())
@@ -140,8 +157,8 @@ std::string AppRRC::on_cmd_log(bfc::ArgsMap&& args)
     }
     else
     {
-        auto idx = args.argAs<int>("index").value_or(0);
-        auto value = args.argAs<int>("set").value_or(0);
+        auto idx = args.as<int>("index").value_or(0);
+        auto value = args.as<int>("set").value_or(0);
         main_logger->set_logbit(value, idx);
     }
     return "level set.\n";
@@ -231,17 +248,18 @@ void AppRRC::setup_80211_base_frame()
 void AppRRC::setup_console()
 {
     Logless(*main_logger, RRC_DBG, "DBG | AppRRC | Setting up console...");
-    if (console_sock.bind(bfc::toIp4Port(
+    if (console_sock.bind(console_to_sockaddr4(
         config.app_config.udp_console)) < 0)
     {
         LoglessF(*main_logger, RRC_ERR, "ERR | AppRRC | Bind error(_) console is now disabled!", strerror(errno));
         return;
     }
 
-    cmdman.addCommand("init", [this](bfc::ArgsMap&& args){return on_cmd_init(std::move(args));});
-    cmdman.addCommand("log", [this](bfc::ArgsMap&& args){return on_cmd_log(std::move(args));});
+    cmdman.add("init", [this](bfc::args_map&& args){return on_cmd_init(std::move(args));});
+    cmdman.add("log", [this](bfc::args_map&& args){return on_cmd_log(std::move(args));});
+    cmdman.add("stop", [this](bfc::args_map&& args){return on_cmd_stop(std::move(args));});
 
-    reactor.addReadHandler(console_sock.handle(), [this](){on_console_read();});
+    reactor.add_read_rdy(console_sock.fd(), [this](){on_console_read();});
 }
 
 void AppRRC::setup_pdcps()
@@ -372,7 +390,13 @@ void AppRRC::setup_scheduler()
 
     timer_thread = std::thread([this](){
         pthread_setname_np(pthread_self(), "RRC_TIMER1");
-        timer.run();});
+        timer_running = true;
+        while (timer_running)
+        {
+            timer.schedule(bfc::timer<>::current_time_us());
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+        }
+    });
 }
 
 void AppRRC::setup_lcrrc()
@@ -394,7 +418,7 @@ void AppRRC::setup_lcrrc()
 
 void AppRRC::setup_rrc()
 {
-    reactor.addReadHandler(rrc_event_fd, [this](){
+    reactor.add_read_rdy(rrc_event_fd, [this](){
             uint64_t one;
             read(rrc_event_fd, &one, sizeof(one));
             on_rrc_event();
@@ -406,9 +430,15 @@ void AppRRC::setup_rrc()
 
     timer2_thread = std::thread([this](){
         pthread_setname_np(pthread_self(), "RRC_TIMER2");
-        timer2.run();});
+        timer2_running = true;
+        while (timer2_running)
+        {
+            timer2.schedule(bfc::timer<>::current_time_us());
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+        }
+    });
 
-    reactor.addReadHandler(wifi->handle(), [this](){
+    reactor.add_read_rdy(wifi->handle(), [this](){
             on_wifi_rx();
         });
 }
@@ -632,8 +662,8 @@ uint8_t AppRRC::allocate_req_id()
 void AppRRC::on_rrc_event(const rrc_event_stop_t&)
 {
     rrc_rx_running = false;
-    timer.stop();
-    timer2.stop();
+    timer_running = false;
+    timer2_running = false;
     reactor.stop();
 }
 

@@ -20,7 +20,7 @@
 
 #include <atomic>
 
-#include <bfc/IMetric.hpp>
+#include <bfc/metric.hpp>
 
 #include "pdu.hpp"
 #include "info_defs.hpp"
@@ -81,14 +81,14 @@ struct IPDCP
 
     struct stats_t
     {
-        bfc::IMetric* tx_queue_size = nullptr;
-        bfc::IMetric* rx_reorder_size = nullptr;
-        bfc::IMetric* rx_invalid_pdu = nullptr;
-        bfc::IMetric* rx_ignored_pdu = nullptr;
-        bfc::IMetric* rx_invalid_segment = nullptr;
-        bfc::IMetric* rx_segment_rcvd = nullptr;
-        bfc::IMetric* tx_enabled = nullptr;
-        bfc::IMetric* rx_enabled = nullptr;
+        bfc::metric* tx_queue_size = nullptr;
+        bfc::metric* rx_reorder_size = nullptr;
+        bfc::metric* rx_invalid_pdu = nullptr;
+        bfc::metric* rx_ignored_pdu = nullptr;
+        bfc::metric* rx_invalid_segment = nullptr;
+        bfc::metric* rx_segment_rcvd = nullptr;
+        bfc::metric* tx_enabled = nullptr;
+        bfc::metric* rx_enabled = nullptr;
     };
 
     virtual ~IPDCP(){}

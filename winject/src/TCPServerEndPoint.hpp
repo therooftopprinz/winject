@@ -25,13 +25,28 @@
 
 #include <sys/eventfd.h>
 
-#include <bfc/IReactor.hpp>
-#include <bfc/Tcp.hpp>
+#include <sstream>
+#include <bfc/socket.hpp>
 
 #include "IPDCP.hpp"
 #include "IRRC.hpp"
 #include "IEndPoint.hpp"
 #include "Logger.hpp"
+
+inline sockaddr_in tcp_ep_to_sockaddr4(const std::string& hostport)
+{
+    std::stringstream ss(hostport);
+    std::string host;
+    std::string port_str;
+
+    if (!std::getline(ss, host, ':') || !std::getline(ss, port_str))
+    {
+        return {};
+    }
+
+    uint16_t port = static_cast<uint16_t>(std::stoul(port_str));
+    return bfc::ip4_port_to_sockaddr(host, port);
+}
 
 class TCPServerEndPoint : public IEndPoint
 {
@@ -43,12 +58,13 @@ public:
         : config(config)
         , rrc(rrc)
         , pdcp(pdcp)
+        , serverSock(bfc::create_tcp4())
     {
-        stats.tx_enabled = &main_monitor->getMetric(to_ep_stat("tx_enabled", config.lcid));
-        stats.rx_enabled = &main_monitor->getMetric(to_ep_stat("rx_enabled", config.lcid));
+        stats.tx_enabled = &main_monitor->get_metric(to_ep_stat("tx_enabled", config.lcid));
+        stats.rx_enabled = &main_monitor->get_metric(to_ep_stat("rx_enabled", config.lcid));
 
         int one=1;
-        if (0 > serverSock.setsockopt(SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)))
+        if (0 > serverSock.set_sock_opt(SOL_SOCKET, SO_REUSEADDR, &one))
         {
             LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | ReUseAddr error(#)",
@@ -57,7 +73,8 @@ public:
             throw std::runtime_error("TCPServerEndPoint: failed");
         }
 
-        if (0 > serverSock.bind(bfc::toIp4Port(config.address1)))
+        auto bind_addr = tcp_ep_to_sockaddr4(config.address1);
+        if (0 > serverSock.bind(bind_addr))
         {
             LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | Bind error(#)",
@@ -76,7 +93,7 @@ public:
             throw std::runtime_error("TCPServerEndPoint: failed");
         }
 
-        if (0 > listen(serverSock.handle(), 1))
+        if (0 > serverSock.listen(1))
         {
             LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | Listen error(#)",
@@ -188,13 +205,13 @@ private:
     {
         // RLF and client active
         if (is_rlf()
-            && clientSock)
+            && clientSock.fd() != -1)
         {
             LoglessF(*main_logger, TEP_ERR,
                 "ERR | TCPEP# | state RLF!",
                 (int)config.lcid);
 
-            clientSock = bfc::TcpSocket(-1);
+            clientSock = bfc::socket();
         }
 
         notify_event(EVENTFD_BREAK_SELECT);
@@ -207,20 +224,20 @@ private:
             (int)config.lcid);
 
         std::unique_lock lg(txrx_mutex);
-        auto newSock = accept(serverSock.handle(), nullptr, nullptr);
+        sockaddr_in addr;
+        auto newSock = serverSock.accept(addr);
 
         Logless(*main_logger, TEP_INF,
             "INF | TCPEP# | accepted clientSock=#",
             (int)config.lcid,
-            newSock);
+            newSock.fd());
 
-        if (clientSock)
+        if (clientSock.fd() != -1)
         {
-            close(newSock);
             return;
         }
 
-        clientSock = bfc::TcpSocket(newSock);
+        clientSock = std::move(newSock);
 
         if (!is_tx_enabled)
         {
@@ -233,19 +250,19 @@ private:
         pdcp_tx_running = true;
         fd_set recv_set;
         FD_ZERO(&recv_set);
-        auto fdmax0 = std::max(serverSock.handle(), ep_event_fd);
+        auto fdmax0 = std::max(serverSock.fd(), ep_event_fd);
 
         while (pdcp_tx_running)
         {
-            FD_SET(serverSock.handle(), &recv_set);
+            FD_SET(serverSock.fd(), &recv_set);
             FD_SET(ep_event_fd, &recv_set);
 
-            if (is_active() && clientSock)
+            if (is_active() && clientSock.fd() != -1)
             {
-                FD_SET(clientSock.handle(), &recv_set);
+                FD_SET(clientSock.fd(), &recv_set);
             }
 
-            auto fdmax1 = std::max(clientSock.handle(), fdmax0);
+            auto fdmax1 = std::max(clientSock.fd(), fdmax0);
             auto maxfd = fdmax1+1;
 
             auto rv = select(maxfd, &recv_set, nullptr, nullptr, nullptr);
@@ -261,17 +278,17 @@ private:
                     "ERR | TCPEP# | select error(_)",
                     (int)config.lcid,
                     strerror(errno));
-                if (clientSock)
+                if (clientSock.fd() != -1)
                 {
-                    clientSock = bfc::TcpSocket(-1);
+                    clientSock = bfc::socket();
                 }
                 continue;
             }
 
-            if (FD_ISSET(clientSock.handle(), &recv_set))
+            if (clientSock.fd() != -1 && FD_ISSET(clientSock.fd(), &recv_set))
             {
-                bfc::BufferView bv{buffer_read, sizeof(buffer_read)};
-                auto rv = clientSock.recv(bv);
+                bfc::buffer_view bv{buffer_read, sizeof(buffer_read)};
+                auto rv = clientSock.recv(bv, 0);
 
                 if (rv>0)
                 {
@@ -285,12 +302,12 @@ private:
                         "ERR | TCPEP# | RLF: client closed error=#",
                         (int)config.lcid,
                         strerror(errno));
-                    clientSock = bfc::TcpSocket(-1);
+                    clientSock = bfc::socket();
                     rrc.on_rlf(config.lcid);
                 }
             }
 
-            if (FD_ISSET(serverSock.handle(), &recv_set))
+            if (FD_ISSET(serverSock.fd(), &recv_set))
             {
                 on_new_connection();
             }
@@ -333,16 +350,18 @@ private:
         while (pdcp_rx_running)
         {
             auto b = pdcp.to_rx(1000*100);
-            if (b.size() && is_active() && clientSock)
+            if (b.size() && is_active() && clientSock.fd() != -1)
             {
-                clientSock.send(bfc::BufferView((uint8_t*)b.data(), b.size()));
+                clientSock.send(
+                    bfc::buffer_view((uint8_t*)b.data(), b.size()),
+                    0);
             }
         }
     }
 
     config_t config;
-    bfc::TcpSocket serverSock;
-    bfc::TcpSocket clientSock = bfc::TcpSocket(-1);
+    bfc::socket serverSock;
+    bfc::socket clientSock;
     IRRC& rrc;
     IPDCP& pdcp;
 

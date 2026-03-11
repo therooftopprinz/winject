@@ -19,12 +19,12 @@
 #define __WINJECTUM_APPRRC_HPP__
 
 #include <atomic>
+#include <functional>
 
-#include <bfc/CommandManager.hpp>
-#include <bfc/Udp.hpp>
-#include <bfc/Tcp.hpp>
-#include <bfc/EpollReactor.hpp>
-#include <bfc/Timer.hpp>
+#include <bfc/command_manager.hpp>
+#include <bfc/socket.hpp>
+#include <bfc/epoll_reactor.hpp>
+#include <bfc/timer.hpp>
 
 #include "802_11.hpp"
 #include "802_11_filters.hpp"
@@ -70,9 +70,9 @@ public:
 private:
     void on_console_read();
 
-    std::string on_cmd_init(bfc::ArgsMap&& args);
-    std::string on_cmd_stop(bfc::ArgsMap&& args);
-    std::string on_cmd_log(bfc::ArgsMap&& args);
+    std::string on_cmd_init(bfc::args_map&& args);
+    std::string on_cmd_stop(bfc::args_map&& args);
+    std::string on_cmd_log(bfc::args_map&& args);
 
     void setup_80211_base_frame();
     void setup_console();
@@ -148,10 +148,12 @@ private:
     config_t peer_config;
     std::mutex peer_config_mutex;
 
-    bfc::Timer<> timer;
-    bfc::Timer<> timer2;
+    bfc::timer<> timer;
+    bfc::timer<> timer2;
     std::thread timer_thread;
     std::thread timer2_thread;
+    std::atomic_bool timer_running = false;
+    std::atomic_bool timer2_running = false;
     std::atomic_uint8_t rrc_req_id = 0;
     std::shared_ptr<IWIFI> wifi;
     TxScheduler tx_scheduler;
@@ -165,9 +167,9 @@ private:
     winject::radiotap::radiotap_t radiotap;
     winject::ieee_802_11::frame_t tx_frame;
 
-    bfc::UdpSocket console_sock;
-    bfc::EpollReactor reactor;
-    bfc::CommandManager cmdman;
+    bfc::socket console_sock;
+    bfc::epoll_reactor<std::function<void()>> reactor;
+    bfc::command_manager<> cmdman;
 
     std::map<uint8_t, std::shared_ptr<ILLC>> llcs;
     std::map<uint8_t, std::shared_ptr<IPDCP>> pdcps;

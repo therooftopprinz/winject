@@ -18,7 +18,7 @@
 #ifndef __WINJECTUM_IENDPOINT_HPP__
 #define __WINJECTUM_IENDPOINT_HPP__
 
-#include <bfc/IMetric.hpp>
+#include <bfc/metric.hpp>
 
 struct IEndPoint
 {
@@ -33,8 +33,8 @@ struct IEndPoint
 
     struct stats_t
     {
-        bfc::IMetric* tx_enabled = nullptr;
-        bfc::IMetric* rx_enabled = nullptr;
+        bfc::metric* tx_enabled = nullptr;
+        bfc::metric* rx_enabled = nullptr;
     };
 
     virtual void set_tx_enabled(bool) = 0;

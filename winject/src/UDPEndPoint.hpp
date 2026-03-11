@@ -24,12 +24,27 @@
 
 #include <sys/eventfd.h>
 
-#include <bfc/IReactor.hpp>
-#include <bfc/Udp.hpp>
+#include <sstream>
+#include <bfc/socket.hpp>
 
 #include "IPDCP.hpp"
 #include "IEndPoint.hpp"
 #include "Logger.hpp"
+
+inline sockaddr_in udp_ep_to_sockaddr4(const std::string& hostport)
+{
+    std::stringstream ss(hostport);
+    std::string host;
+    std::string port_str;
+
+    if (!std::getline(ss, host, ':') || !std::getline(ss, port_str))
+    {
+        return {};
+    }
+
+    uint16_t port = static_cast<uint16_t>(std::stoul(port_str));
+    return bfc::ip4_port_to_sockaddr(host, port);
+}
 
 class UDPEndPoint : public IEndPoint
 {
@@ -39,11 +54,13 @@ public:
         IPDCP& pdcp)
         : config(config)
         , pdcp(pdcp)
+        , sock(bfc::create_udp4())
     {
-        stats.tx_enabled = &main_monitor->getMetric(to_ep_stat("tx_enabled", config.lcid));
-        stats.rx_enabled = &main_monitor->getMetric(to_ep_stat("rx_enabled", config.lcid));
+        stats.tx_enabled = &main_monitor->get_metric(to_ep_stat("tx_enabled", config.lcid));
+        stats.rx_enabled = &main_monitor->get_metric(to_ep_stat("rx_enabled", config.lcid));
 
-        if (0 > sock.bind(bfc::toIp4Port(config.address1)))
+        auto bind_addr = udp_ep_to_sockaddr4(config.address1);
+        if (0 > sock.bind(bind_addr))
         {
             LoglessF(*main_logger, TEP_ERR,
                 "ERR | UDPEP# | Bind error(_)",
@@ -62,7 +79,7 @@ public:
             throw std::runtime_error("TCPEndPoint: failed");
         }
 
-        target_addr = bfc::toIp4Port(config.address2);
+        target_addr = udp_ep_to_sockaddr4(config.address2);
 
         pdcp_tx_thread = std::thread([this, lcid = config.lcid](){
             std::string name = "PDCP_";
@@ -118,11 +135,11 @@ private:
         // struct timeval tv = {1, 0};
         fd_set recv_set;
         FD_ZERO(&recv_set);
-        auto maxfd = std::max(sock.handle(), ep_event_fd)+1;
+        auto maxfd = std::max(sock.fd(), ep_event_fd)+1;
 
         while (pdcp_tx_running)
         {
-            FD_SET(sock.handle(), &recv_set);
+            FD_SET(sock.fd(), &recv_set);
             FD_SET(ep_event_fd,   &recv_set);
 
             auto rv = select(maxfd, &recv_set, nullptr, nullptr, nullptr);
@@ -141,11 +158,12 @@ private:
                 return;
             }
 
-            if (FD_ISSET(sock.handle(), &recv_set))
+            if (FD_ISSET(sock.fd(), &recv_set))
             {
-                bfc::BufferView bv{buffer_read, sizeof(buffer_read)};
-                bfc::Ip4Port sender_addr;
-                auto rv = sock.recvfrom(bv, sender_addr);
+                bfc::buffer_view bv{buffer_read, sizeof(buffer_read)};
+                sockaddr_in sender_addr;
+                socklen_t sender_addr_sz = sizeof(sender_addr);
+                auto rv = sock.recv(bv, 0, (sockaddr*)&sender_addr, &sender_addr_sz);
 
                 if (rv>0)
                 {
@@ -173,15 +191,20 @@ private:
             auto b = pdcp.to_rx(1000*100);
             if (b.size())
             {
-                int pFd = sock.handle();
-                sock.sendto(bfc::BufferView((uint8_t*)b.data(), b.size()), target_addr);
+                int pFd = sock.fd();
+                (void)pFd;
+                sock.send(
+                    bfc::buffer_view((uint8_t*)b.data(), b.size()),
+                    0,
+                    (const sockaddr*)&target_addr,
+                    sizeof(target_addr));
             }
         }
     }
 
     config_t config;
-    bfc::UdpSocket sock;
-    bfc::Ip4Port target_addr;
+    bfc::socket sock;
+    sockaddr_in target_addr;
     IPDCP& pdcp;
 
     std::thread pdcp_tx_thread;

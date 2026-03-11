@@ -24,14 +24,14 @@ PDCP::PDCP(IRRC& rrc, lcid_t lcid, const tx_config_t& tx_config, const rx_config
     , tx_config(tx_config)
     , rx_config(rx_config)
 {
-    stats.tx_queue_size       = &main_monitor->getMetric(to_pdcp_stat("tx_queue_size", lcid));
-    stats.rx_reorder_size     = &main_monitor->getMetric(to_pdcp_stat("rx_reorder_size", lcid));
-    stats.rx_invalid_pdu      = &main_monitor->getMetric(to_pdcp_stat("rx_invalid_pdu", lcid));
-    stats.rx_ignored_pdu      = &main_monitor->getMetric(to_pdcp_stat("rx_ignored_pdu", lcid));
-    stats.rx_invalid_segment  = &main_monitor->getMetric(to_pdcp_stat("rx_invalid_segment", lcid));
-    stats.rx_segment_rcvd     = &main_monitor->getMetric(to_pdcp_stat("rx_segment_rcvd", lcid));
-    stats.tx_enabled          = &main_monitor->getMetric(to_pdcp_stat("tx_enabled", lcid));
-    stats.rx_enabled          = &main_monitor->getMetric(to_pdcp_stat("rx_enabled", lcid));
+    stats.tx_queue_size       = &main_monitor->get_metric(to_pdcp_stat("tx_queue_size", lcid));
+    stats.rx_reorder_size     = &main_monitor->get_metric(to_pdcp_stat("rx_reorder_size", lcid));
+    stats.rx_invalid_pdu      = &main_monitor->get_metric(to_pdcp_stat("rx_invalid_pdu", lcid));
+    stats.rx_ignored_pdu      = &main_monitor->get_metric(to_pdcp_stat("rx_ignored_pdu", lcid));
+    stats.rx_invalid_segment  = &main_monitor->get_metric(to_pdcp_stat("rx_invalid_segment", lcid));
+    stats.rx_segment_rcvd     = &main_monitor->get_metric(to_pdcp_stat("rx_segment_rcvd", lcid));
+    stats.tx_enabled          = &main_monitor->get_metric(to_pdcp_stat("tx_enabled", lcid));
+    stats.rx_enabled          = &main_monitor->get_metric(to_pdcp_stat("rx_enabled", lcid));
     reset_stats();
 }
 
