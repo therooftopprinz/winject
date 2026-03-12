@@ -49,6 +49,8 @@ add_executable(test
     ${test_src}
     src/LLC.cpp
     src/PDCP.cpp
+    src/pdcp/pdcp_dl.cpp
+    src/pdcp/pdcp_ul.cpp
     )
 target_include_directories(test PRIVATE
     src

@@ -30,7 +30,7 @@ struct crc{
         static std::once_flag lut_setup{};
         std::call_once(lut_setup, [](){
                 crc_t  crc_rem;
-                constexpr auto CRC_MSB = 1 << (CRCWIDTH-1);
+                constexpr auto CRC_MSB = crc_t{1} << (CRCWIDTH-1);
                 for (int div = 0; div < 256; div++)
                 {
                     crc_rem = div << (CRCWIDTH - 8);

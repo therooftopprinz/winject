@@ -87,7 +87,7 @@ TEST_F(Test_PDCP, should_allocate_basic)
     pdcp.rescan();
 
     auto payload = pdcp.payload;
-    pdcp_segment_t segment(payload, pdcp.pdu_size);
+    pdcp_segment_t segment(payload, pdcp.max_size);
     segment.has_offset = false;
     segment.has_sn = true;
     segment.rescan();

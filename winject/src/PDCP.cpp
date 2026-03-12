@@ -177,7 +177,7 @@ void PDCP::on_tx(tx_info_t& info)
         return;
     }
 
-    size_t available_for_data = pdcp.pdu_size - pdcp.get_header_size();
+    size_t available_for_data = pdcp.max_size - pdcp.get_header_size();
     uint8_t* payload = pdcp.payload;
     size_t allocated_segments = 0;
 

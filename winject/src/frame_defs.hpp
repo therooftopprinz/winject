@@ -30,12 +30,69 @@ using llc_sz_t = uint16_t;
 using pdcp_sn_t = uint16_t;
 using pdcp_segment_offset_t = uint16_t;
 
+struct safe_checker
+{
+public:
+    safe_checker(uint8_t* start, uint8_t* end)
+        : start(start)
+        , current(start)
+        , end(end)
+        , validity(true)
+    {}
+
+    template <typename T>
+    T* get()
+    {
+        if (current + sizeof(T) > end)
+        {
+            validity = false;
+            return nullptr;
+        }
+        auto rv = reinterpret_cast<T*>(current);
+        current += sizeof(T);
+        return rv;
+    }
+
+    uint8_t* get_n(size_t n)
+    {
+        if (current + n > end)
+        {
+            validity = false;
+            return nullptr;
+        }
+        auto rv = reinterpret_cast<uint8_t*>(current);
+        current += n;
+        return rv;
+    }
+
+    bool is_valid() const
+    {
+        return validity;
+    }
+
+    operator bool() const
+    {
+        return is_valid();
+    }
+
+    size_t remaining() const
+    {
+        return size_t(end - current);
+    }
+
+private:
+    uint8_t* start = nullptr;
+    uint8_t* current = nullptr;
+    uint8_t* end = nullptr;
+    bool validity = false;
+};
+
 //     +-------------------------------+
-//  01 | FEC_TYPE                      | 01
+//     | FEC_TYPE                      | 01
 //     +-------------------------------+
-//  02 | N (FEC_TYPE != 0)             | 01 * (FEC_TYPE!=0)
+//     | N (FEC_TYPE != 0)             | 01 * (FEC_TYPE!=0)
 //     +-------------------------------+
-//  03 | REDUNDANCY                    | FEC_R_SZ * N
+//     | REDUNDANCY                    | FEC_R_SZ * N
 //     +-------------------------------+
 //     | DATA                          | FEC_D_SZ * N
 //     +-------------------------------+
@@ -61,46 +118,36 @@ struct fec_t
         data_sz = 0;
     }
 
+    bool is_valid()
+    {
+        return fec_type != nullptr;
+    }
+
     void init(uint8_t fec, uint8_t n_)
     {
-        if (max_size < 2)
-        {
-            return;
-        }
-
-        uint8_t *cursor = base;
-        fec_type = cursor++;
-        n = cursor++;
-        *fec_type = fec;
-        *n = n_;
+        safe_checker checker(base, base + max_size);
+        fec_type = checker.get<uint8_t>();
         rescan();
+        if (n)
+        {
+            *n = n_;
+        }
     }
 
     void rescan()
     {
-        reset();
-
-        if (max_size < 2)
-        {
-            return;
-        }
-
-        uint8_t *cursor = base;
-        fec_type = cursor++;
-        n = cursor++;
+        safe_checker checker(base, base + max_size);
+        fec_type = checker.get<uint8_t>();
+        if (!checker) return reset();
 
         auto ft = (fec_type_e)(*fec_type);
-        if      ( E_FEC_TYPE_NONE == ft)
+        if (ft != E_FEC_TYPE_NONE)
         {
-            fec_d_sz = 0;
-            fec_r_sz = 0;
-            data_blocks = n;
-            n = nullptr;
-            header_sz = 1;
-            data_sz = max_size - header_sz;
-            return;
+            n = checker.get<uint8_t>();
+            if (!checker) return reset();
         }
-        else if (E_FEC_TYPE_RS_255_247 == ft)
+
+        if (E_FEC_TYPE_RS_255_247 == ft)
         {
             fec_d_sz = 247;
             fec_r_sz = 255-247;
@@ -126,18 +173,10 @@ struct fec_t
             fec_r_sz = 255-127;
         }
 
-        header_sz = 2;
-        data_sz = *n*fec_d_sz;
-
-        redu_blocks = cursor;
-        if (*n*fec_d_sz + *n*fec_r_sz + 2 > max_size)
-        {
-            reset();
-            return;
-        }
-
-        cursor += *n * fec_r_sz;
-        data_blocks = cursor;
+        redu_blocks = checker.get_n(*n*fec_r_sz);
+        if (!checker) return reset();
+        data_blocks = checker.get_n(*n*fec_d_sz);
+        if (!checker) return reset();
     }
 
     uint8_t* base = nullptr;
@@ -271,6 +310,11 @@ struct llc_t
         return max_size ? base+3 : nullptr;
     }
 
+    bool is_valid()
+    {
+        return get_SIZE() > max_size;
+    }
+
     uint8_t* base = nullptr;
     llc_sz_t max_size = 0;
     size_t crc_size = 0;
@@ -294,14 +338,16 @@ struct llc_payload_ack_t
 //    +-------------------------------+
 //    | HMAC (OPTIONAL)               | HMSZ
 //    +-------------------------------|
-//    | PAYLOAD                       | EOP
+//    | PAYLOAD                       |
 //    +-------------------------------+
 
+
+// @note: Deprecated, pdcp is now composed of pdcp_segment_t only, encryption moved to upper layer.
 struct pdcp_t
 {
     pdcp_t(uint8_t* base, size_t size)
         : base(base)
-        , pdu_size(size)
+        , max_size(size)
     {
     }
 
@@ -329,6 +375,11 @@ struct pdcp_t
         return (hmac_size + iv_size);
     }
 
+    bool is_header_valid()
+    {
+        return max_size > get_header_size();
+    }
+
     size_t iv_size = 0;
     size_t hmac_size = 0;
 
@@ -338,7 +389,7 @@ struct pdcp_t
     uint8_t* payload = nullptr;
 
     uint8_t* base = nullptr;
-    llc_sz_t pdu_size = 0;
+    size_t   max_size = 0;
 };
 
 //     +---+---------------------------+
@@ -356,29 +407,36 @@ struct pdcp_segment_t
     pdcp_segment_t(uint8_t* base, size_t size)
         : base(base)
         , max_size(size)
+    {}
+
+    void reset()
     {
+        size = nullptr;
+        sn = nullptr;
+        offset = nullptr;
+        payload = nullptr;
     }
 
     void rescan()
     {
-        uint8_t *ptr = base;
+        safe_checker checker(base, base + max_size);
 
-        size = (winject::BEU16UA*) ptr;
-        ptr += sizeof(*size);
+        size = checker.get<winject::BEU16UA>();
+        if (!checker) return reset();
 
         if (has_sn)
         {
-            sn = (winject::BEU16UA*)ptr;
-            ptr += sizeof(*sn);
+            sn = checker.get<winject::BEU16UA>();
+            if (!checker) return reset();
         }
 
         if (has_offset)
         {
-            offset = (winject::BEU16UA*) ptr;
-            ptr += sizeof(*offset);
+            offset = checker.get<winject::BEU16UA>();
+            if (!checker) return reset();
         }
 
-        payload = ptr;
+        payload = checker.get_n(checker.remaining());
     }
 
     void set_SN(std::optional<pdcp_sn_t> value)
@@ -393,7 +451,7 @@ struct pdcp_segment_t
 
     std::optional<pdcp_sn_t> get_SN()
     {
-        if (!has_sn || sn==nullptr)
+        if (!has_sn)
         {
             return {};
         }
@@ -402,17 +460,12 @@ struct pdcp_segment_t
 
     void set_OFFSET(std::optional<pdcp_segment_offset_t> value)
     {
-        if (!value || offset==nullptr)
-        {
-            return;
-        }
-
         *offset = *value;
     }
 
     std::optional<pdcp_segment_offset_t> get_OFFSET()
     {
-        if (!has_offset || offset==nullptr)
+        if (!has_offset)
         {
             return {};
         }
@@ -454,6 +507,16 @@ struct pdcp_segment_t
     void set_payload_size(pdcp_segment_offset_t payload_size)
     {
         set_SIZE(get_header_size() + payload_size);
+    }
+
+    bool is_header_valid()
+    {
+        return max_size > get_header_size();
+    }
+
+    bool is_valid()
+    {
+        return is_header_valid() && max_size > get_payload_size();;
     }
 
     uint8_t *base = nullptr;
