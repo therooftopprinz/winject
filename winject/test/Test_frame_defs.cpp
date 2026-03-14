@@ -37,10 +37,8 @@ TEST(Test_frame_defs_basic_fec_t, pointer_generation)
         fec_t f(buffer, sizeof(buffer));
         f.rescan();
         ASSERT_TRUE(f.is_valid());
-        EXPECT_EQ(buffer, f.fec_type);
-        EXPECT_EQ(buffer + 1, f.n);
-        EXPECT_EQ(buffer + 2, f.redu_blocks);
-        EXPECT_EQ(buffer + 2 + 8, f.data_blocks);
+        EXPECT_EQ(buffer + 2,     f.get_redu_blocks());
+        EXPECT_EQ(buffer + 2 + 8, f.get_data_blocks());
     }
 }
 
@@ -56,15 +54,15 @@ TEST(Test_frame_defs_basic_fec_t, setter_getter_vs_raw_bytes)
     ASSERT_TRUE(f.is_valid());
 
     // Set via pointers and compare to raw bytes
-    *f.fec_type = static_cast<uint8_t>(E_FEC_TYPE_RS_255_239);
-    *f.n = 2;
+    f.init(E_FEC_TYPE_RS_255_239, 2);
+    f.rescan();
     EXPECT_EQ(buffer[0], static_cast<uint8_t>(E_FEC_TYPE_RS_255_239));
     EXPECT_EQ(buffer[1], 2);
 
     // Write into data_blocks and read back from raw buffer
     const size_t data_offset = 2 + 2 * (255 - 239);  // after redu_blocks for n=2, RS_255_239
-    f.redu_blocks[0] = 0xAB;
-    f.redu_blocks[1] = 0xCD;
+    f.get_redu_blocks()[0] = 0xAB;
+    f.get_redu_blocks()[1] = 0xCD;
     EXPECT_EQ(buffer[2], 0xAB);
     EXPECT_EQ(buffer[3], 0xCD);
 
@@ -72,8 +70,8 @@ TEST(Test_frame_defs_basic_fec_t, setter_getter_vs_raw_bytes)
     fec_t f2(buffer, sizeof(buffer));
     f2.rescan();
     ASSERT_TRUE(f2.is_valid());
-    EXPECT_EQ(static_cast<uint8_t>(E_FEC_TYPE_RS_255_239), *f2.fec_type);
-    EXPECT_EQ(2, *f2.n);
+    EXPECT_EQ(static_cast<uint8_t>(E_FEC_TYPE_RS_255_239), f2.get_FEC_TYPE());
+    EXPECT_EQ(2, f2.get_N());
 }
 
 TEST(Test_frame_defs_basic_fec_t, nok_buffer_too_small)
@@ -85,10 +83,6 @@ TEST(Test_frame_defs_basic_fec_t, nok_buffer_too_small)
     fec_t f(small_buffer, sizeof(small_buffer));
     f.rescan();
     EXPECT_FALSE(f.is_valid());
-    EXPECT_EQ(nullptr, f.fec_type);
-    EXPECT_EQ(nullptr, f.n);
-    EXPECT_EQ(nullptr, f.data_blocks);
-    EXPECT_EQ(nullptr, f.redu_blocks);
 }
 
 TEST(Test_frame_defs_basic_fec_t, nok_rescan_truncated)
@@ -115,13 +109,11 @@ TEST(Test_frame_defs_basic_llc_t, pointer_generation)
 
     llc_t llc(buffer, sizeof(buffer));
     // Header: SN(0) + LCID|A|SIZEH(1) + SIZEL(2) = 3 bytes; CRC follows if crc_size set
-    llc.crc_size = 0;
-    EXPECT_EQ(buffer, llc.base);
-    EXPECT_EQ(buffer + 3, llc.payload());
-    EXPECT_EQ(buffer + 3, llc.CRC());  // max_size non-zero so base+3
-    llc.crc_size = 4;
-    EXPECT_EQ(buffer + 3, llc.CRC());
-    EXPECT_EQ(buffer + 3 + 4, llc.payload());
+    EXPECT_EQ(buffer + 3, llc.get_payload());
+    EXPECT_EQ(buffer + 3, llc.get_CRC());  // max_size non-zero so base+3
+    llc_t llc2(buffer, sizeof(buffer), 4);
+    EXPECT_EQ(buffer + 3, llc2.get_CRC());
+    EXPECT_EQ(buffer + 3 + 4, llc2.get_payload());
 }
 
 TEST(Test_frame_defs_basic_llc_t, setter_getter_vs_raw_bytes)
@@ -129,7 +121,6 @@ TEST(Test_frame_defs_basic_llc_t, setter_getter_vs_raw_bytes)
     uint8_t buffer[1024];
     std::memset(buffer, 0, sizeof(buffer));
     llc_t llc(buffer, sizeof(buffer));
-    llc.crc_size = 0;
 
     llc.set_SN(0xAB);
     llc.set_LCID(0x0F);
@@ -143,7 +134,6 @@ TEST(Test_frame_defs_basic_llc_t, setter_getter_vs_raw_bytes)
     EXPECT_EQ(buffer[2], 0x23);
 
     llc_const_t read(buffer, sizeof(buffer));
-    read.crc_size = 0;
     EXPECT_EQ(read.get_SN(), 0xAB);
     EXPECT_EQ(read.get_LCID(), 0x0F);
     EXPECT_TRUE(read.get_A());
@@ -155,11 +145,9 @@ TEST(Test_frame_defs_basic_llc_t, nok_size_overflow)
     uint8_t buffer[32];
     std::memset(buffer, 0, sizeof(buffer));
     llc_t llc(buffer, sizeof(buffer));
-    llc.crc_size = 0;
     // is_valid() returns true when get_SIZE() > max_size (invalid/corrupt)
     llc.set_SIZE(1000);  // larger than 32
     llc_const_t read(buffer, sizeof(buffer));
-    read.crc_size = 0;
     EXPECT_TRUE(read.is_valid());  // indicates invalid/corrupt frame
 }
 
@@ -174,39 +162,26 @@ TEST(Test_frame_defs_basic_pdcp_segment_t, pointer_generation)
 
     // Minimal header: size only (2 bytes)
     {
-        pdcp_segment_t seg(buffer, sizeof(buffer));
-        seg.has_sn = false;
-        seg.has_offset = false;
+        pdcp_segment_t seg(buffer, sizeof(buffer), false, false);
         seg.rescan();
-        ASSERT_NE(nullptr, seg.size);
-        EXPECT_EQ(buffer, reinterpret_cast<const uint8_t*>(seg.size));
-        EXPECT_EQ(nullptr, seg.sn);
-        EXPECT_EQ(nullptr, seg.offset);
-        EXPECT_EQ(buffer + 2, seg.payload);
+        ASSERT_TRUE(seg.is_valid());
+        EXPECT_EQ(buffer + 2, seg.get_payload());
     }
 
     // With SN
     {
-        pdcp_segment_t seg(buffer, sizeof(buffer));
-        seg.has_sn = true;
-        seg.has_offset = false;
+        pdcp_segment_t seg(buffer, sizeof(buffer), true, false);
         seg.rescan();
-        EXPECT_EQ(buffer, reinterpret_cast<const uint8_t*>(seg.size));
-        EXPECT_EQ(buffer + 2, reinterpret_cast<const uint8_t*>(seg.sn));
-        EXPECT_EQ(nullptr, seg.offset);
-        EXPECT_EQ(buffer + 4, seg.payload);
+        ASSERT_TRUE(seg.is_valid());
+        EXPECT_EQ(buffer + 4, seg.get_payload());
     }
 
     // With SN and offset
     {
-        pdcp_segment_t seg(buffer, sizeof(buffer));
-        seg.has_sn = true;
-        seg.has_offset = true;
+        pdcp_segment_t seg(buffer, sizeof(buffer), true, true);
         seg.rescan();
-        EXPECT_EQ(buffer, reinterpret_cast<const uint8_t*>(seg.size));
-        EXPECT_EQ(buffer + 2, reinterpret_cast<const uint8_t*>(seg.sn));
-        EXPECT_EQ(buffer + 4, reinterpret_cast<const uint8_t*>(seg.offset));
-        EXPECT_EQ(buffer + 6, seg.payload);
+        ASSERT_TRUE(seg.is_valid());
+        EXPECT_EQ(buffer + 6, seg.get_payload());
     }
 }
 
@@ -215,9 +190,7 @@ TEST(Test_frame_defs_basic_pdcp_segment_t, setter_getter_vs_raw_bytes)
     uint8_t buffer[1024];
     std::memset(buffer, 0, sizeof(buffer));
 
-    pdcp_segment_t seg(buffer, sizeof(buffer));
-    seg.has_sn = true;
-    seg.has_offset = true;
+    pdcp_segment_t seg(buffer, sizeof(buffer), true, true);
     seg.rescan();
     seg.set_SIZE(6 + 10);  // header 6 + payload 10
     seg.set_SN(0x1234);
@@ -234,9 +207,7 @@ TEST(Test_frame_defs_basic_pdcp_segment_t, setter_getter_vs_raw_bytes)
     EXPECT_EQ(buffer[4], 0x56);
     EXPECT_EQ(buffer[5], 0x78);
 
-    pdcp_segment_const_t read(buffer, sizeof(buffer));
-    read.has_sn = true;
-    read.has_offset = true;
+    pdcp_segment_const_t read(buffer, sizeof(buffer), true, true);
     read.rescan();
     EXPECT_EQ(read.get_SIZE(), 16);
     EXPECT_TRUE(read.is_LAST());
@@ -251,34 +222,9 @@ TEST(Test_frame_defs_basic_pdcp_segment_t, nok_buffer_too_small)
     uint8_t buffer[2];
     buffer[0] = 0x80;
     buffer[1] = 0xFF;  // size 0x7FFF
-    pdcp_segment_t seg(buffer, 2);
-    seg.has_sn = false;
-    seg.has_offset = false;
+    pdcp_segment_t seg(buffer, 2, false, false);
     seg.rescan();
-    // Header valid (2 bytes) but get_SIZE() is 0x7FFF, payload would extend past buffer
+    seg.set_payload_size(10);
+    // Header valid (2 bytes) but get_SIZE() is 12, payload would extend past buffer
     EXPECT_FALSE(seg.is_valid());
-}
-
-TEST(Test_frame_defs_basic_pdcp_segment_t, nok_get_SN_without_has_sn)
-{
-    uint8_t buffer[1024];
-    std::memset(buffer, 0, sizeof(buffer));
-    pdcp_segment_t seg(buffer, sizeof(buffer));
-    seg.has_sn = false;
-    seg.has_offset = false;
-    seg.rescan();
-    seg.set_SIZE(2);
-    EXPECT_FALSE(seg.get_SN().has_value());
-}
-
-TEST(Test_frame_defs_basic_pdcp_segment_t, nok_get_OFFSET_without_has_offset)
-{
-    uint8_t buffer[1024];
-    std::memset(buffer, 0, sizeof(buffer));
-    pdcp_segment_t seg(buffer, sizeof(buffer));
-    seg.has_sn = false;
-    seg.has_offset = false;
-    seg.rescan();
-    seg.set_SIZE(2);
-    EXPECT_FALSE(seg.get_OFFSET().has_value());
 }

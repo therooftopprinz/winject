@@ -204,8 +204,7 @@ void LLC::on_tx(tx_info_t& info)
 
     check_retransmit(slot_number);
 
-    llc_t llc(info.out_pdu.base, info.out_pdu.size);
-    llc.crc_size = tx_crc_size;
+    llc_t llc(info.out_pdu.base, info.out_pdu.size, tx_crc_size);
 
     // tx_info for slot synchronization and data detection
     if (info.out_pdu.size <= llc.get_header_size())
@@ -217,13 +216,13 @@ void LLC::on_tx(tx_info_t& info)
         return;
     }
 
-    info.out_pdu.base = llc.payload();
+    info.out_pdu.base = llc.get_payload();
     info.out_pdu.size -= llc.get_header_size();
 
     // @note Allocate LLC-DATA-ACKs first
     {
         std::unique_lock<std::mutex> lg(to_ack_list_mutex);
-        llc_payload_ack_t* acks = (llc_payload_ack_t*) llc.payload();
+        llc_payload_ack_t* acks = (llc_payload_ack_t*) llc.get_payload();
 
         if (to_ack_list.size())
         {
@@ -259,9 +258,9 @@ void LLC::on_tx(tx_info_t& info)
             size_t crc = 0;
             if (tx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
             {
-                auto& crc_actual = *(uint32_t*)(llc.CRC());
+                auto& crc_actual = *(uint32_t*)(llc.get_CRC());
                 crc_actual= 0;
-                crc = crc32_04C11DB7()(llc.base, llc.get_SIZE());
+                crc = crc32_04C11DB7()(llc.get_base(), llc.get_SIZE());
                 crc_actual = htonl(crc);
             }
 
@@ -273,7 +272,7 @@ void LLC::on_tx(tx_info_t& info)
                 crc);
 
             info.out_allocated += llc.get_SIZE();
-            llc.base = llc.base + llc.get_SIZE();
+            llc.rebase(llc.get_base() + llc.get_SIZE(), llc.get_max_size() - llc.get_SIZE());
         }
     }
 
@@ -291,7 +290,7 @@ void LLC::on_tx(tx_info_t& info)
 
     llc.set_LCID(lcid);
     llc.set_A(false);
-    info.out_pdu.base = llc.payload();
+    info.out_pdu.base  = llc.get_payload();
     info.out_pdu.size -= llc.get_header_size();
 
     // @note Check for retransmit
@@ -364,7 +363,7 @@ void LLC::on_tx(tx_info_t& info)
         }
         else
         {
-            std::memcpy(llc.payload(), retx_pdu.pdcp_pdu.data(), retx_pdu.pdcp_pdu_size);
+            std::memcpy(llc.get_payload(), retx_pdu.pdcp_pdu.data(), retx_pdu.pdcp_pdu_size);
             free_tx_buffer(std::move(retx_pdu.pdcp_pdu));
             llc.set_payload_size(retx_pdu.pdcp_pdu_size);
             info.out_allocated += retx_pdu.pdcp_pdu_size;
@@ -392,9 +391,9 @@ void LLC::on_tx(tx_info_t& info)
     size_t crc = 0;
     if (tx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
     {
-        auto& crc_actual = *(winject::BEU32UA*)(llc.CRC());
+        auto& crc_actual = *(winject::BEU32UA*)(llc.get_CRC());
         crc_actual= 0;
-        crc_actual = crc32_04C11DB7()(llc.base, llc.get_SIZE());
+        crc_actual = crc32_04C11DB7()(llc.get_base(), llc.get_SIZE());
         crc = crc_actual;
     }
 
@@ -420,7 +419,7 @@ void LLC::on_tx(tx_info_t& info)
         tx_elem.retry_count = retx_count;
         tx_elem.acknowledged = false;
         ack_elem.sent_index = tx_idx;
-        std::memcpy(tx_elem.pdcp_pdu.data(), llc.payload(), llc.get_payload_size());
+        std::memcpy(tx_elem.pdcp_pdu.data(), llc.get_payload(), llc.get_payload_size());
         // @note copy PDCP to tx_ring elem needed when retransmitting
         tx_elem.pdcp_pdu_size = llc.get_payload_size();
         sn_ring[sn_ring_index(llc.get_SN())].ring_idx = ack_ck_idx;
@@ -470,8 +469,7 @@ void LLC::on_rx(rx_info_t& info)
         return;
     }
 
-    llc_t llc(info.in_pdu.base, info.in_pdu.size);
-    llc.crc_size = rx_crc_size;
+    llc_t llc(info.in_pdu.base, info.in_pdu.size, rx_crc_size);
 
     if (llc.get_SIZE() > info.in_pdu.size)
     {
@@ -487,10 +485,10 @@ void LLC::on_rx(rx_info_t& info)
 
     if (rx_config.crc_type == E_CRC_TYPE_CRC32_04C11DB7)
     {
-        auto& crc = *(winject::BEU32UA*)(llc.CRC());
+        auto& crc = *(winject::BEU32UA*)(llc.get_CRC());
         crc_expected = crc;
         crc = 0;
-        crc_actual = crc32_04C11DB7()(llc.base, llc.get_SIZE());
+        crc_actual = crc32_04C11DB7()(llc.get_base(), llc.get_SIZE());
     }
 
     if (crc_actual != crc_expected)
@@ -507,7 +505,7 @@ void LLC::on_rx(rx_info_t& info)
     // @note Handle ack
     if (llc.get_A())
     {
-        llc_payload_ack_t* acks = (llc_payload_ack_t*) llc.payload();
+        llc_payload_ack_t* acks = (llc_payload_ack_t*) llc.get_payload();
         size_t acks_n = llc.get_payload_size()/sizeof(llc_payload_ack_t);
         size_t llc_header_size = llc.get_header_size();
         size_t llc_size = llc.get_SIZE();

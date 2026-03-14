@@ -102,7 +102,6 @@ public:
 private:
     void run_monitor()
     {
-        m_monitor_running = true;
         while (m_monitor_running)
         {
             auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -142,7 +141,7 @@ private:
     size_t m_interval_ms = 1000;
     std::string m_path = "metrics";
     int64_t m_last_update = 0;
-    std::atomic_bool m_monitor_running = false;
+    std::atomic_bool m_monitor_running = true;
     std::thread m_monitor_thread;
     std::mutex m_mutex;
     std::map<std::string, std::unique_ptr<metric>> m_metrics;

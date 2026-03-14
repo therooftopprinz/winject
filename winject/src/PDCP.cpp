@@ -183,9 +183,7 @@ void PDCP::on_tx(tx_info_t& info)
 
     while (true)
     {
-        pdcp_segment_t segment(payload, available_for_data);
-        segment.has_offset = tx_config.allow_segmentation;
-        segment.has_sn = tx_config.allow_reordering;
+        pdcp_segment_t segment(payload, available_for_data, tx_config.allow_reordering, tx_config.allow_segmentation);
         segment.rescan();
 
         if (segment.get_header_size() >= available_for_data)
@@ -197,7 +195,7 @@ void PDCP::on_tx(tx_info_t& info)
 
         segment.set_SN(tx_sn);
 
-        if (!segment.has_offset)
+        if (!tx_config.allow_segmentation)
         {
             std::unique_lock<std::mutex> lg(to_tx_queue_mutex);
 
@@ -222,7 +220,7 @@ void PDCP::on_tx(tx_info_t& info)
 
             to_tx_queue.pop_front();
             to_tx_queue_cv.notify_one();
-            std::memcpy(segment.payload, pdu.data(), pdu.size());
+            std::memcpy(segment.get_payload(), pdu.data(), pdu.size());
             segment.set_payload_size(pdu.size());
             segment.set_LAST(true);
 
@@ -248,7 +246,7 @@ void PDCP::on_tx(tx_info_t& info)
             size_t remaining_size = current_tx_buffer.size() - current_tx_offset;
             size_t alloc_size = std::min(remaining_size, available_for_data);
 
-            std::memcpy(segment.payload, current_tx_buffer.data() + current_tx_offset, alloc_size);
+            std::memcpy(segment.get_payload(), current_tx_buffer.data() + current_tx_offset, alloc_size);
 
             segment.set_OFFSET(current_tx_offset);
             segment.set_payload_size(alloc_size);
@@ -383,9 +381,7 @@ void PDCP::on_rx(rx_info_t& info)
 
     while (available_data)
     {
-        pdcp_segment_t segment(payload, available_data);
-        segment.has_offset = rx_config.allow_segmentation;
-        segment.has_sn = rx_config.allow_reordering;
+        pdcp_segment_t segment(payload, available_data, rx_config.allow_reordering, rx_config.allow_segmentation);
         segment.rescan();
 
         if (segment.get_header_size() >= available_data)
@@ -396,7 +392,11 @@ void PDCP::on_rx(rx_info_t& info)
 
         stats.rx_segment_rcvd->fetch_add(1);
 
-        pdcp_sn_t sn = segment.get_SN().value_or(0u);
+        pdcp_sn_t sn = 0;
+        if (rx_config.allow_reordering)
+        {
+            sn = segment.get_SN();
+        }
 
         payload += segment.get_SIZE();
         if (segment.get_SIZE() > available_data)
@@ -405,7 +405,12 @@ void PDCP::on_rx(rx_info_t& info)
         }
         available_data -= segment.get_SIZE();
 
-        pdcp_segment_offset_t offset = segment.get_OFFSET().value_or(0);
+        pdcp_segment_offset_t offset = 0;
+        if (rx_config.allow_segmentation)
+        {
+            offset = segment.get_OFFSET();
+        }
+
         pdcp_segment_offset_t size = segment.get_payload_size();
 
         if (!rx_sn_synced)
@@ -476,7 +481,7 @@ void PDCP::on_rx(rx_info_t& info)
         // Only copy not yet received offset
         if (!current_rx_buffer_el.recvd_offsets.count(offset))
         {
-            std::memcpy(current_rx_buffer.data() + offset, segment.payload, size);
+            std::memcpy(current_rx_buffer.data() + offset, segment.get_payload(), size);
             current_rx_buffer_el.recvd_offsets.emplace(offset);
             current_rx_buffer_el.accumulated_size += size;
         }

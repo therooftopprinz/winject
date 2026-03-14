@@ -42,7 +42,7 @@ struct Test_LLC : public testing::Test
         auto pdcp_data = to_buffer(pdcp_hex);
 
         llc_t rcv_pdu = prepare_data_pdu(buffer, lcid, sn, pdcp_data.size());
-        memcpy(rcv_pdu.payload(), pdcp_data.data(), pdcp_data.size());
+        memcpy(rcv_pdu.get_payload(), pdcp_data.data(), pdcp_data.size());
         rx_info.in_pdu.size = rcv_pdu.get_SIZE();
 
         sut->on_rx(rx_info);
@@ -92,7 +92,7 @@ TEST_F(Test_LLC, should_allocate_ACK_first)
     EXPECT_EQ(send_pdu.get_SN(), 0);
     EXPECT_EQ(send_pdu.get_LCID(), 0);
     EXPECT_EQ(send_pdu.get_SIZE(), expected_pdu_size);
-    auto acks = (llc_payload_ack_t*) send_pdu.payload();
+    auto acks = (llc_payload_ack_t*) send_pdu.get_payload();
     EXPECT_EQ(acks[0].sn, 0x3A);
     EXPECT_EQ(acks[0].count, 1);
 }
@@ -114,7 +114,7 @@ TEST_F(Test_LLC, should_combine_ACKs)
     EXPECT_EQ(send_pdu.get_SN(), 0);
     EXPECT_EQ(send_pdu.get_LCID(), 0);
     EXPECT_EQ(send_pdu.get_SIZE(), expected_pdu_size);
-    auto acks = (llc_payload_ack_t*) send_pdu.payload();
+    auto acks = (llc_payload_ack_t*) send_pdu.get_payload();
     EXPECT_EQ(acks[0].sn, 0x01);
     EXPECT_EQ(acks[0].count, 2);
 }
@@ -140,7 +140,7 @@ TEST_F(Test_LLC, should_allocate_ACKs_when_possible)
     EXPECT_EQ(send_pdu.get_SN(), 0);
     EXPECT_EQ(send_pdu.get_LCID(), 0);
     EXPECT_EQ(send_pdu.get_SIZE(), expected_pdu_size);
-    auto acks = (llc_payload_ack_t*) send_pdu.payload();
+    auto acks = (llc_payload_ack_t*) send_pdu.get_payload();
     EXPECT_EQ(acks[0].sn, 0x01);
     EXPECT_EQ(acks[0].count, 1);
     EXPECT_EQ(acks[1].sn, 0x03);
@@ -169,7 +169,7 @@ TEST_F(Test_LLC, should_allocate_PDCP)
     EXPECT_EQ(0, llc.get_SN());
     EXPECT_EQ(0, llc.get_LCID());
     ASSERT_EQ(strlen(str_data)+1, llc.get_payload_size());
-    EXPECT_EQ(0, strcmp(str_data, (char*)llc.payload()));
+    EXPECT_EQ(0, strcmp(str_data, (char*)llc.get_payload()));
 }
 
 TEST_F(Test_LLC, should_allocate_retx_PDCP)
@@ -196,7 +196,7 @@ TEST_F(Test_LLC, should_allocate_retx_PDCP)
     EXPECT_EQ(1, llc.get_SN());
     EXPECT_EQ(0, llc.get_LCID());
     ASSERT_EQ(strlen(str_data)+1, llc.get_payload_size());
-    EXPECT_EQ(0, strcmp(str_data, (char*)llc.payload()));
+    EXPECT_EQ(0, strcmp(str_data, (char*)llc.get_payload()));
 }
 
 TEST_F(Test_LLC, should_allocate_PDCP_and_ACKs)
@@ -230,7 +230,7 @@ TEST_F(Test_LLC, should_allocate_PDCP_and_ACKs)
     EXPECT_EQ(ack_pdu.get_SN(), 0);
     EXPECT_EQ(ack_pdu.get_LCID(), 0);
     EXPECT_EQ(ack_pdu.get_SIZE(), ack_pdu.get_header_size()+sizeof(llc_payload_ack_t)*3);
-    auto acks = (llc_payload_ack_t*) ack_pdu.payload();
+    auto acks = (llc_payload_ack_t*) ack_pdu.get_payload();
     EXPECT_EQ(acks[0].sn, 0x01);
     EXPECT_EQ(acks[0].count, 1);
     EXPECT_EQ(acks[1].sn, 0x03);
@@ -245,7 +245,7 @@ TEST_F(Test_LLC, should_allocate_PDCP_and_ACKs)
     EXPECT_EQ(0, data_pdu.get_LCID());
     EXPECT_EQ(data_pdu.get_header_size() + strlen(str_data)+1, next_size);
     ASSERT_EQ(strlen(str_data)+1, data_pdu.get_payload_size());
-    EXPECT_EQ(0, strcmp(str_data, (char*)data_pdu.payload()));
+    EXPECT_EQ(0, strcmp(str_data, (char*)data_pdu.get_payload()));
 }
 
 TEST_F(Test_LLC, should_RLF_on_max_retry)

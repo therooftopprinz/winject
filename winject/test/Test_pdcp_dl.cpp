@@ -38,7 +38,7 @@ TEST_F(Test_pdcp_dl, should_not_accept_empty_pdcp_buffer)
     EXPECT_FALSE(sut.on_pdcp_data(empty_view));
     EXPECT_EQ(0u, sut.get_outstanding_packet());
     EXPECT_EQ(0u, sut.get_outstanding_bytes());
-    EXPECT_EQ(pdcp_dl::STATUS_CODE_BUFFER_INVALID_DATA, sut.get_status());
+    EXPECT_EQ(pdcp_dl::STATUS_CODE_INPUT_EMPTY, sut.get_status());
 }
 
 TEST_F(Test_pdcp_dl, should_reassemble_single_unsegmented_frame)
@@ -62,7 +62,7 @@ TEST_F(Test_pdcp_dl, should_reassemble_single_unsegmented_frame)
     auto written = ul.write_pdcp(pdcp_view);
     ASSERT_GT(written, 0);
 
-    pdcp_dl sut(make_dl_config(true, true)); // parse SN/OFFSET
+    pdcp_dl sut(make_dl_config(false, true)); // parse SN/OFFSET
 
     bfc::buffer_view pdcp_in{pdcp_storage, static_cast<size_t>(written)};
     ASSERT_TRUE(sut.on_pdcp_data(pdcp_in));
@@ -172,20 +172,15 @@ TEST_F(Test_pdcp_dl, should_flush_completed_frames_in_order)
 
     while (remaining)
     {
-        pdcp_segment_t seg(cursor, remaining);
-        seg.has_sn     = true;
-        seg.has_offset = true;
+        pdcp_segment_t seg(cursor, remaining, true, false);
         seg.rescan();
-
+        ASSERT_TRUE(seg.is_valid());
         size_t seg_size = static_cast<size_t>(seg.get_SIZE());
         ASSERT_LE(seg_size, remaining);
 
-        auto sn_opt = seg.get_SN();
-        ASSERT_TRUE(sn_opt.has_value());
-
         segment_t s{};
         s.bytes.assign(cursor, cursor + seg_size);
-        s.sn = *sn_opt;
+        s.sn = seg.get_SN();
         segments.emplace_back(std::move(s));
 
         cursor    += seg_size;
@@ -213,7 +208,7 @@ TEST_F(Test_pdcp_dl, should_flush_completed_frames_in_order)
     ASSERT_NE(nullptr, seg_sn0);
     ASSERT_NE(nullptr, seg_sn1);
 
-    pdcp_dl sut(make_dl_config(true, true)); // parse SN/OFFSET and reorder
+    pdcp_dl sut(make_dl_config(false, true)); // parse SN/OFFSET and reorder
 
     // First, deliver SN 1: this should not yet be popped.
     {

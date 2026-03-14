@@ -197,8 +197,8 @@ private:
             fec_frame.init(0, 0);
             // @todo : setup fec
 
-            cursor = fec_frame.data_blocks;
-            frame_payload_remaining = fec_frame.data_sz;
+            cursor = fec_frame.get_data_blocks();
+            frame_payload_remaining = fec_frame.get_data_sz();
 
             schedules_cache.clear();
             schedules_cache.reserve(llcs.size());

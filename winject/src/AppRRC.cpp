@@ -510,8 +510,8 @@ void AppRRC::process_rx_frame(uint8_t* start, size_t size)
 
     // @todo : check and fix fec errors
 
-    cursor = fec_frame.data_blocks;
-    frame_payload_remaining = fec_frame.data_sz;
+    cursor = fec_frame.get_data_blocks();
+    frame_payload_remaining = fec_frame.get_data_sz();
 
     while (frame_payload_remaining > 0)
     {
@@ -540,7 +540,7 @@ void AppRRC::process_rx_frame(uint8_t* start, size_t size)
         auto llc = llc_it->second;
 
         rx_info_t info{};
-        info.in_pdu.base = llc_pdu.base;
+        info.in_pdu.base = llc_pdu.get_base();
         info.in_pdu.size = llc_pdu.get_SIZE();
 
         if (llc_pdu.get_SIZE() > frame_payload_remaining)

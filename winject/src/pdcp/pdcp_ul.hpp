@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #ifndef __PDCP_PDCP_UL_HPP__
 #define __PDCP_PDCP_UL_HPP__
 
@@ -16,7 +33,7 @@ struct pdcp_ul_config_t
     // @brief Allow reordering of the packets.
     bool allow_reordering = false;
     // @brief Minimum size of the packet to be committed.
-    size_t min_commit_size  = 128;
+    size_t min_commit_size  = 7;
 };
 
 /* @brief PDCP UL class
@@ -27,12 +44,11 @@ class pdcp_ul
 public:
     enum status_code_e
     {
-        // @brief Ok
         STATUS_CODE_SUCCESS,
-        // @brief Can't encode PDCP on the given buffer.
-        STATUS_CODE_BUFFER_TOO_SMALL,
-        // @brief No data to write.
-        STATUS_CODE_NO_DATA_TO_WRITE
+        STATUS_CODE_OUTPUT_EMPTY,
+        STATUS_CODE_OUTPUT_LESS_THAN_MIN_COMMIT_SIZE,
+        STATUS_CODE_NO_DATA,
+        STATUS_CODE_NO_SEGMENTS_WRITTEN,
     };
 
     pdcp_ul(const pdcp_ul_config_t& config);

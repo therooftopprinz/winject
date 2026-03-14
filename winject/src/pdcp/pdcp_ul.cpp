@@ -1,5 +1,18 @@
 /*
- * PDCP UL helper implementation
+ * Copyright (C) 2023 Prinz Rainer Buyo <mynameisrainer@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "pdcp_ul.hpp"
@@ -79,13 +92,19 @@ ssize_t pdcp_ul::write_pdcp(bfc::buffer_view buffer)
 {
     if (buffer.empty())
     {
-        status = STATUS_CODE_BUFFER_TOO_SMALL;
+        status = STATUS_CODE_OUTPUT_EMPTY;
+        return -1;
+    }
+
+    if (config.min_commit_size > buffer.size())
+    {
+        status = STATUS_CODE_OUTPUT_LESS_THAN_MIN_COMMIT_SIZE;
         return -1;
     }
 
     if (outstanding_buffers.empty())
     {
-        status = STATUS_CODE_NO_DATA_TO_WRITE;
+        status = STATUS_CODE_NO_DATA;
         return -1;
     }
 
@@ -97,11 +116,7 @@ ssize_t pdcp_ul::write_pdcp(bfc::buffer_view buffer)
 
     while (available_for_data && !outstanding_buffers.empty())
     {
-        const bool enable_reordering = config.allow_reordering;
-
-        pdcp_segment_t segment(payload_cursor, available_for_data);
-        segment.has_sn     = enable_reordering;
-        segment.has_offset = enable_reordering;
+        pdcp_segment_t segment(payload_cursor, available_for_data, config.allow_reordering, config.allow_segmentation);
         segment.rescan();
 
         if (!segment.is_header_valid())
@@ -110,6 +125,10 @@ ssize_t pdcp_ul::write_pdcp(bfc::buffer_view buffer)
         }
 
         size_t max_segment_payload = available_for_data - segment.get_header_size();
+        if (max_segment_payload == 0)
+        {
+            break;
+        }
 
         auto& front = outstanding_buffers.front();
         size_t frame_remaining = front.size() > data_offset ? (front.size() - data_offset) : 0;
@@ -122,7 +141,6 @@ ssize_t pdcp_ul::write_pdcp(bfc::buffer_view buffer)
         }
 
         size_t copy_size = frame_remaining;
-
         if (copy_size > max_segment_payload)
         {
             if (!config.allow_segmentation)
@@ -133,17 +151,19 @@ ssize_t pdcp_ul::write_pdcp(bfc::buffer_view buffer)
         }
 
         std::memcpy(
-            segment.payload,
+            segment.get_payload(),
             reinterpret_cast<uint8_t*>(front.data()) + data_offset,
             copy_size);
 
-        if (enable_reordering)
+        if (config.allow_reordering)
         {
-            const pdcp_segment_offset_t segment_offset =
-                static_cast<pdcp_segment_offset_t>(data_offset);
+            segment.set_SN(sequence_number);
+        }
 
-            segment.set_SN(std::optional<pdcp_sn_t>(sequence_number));
-            segment.set_OFFSET(std::optional<pdcp_segment_offset_t>(segment_offset));
+        if (config.allow_segmentation)
+        {
+            const pdcp_segment_offset_t segment_offset = static_cast<pdcp_segment_offset_t>(data_offset);
+            segment.set_OFFSET(segment_offset);
         }
 
         data_offset     += copy_size;
@@ -169,7 +189,7 @@ ssize_t pdcp_ul::write_pdcp(bfc::buffer_view buffer)
 
     if (!segments_allocated)
     {
-        status = STATUS_CODE_BUFFER_TOO_SMALL;
+        status = STATUS_CODE_NO_SEGMENTS_WRITTEN;
         return -1;
     }
 

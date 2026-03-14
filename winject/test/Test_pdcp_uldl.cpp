@@ -104,44 +104,109 @@ TEST_F(Test_pdcp_uldl, direct_dl_should_order_correctly)
     pdcp_ul ul_sut(make_ul_config(true, true));
     pdcp_dl dl_sut(make_dl_config(true, true));
 
-    for (auto i=0u; i < 3; ++i)
+    for (auto i=0u; i < 4; ++i)
     {
-        auto buffer = make_buffer(i, 1500);
+        auto frame_size = random_range(32, 1500);
+        auto buffer = make_buffer(i, frame_size);
         auto header = reinterpret_cast<header_t*>(buffer.data());
-        std::cout << "pushing: sn " << header->sequence_number << " crc " << header->crc << std::endl;
+        std::cout << "pushing: sn " << header->sequence_number << " crc " << header->crc << " size " << frame_size << std::endl;
         ul_sut.on_frame_data(std::move(buffer));
     }
 
     std::vector<bfc::sized_buffer> buffers;
-    // uint32_t sizes[3] = {``};
     while (ul_sut.get_outstanding_bytes() > 0)
     {
-        bfc::buffer buf = make_buffer(750);
+        auto pdcp_size = random_range(7, 1500);
+        bfc::buffer buf = make_buffer(pdcp_size);
+        std::cout << "write_pdcp: size " << pdcp_size << std::endl;
         auto written = ul_sut.write_pdcp(buf);
-        ASSERT_GT(written, 0);
+        ASSERT_EQ(ul_sut.get_status(), pdcp_ul::STATUS_CODE_SUCCESS);
         buffers.emplace_back(bfc::sized_buffer(std::move(buf), written));
     }
 
     // Simulate random reordering of the buffers
-    // constexpr auto N_PASSES = 10u;
-    // for (auto n=0u; n < N_PASSES; ++n)
-    // {
-    //     for (uint32_t i=0; i < (buffers.size()-1); i++)
-    //     {
-    //         if ( random_range(0, 1) == 0)
-    //         {
-    //             auto tmp = std::move(buffers[i]);
-    //             std::swap(buffers[i], buffers[i+1]);
-    //         }
-    //     }
-    // }
-    
+    constexpr auto N_PASSES = 1u;
+    std::vector<size_t> indices(buffers.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    for (auto n=0u; n < N_PASSES; ++n)
+    {
+        for (uint32_t i=0; i < (buffers.size()-1); i++)
+        {
+            if ( random_range(0, 1) == 0)
+            {
+                std::swap(buffers[i], buffers[i+1]);
+                std::swap(indices[i], indices[i+1]);
+            }
+        }
+    }
+
+    for (auto& index : indices)
+    {
+        std::cout << "reshuffle: sequence:  " << index << std::endl;
+    }
+
     crc32_04C11DB7 crc;
     uint32_t expected_sequence_number = 0;
     for (auto& buffer : buffers)
     {
         dl_sut.on_pdcp_data(std::move(buffer));
         EXPECT_EQ(dl_sut.get_status(), pdcp_dl::STATUS_CODE_SUCCESS);
+        while (dl_sut.get_outstanding_packet())
+        {
+            auto buffer = dl_sut.pop();
+            auto header = reinterpret_cast<header_t*>(buffer.data());
+            auto expected_crc = header->crc;
+            std::cout << "popped: sn " << header->sequence_number << " crc "<< expected_crc << std::endl;
+            header->crc = 0;
+            ASSERT_EQ(header->sequence_number, expected_sequence_number++);
+            ASSERT_EQ(expected_crc, crc(buffer.data(), buffer.size()));
+        }
+    }
+}
+
+TEST_F(Test_pdcp_uldl, test_sequence012354)
+{
+    pdcp_ul ul_sut(make_ul_config(true, true));
+    pdcp_dl dl_sut(make_dl_config(true, true));
+
+    ul_sut.on_frame_data(make_buffer(0, 107));  ASSERT_EQ(ul_sut.get_status(), pdcp_ul::STATUS_CODE_SUCCESS);
+    ul_sut.on_frame_data(make_buffer(1, 1267)); ASSERT_EQ(ul_sut.get_status(), pdcp_ul::STATUS_CODE_SUCCESS);
+    ul_sut.on_frame_data(make_buffer(2, 1233)); ASSERT_EQ(ul_sut.get_status(), pdcp_ul::STATUS_CODE_SUCCESS);
+    ul_sut.on_frame_data(make_buffer(3, 778));  ASSERT_EQ(ul_sut.get_status(), pdcp_ul::STATUS_CODE_SUCCESS);
+
+    std::vector<bfc::buffer> tbuffers;
+    tbuffers.emplace_back(make_buffer(70));
+    tbuffers.emplace_back(make_buffer(1292));
+    tbuffers.emplace_back(make_buffer(765));
+    tbuffers.emplace_back(make_buffer(522));
+    tbuffers.emplace_back(make_buffer(9));
+    tbuffers.emplace_back(make_buffer(973));
+
+    std::vector<bfc::sized_buffer> ubuffers;
+
+    for (auto& buffer : tbuffers)
+    {
+        auto written = ul_sut.write_pdcp(buffer);
+        ASSERT_EQ(ul_sut.get_status(), pdcp_ul::STATUS_CODE_SUCCESS);
+        ubuffers.emplace_back(bfc::sized_buffer(std::move(buffer), written));
+    }
+
+    std::vector<bfc::sized_buffer> buffers;
+    buffers.emplace_back(std::move(ubuffers[0]));
+    buffers.emplace_back(std::move(ubuffers[1]));
+    buffers.emplace_back(std::move(ubuffers[2]));
+    buffers.emplace_back(std::move(ubuffers[3]));
+    buffers.emplace_back(std::move(ubuffers[5]));
+    buffers.emplace_back(std::move(ubuffers[4]));
+
+    crc32_04C11DB7 crc;
+    uint32_t expected_sequence_number = 0;
+    uint32_t current_buffer = 0;
+    for (auto& buffer : buffers)
+    {
+        std::cout << "on_pdcp_data: buffer " << current_buffer++ << std::endl;
+        dl_sut.on_pdcp_data(std::move(buffer));
+        ASSERT_EQ(dl_sut.get_status(), pdcp_dl::STATUS_CODE_SUCCESS);
         while (dl_sut.get_outstanding_packet())
         {
             auto buffer = dl_sut.pop();

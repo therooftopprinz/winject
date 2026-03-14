@@ -57,33 +57,29 @@ TEST(Test_pdcp_segment_t, should_set_fields)
     uint8_t buffer[1024];
 
     {
-        pdcp_segment_t encode(buffer, sizeof(buffer));
-        encode.has_sn = true;
+        pdcp_segment_t encode(buffer, sizeof(buffer), true, false);
         encode.rescan();
         encode.set_SN(5);
         encode.set_payload_size(1);
-        pdcp_segment_t decode(buffer, encode.get_SIZE());
-        decode.has_sn = true;
+        pdcp_segment_t decode(buffer, encode.get_SIZE(), true, false);
         decode.rescan();
+        ASSERT_TRUE(decode.is_valid());
         EXPECT_EQ(5, decode.get_SN());
         EXPECT_EQ(1, decode.get_payload_size());
-        EXPECT_EQ(buffer+decode.get_header_size(), decode.payload);
+        EXPECT_EQ(buffer+decode.get_header_size(), decode.get_payload());
     }
     {
-        pdcp_segment_t encode(buffer, sizeof(buffer));
-        encode.has_offset = true;
-        encode.has_sn = true;
+        pdcp_segment_t encode(buffer, sizeof(buffer), true, true);
         encode.rescan();
         encode.set_SN(8);
         encode.set_OFFSET(10);
         encode.set_payload_size(5);
-        pdcp_segment_t decode(buffer, encode.get_SIZE());
-        decode.has_offset = true;
-        decode.has_sn = true;
+        pdcp_segment_t decode(buffer, encode.get_SIZE(), true, true);
         decode.rescan();
+        ASSERT_TRUE(decode.is_valid());
         EXPECT_EQ(8, decode.get_SN());
         EXPECT_EQ(10, decode.get_OFFSET());
         EXPECT_EQ(5, decode.get_payload_size());
-        EXPECT_EQ(buffer+decode.get_header_size(), decode.payload);
+        EXPECT_EQ(buffer+decode.get_header_size(), decode.get_payload());
     }
 }

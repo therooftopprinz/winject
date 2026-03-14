@@ -50,7 +50,6 @@ add_executable(test
     src/LLC.cpp
     src/PDCP.cpp
     src/pdcp/pdcp_dl.cpp
-    src/pdcp/pdcp_dl_cb.cpp
     src/pdcp/pdcp_ul.cpp
     )
 target_include_directories(test PRIVATE

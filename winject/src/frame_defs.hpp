@@ -15,13 +15,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __WINJECTUM_FRAME_DEFS_HPP__
-#define __WINJECTUM_FRAME_DEFS_HPP__
+#ifndef __WINJECT_FRAME_DEFS_HPP__
+#define __WINJECT_FRAME_DEFS_HPP__
 
 #include <cstdint>
 #include <cstddef>
 #include <optional>
 #include <type_traits>
+#include <cstring>
 #include "safeint.hpp"
 #include "info_defs.hpp"
 
@@ -31,14 +32,15 @@ using llc_sz_t = uint16_t;
 using pdcp_sn_t = uint16_t;
 using pdcp_segment_offset_t = uint16_t;
 
-struct safe_checker
+class safe_checker
 {
 public:
-    safe_checker(uint8_t* start, uint8_t* end)
+    safe_checker() = delete;
+    safe_checker(uint8_t* start, uint8_t* end, bool& validity)
         : start(start)
         , current(start)
         , end(end)
-        , validity(true)
+        , validity(validity)
     {}
 
     template <typename T>
@@ -85,7 +87,7 @@ private:
     uint8_t* start = nullptr;
     uint8_t* current = nullptr;
     uint8_t* end = nullptr;
-    bool validity = false;
+    bool& validity;
 };
 
 //     +-------------------------------+
@@ -100,8 +102,9 @@ private:
 
 
 template <bool IsConst>
-struct basic_fec_t
+class basic_fec_t
 {
+public:
     using byte_ptr = std::conditional_t<IsConst, const uint8_t*, uint8_t*>;
 
     basic_fec_t(byte_ptr base, size_t size)
@@ -111,27 +114,36 @@ struct basic_fec_t
 
     void reset()
     {
-        fec_type   = nullptr;
-        n          = nullptr;
+        fec_type    = nullptr;
+        n           = nullptr;
         data_blocks = nullptr;
         redu_blocks = nullptr;
-        fec_d_sz   = 0;
-        fec_r_sz   = 0;
-        header_sz  = 0;
-        data_sz    = 0;
+        fec_d_sz    = 0;
+        fec_r_sz    = 0;
+        is_valid_   = false;
     }
 
     bool is_valid() const
     {
-        return fec_type != nullptr;
+        return is_valid_;
+    }
+
+    byte_ptr get_base() const
+    {
+        return base;
     }
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void init(uint8_t fec, uint8_t n_)
     {
-        safe_checker checker(base, base + max_size);
+        is_valid_ = true;
+        safe_checker checker(base, base + max_size, is_valid_);
         fec_type = checker.get<uint8_t>();
+        if (!is_valid()) return;
+        *fec_type = fec;
+
         rescan();
+
         if (n)
         {
             *n = n_;
@@ -140,16 +152,17 @@ struct basic_fec_t
 
     void rescan()
     {
+        is_valid_ = true;
         auto start = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(base));
-        safe_checker checker(start, start + max_size);
+        safe_checker checker(start, start + max_size, is_valid_);
         fec_type = checker.get<uint8_t>();
-        if (!checker) return reset();
+        if (!is_valid()) return reset();
 
         auto ft = (fec_type_e)(*fec_type);
         if (ft != E_FEC_TYPE_NONE)
         {
             n = checker.get<uint8_t>();
-            if (!checker) return reset();
+            if (!is_valid()) return;
         }
 
         if (E_FEC_TYPE_RS_255_247 == ft)
@@ -179,22 +192,62 @@ struct basic_fec_t
         }
 
         redu_blocks = checker.get_n(*n * fec_r_sz);
-        if (!checker) return reset();
+        if (!is_valid()) return;
         data_blocks = checker.get_n(*n * fec_d_sz);
-        if (!checker) return reset();
+        if (!is_valid()) return;
     }
 
+    uint8_t get_FEC_TYPE() const
+    {
+        return *fec_type;
+    }
+
+    uint8_t get_N() const
+    {
+        return *n;
+    }
+
+    byte_ptr get_data_blocks() const
+    {
+        return data_blocks;
+    }
+
+    byte_ptr get_redu_blocks() const
+    {
+        return redu_blocks;
+    }
+
+    size_t get_fec_d_sz() const
+    {
+        return fec_d_sz;
+    }
+
+    size_t get_fec_r_sz() const
+    {
+        return fec_r_sz;
+    }
+
+    size_t get_data_sz() const
+    {
+        return get_N() * get_fec_d_sz();
+    }
+
+    size_t get_redu_sz() const
+    {
+        return get_N() * get_fec_r_sz();
+    }
+
+private:
     byte_ptr base         = nullptr;
     llc_sz_t max_size     = 0;
     size_t   fec_d_sz     = 0;
     size_t   fec_r_sz     = 0;
-    size_t   header_sz    = 0;
-    size_t   data_sz      = 0;
 
     byte_ptr fec_type     = nullptr;
     byte_ptr n            = nullptr;
     byte_ptr data_blocks  = nullptr;
     byte_ptr redu_blocks  = nullptr;
+    bool     is_valid_    = false;
 };
 
 using fec_t       = basic_fec_t<false>;
@@ -216,38 +269,48 @@ constexpr size_t llc_sn_size = llc_sn_mask+1;
 //        +-------------------------------+
 
 template <bool IsConst>
-struct basic_llc_t
+class basic_llc_t
 {
+public:
     using byte_ptr = std::conditional_t<IsConst, const uint8_t*, uint8_t*>;
 
-    basic_llc_t(byte_ptr base, size_t size)
+
+    basic_llc_t() = delete;
+
+    basic_llc_t(byte_ptr base, size_t size, size_t crc_size = 0)
         : base(base)
         , max_size(size)
+        , crc_size(crc_size)
     {}
 
-    static constexpr uint8_t mask_SN    = 0b11111111;
-    static constexpr uint8_t mask_LCID  = 0b11110000;
-    static constexpr uint8_t mask_A     = 0b00001000;
-    static constexpr uint8_t mask_SIZEH = 0b00000111;
-    static constexpr uint8_t mask_SIZEL = 0b11111111;
+    basic_llc_t(const basic_llc_t& other)
+        : base(other.base)
+        , max_size(other.max_size)
+        , crc_size(other.crc_size)
+    {}
 
-    static constexpr uint8_t shift_SN    = 0;
-    static constexpr uint8_t shift_LCID  = 4;
-    static constexpr uint8_t shift_A     = 3;
-    static constexpr uint8_t shift_SIZEH = 0;
-    static constexpr uint8_t shift_SIZEL = 0;
-
-    uint8_t get(int index, uint8_t mask, uint8_t shift) const
+    basic_llc_t& operator=(const basic_llc_t& other)
     {
-        return (base[index] & mask) >> shift;
+        base = other.base;
+        max_size = other.max_size;
+        crc_size = other.crc_size;
+        return *this;
     }
 
-    template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set(int index, uint8_t mask, uint8_t shift, uint8_t val)
+    void rebase(byte_ptr new_base, size_t new_max_size)
     {
-        uint8_t mv = base[index] & ~mask;
-        mv |= ((val << shift) & mask);
-        base[index] = mv;
+        base = new_base;
+        max_size = new_max_size;
+    }
+
+    byte_ptr get_base() const
+    {
+        return base;
+    }
+
+    size_t get_max_size() const
+    {
+        return max_size;
     }
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
@@ -296,12 +359,23 @@ struct basic_llc_t
                (get(2, mask_SIZEL, shift_SIZEL));
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
+    void set_CRC(byte_ptr crc)
+    {
+        std::memcpy(base + 3, crc, crc_size);
+    }
+
+    byte_ptr get_CRC() const
+    {
+        return base + 3;
+    }
+
     llc_sz_t get_header_size() const
     {
         return 3 + crc_size;
     }
 
-    byte_ptr payload() const
+    byte_ptr get_payload() const
     {
         return base + get_header_size();
     }
@@ -322,19 +396,45 @@ struct basic_llc_t
         set_SIZE(size + get_header_size());
     }
 
-    byte_ptr CRC() const
-    {
-        return max_size ? base + 3 : nullptr;
-    }
-
     bool is_valid() const
     {
         return get_SIZE() > max_size;
     }
 
-    byte_ptr base     = nullptr;
-    llc_sz_t max_size = 0;
-    size_t   crc_size = 0;
+    bool is_header_valid() const
+    {
+        return max_size >= get_header_size();
+    }
+
+private:
+    static constexpr uint8_t mask_SN    = 0b11111111;
+    static constexpr uint8_t mask_LCID  = 0b11110000;
+    static constexpr uint8_t mask_A     = 0b00001000;
+    static constexpr uint8_t mask_SIZEH = 0b00000111;
+    static constexpr uint8_t mask_SIZEL = 0b11111111;
+
+    static constexpr uint8_t shift_SN    = 0;
+    static constexpr uint8_t shift_LCID  = 4;
+    static constexpr uint8_t shift_A     = 3;
+    static constexpr uint8_t shift_SIZEH = 0;
+    static constexpr uint8_t shift_SIZEL = 0;
+
+    uint8_t get(int index, uint8_t mask, uint8_t shift) const
+    {
+        return (base[index] & mask) >> shift;
+    }
+
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
+    void set(int index, uint8_t mask, uint8_t shift, uint8_t val)
+    {
+        uint8_t mv = base[index] & ~mask;
+        mv |= ((val << shift) & mask);
+        base[index] = mv;
+    }
+
+    byte_ptr     base     = nullptr;
+    llc_sz_t     max_size = 0;
+    const size_t crc_size = 0;
 };
 
 using llc_t       = basic_llc_t<false>;
@@ -422,85 +522,94 @@ struct pdcp_t
 //     | PAYLOAD                       | EOS
 //     +-------------------------------+
 
-
+// @brief PDCP segment frame definition
+//        Handles set and get for PDCP Segment
+// @note UB when accessing fields without proper configuration.
+//       You must check is_valid() after rescan() or set_SIZE() to ensure the segment is valid.
 template <bool IsConst>
-struct basic_pdcp_segment_t
+class basic_pdcp_segment_t
 {
+public:
     using byte_ptr = std::conditional_t<IsConst, const uint8_t*, uint8_t*>;
     using u16_ptr  = std::conditional_t<IsConst, const winject::BEU16UA*, winject::BEU16UA*>;
 
-    basic_pdcp_segment_t(byte_ptr base, size_t size)
+    basic_pdcp_segment_t() = delete;
+    basic_pdcp_segment_t(byte_ptr base, size_t size, bool has_sn = false, bool has_offset = false)
         : base(base)
         , max_size(size)
+        , has_sn(has_sn)
+        , has_offset(has_offset)
     {}
+
+    void rebase(byte_ptr new_base, size_t new_size)
+    {
+        base = new_base;
+        max_size = new_size;
+        rescan();
+    }
+
+    byte_ptr get_base() const
+    {
+        return base;
+    }
+
+    size_t get_max_size() const
+    {
+        return max_size;
+    }
 
     void reset()
     {
-        size = nullptr;
-        sn = nullptr;
-        offset = nullptr;
+        size    = nullptr;
+        sn      = nullptr;
+        offset  = nullptr;
         payload = nullptr;
     }
 
-    void rescan()
+    bool rescan()
     {
+        is_valid_ = true;
         auto start = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(base));
-        safe_checker checker(start, start + max_size);
+        safe_checker checker(start, start + max_size, is_valid_);
 
         size = checker.get<winject::BEU16UA>();
-        if (!checker) return reset();
+        if (!is_valid()) return false;
 
         if (has_sn)
         {
             sn = checker.get<winject::BEU16UA>();
-            if (!checker) return reset();
+            if (!is_valid()) return false;
         }
 
         if (has_offset)
         {
             offset = checker.get<winject::BEU16UA>();
-            if (!checker) return reset();
+            if (!is_valid()) return false;
         }
 
         payload = checker.get_n(checker.remaining());
+        return is_valid();
     }
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set_SN(std::optional<pdcp_sn_t> value)
+    void set_SN(pdcp_sn_t value)
     {
-        if (!value || sn==nullptr)
-        {
-            return;
-        }
-
-        *sn = *value;
+        *sn = value;
     }
 
-    std::optional<pdcp_sn_t> get_SN() const
+    pdcp_sn_t get_SN() const
     {
-        if (!has_sn || sn == nullptr)
-        {
-            return {};
-        }
         return *sn;
     }
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set_OFFSET(std::optional<pdcp_segment_offset_t> value)
+    void set_OFFSET(pdcp_segment_offset_t value)
     {
-        if (!value || offset == nullptr)
-        {
-            return;
-        }
-        *offset = *value;
+        *offset = value;
     }
 
-    std::optional<pdcp_segment_offset_t> get_OFFSET() const
+    pdcp_segment_offset_t get_OFFSET() const
     {
-        if (!has_offset || offset == nullptr)
-        {
-            return {};
-        }
         return *offset;
     }
 
@@ -512,33 +621,25 @@ struct basic_pdcp_segment_t
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_SIZE(pdcp_segment_offset_t size_)
     {
-        if (!size)
-        {
-            return;
-        }
         *size = (static_cast<pdcp_segment_offset_t>(*size) & 0x8000) | size_;
     }
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_LAST(bool is_last)
     {
-        if (!size)
-        {
-            return;
-        }
         *size = (uint16_t(is_last) << 15) | get_SIZE();
     }
 
     bool is_LAST() const
     {
-        return size ? (static_cast<pdcp_segment_offset_t>(*size) & 0x8000) != 0 : false;
+        return (static_cast<pdcp_segment_offset_t>(*size) & 0x8000) != 0;
     }
 
     size_t get_header_size() const
     {
-        return size_t(has_sn)*sizeof(*sn) +
-            sizeof(*size) +
-            size_t(has_offset)*sizeof(*offset);
+        return sizeof(*size) +
+               has_sn        * sizeof(*sn) +
+               has_offset    * sizeof(*offset);
     }
 
     pdcp_segment_offset_t get_payload_size() const
@@ -546,22 +647,34 @@ struct basic_pdcp_segment_t
         return get_SIZE()-get_header_size();
     }
 
-    template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set_payload_size(pdcp_segment_offset_t payload_size)
+    byte_ptr get_payload() const
     {
+        return payload;
+    }
+
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
+    bool set_payload_size(pdcp_segment_offset_t payload_size)
+    {
+        auto new_size = get_header_size() + payload_size;
         set_SIZE(get_header_size() + payload_size);
+        if (new_size > max_size)
+        {
+            is_valid_ = false;
+        }
+        return is_valid();
     }
 
     bool is_header_valid() const
     {
-        return max_size > get_header_size();
+        return max_size >= get_header_size();
     }
 
-    bool is_valid() const
+    bool is_valid()
     {
-        return is_header_valid() && max_size > get_payload_size();;
+        return is_valid_;
     }
 
+private:
     byte_ptr base       = nullptr;
     size_t   max_size   = 0;
     u16_ptr  size       = nullptr;
@@ -570,9 +683,10 @@ struct basic_pdcp_segment_t
     bool     has_offset = false;
     u16_ptr  offset     = nullptr;
     byte_ptr payload    = nullptr;
+    bool     is_valid_   = false;
 };
 
 using pdcp_segment_t       = basic_pdcp_segment_t<false>;
 using pdcp_segment_const_t = basic_pdcp_segment_t<true>;
 
-#endif // __WINJECTUM_FRAME_DEFS_HPP__
+#endif // __WINJECT_FRAME_DEFS_HPP__

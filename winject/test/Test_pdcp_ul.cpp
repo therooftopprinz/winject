@@ -55,7 +55,7 @@ TEST_F(Test_pdcp_ul, should_fail_write_when_no_data)
 
     auto written = sut.write_pdcp(out_view);
     EXPECT_EQ(-1, written);
-    EXPECT_EQ(pdcp_ul::STATUS_CODE_NO_DATA_TO_WRITE, sut.get_status());
+    EXPECT_EQ(pdcp_ul::STATUS_CODE_NO_DATA, sut.get_status());
 }
 
 TEST_F(Test_pdcp_ul, should_set_buffer_too_small_on_empty_output)
@@ -70,7 +70,7 @@ TEST_F(Test_pdcp_ul, should_set_buffer_too_small_on_empty_output)
     auto written = sut.write_pdcp(empty_out);
 
     EXPECT_EQ(-1, written);
-    EXPECT_EQ(pdcp_ul::STATUS_CODE_BUFFER_TOO_SMALL, sut.get_status());
+    EXPECT_EQ(pdcp_ul::STATUS_CODE_OUTPUT_EMPTY, sut.get_status());
     EXPECT_EQ(1u, sut.get_outstanding_packet());
 }
 
@@ -97,10 +97,9 @@ TEST_F(Test_pdcp_ul, should_write_single_segment_without_segmentation)
     EXPECT_EQ(0u, sut.get_outstanding_packet());
     EXPECT_EQ(0u, sut.get_outstanding_bytes());
 
-    pdcp_segment_t segment(out_storage, static_cast<size_t>(written));
-    segment.has_sn     = true;
-    segment.has_offset = true;
+    pdcp_segment_t segment(out_storage, static_cast<size_t>(written), true, false);
     segment.rescan();
+    ASSERT_TRUE(segment.is_valid());
 
     EXPECT_EQ(0, segment.get_SN());
     EXPECT_TRUE(segment.is_LAST());
@@ -110,7 +109,7 @@ TEST_F(Test_pdcp_ul, should_write_single_segment_without_segmentation)
     EXPECT_EQ(static_cast<size_t>(written),
               static_cast<size_t>(segment.get_SIZE()));
 
-    EXPECT_EQ(0, std::memcmp(segment.payload,
+    EXPECT_EQ(0, std::memcmp(segment.get_payload(),
                              in_data,
                              payload_size));
 }
@@ -138,10 +137,9 @@ TEST_F(Test_pdcp_ul, should_segment_frame_when_segmentation_enabled)
     EXPECT_EQ(pdcp_ul::STATUS_CODE_SUCCESS, sut.get_status());
     EXPECT_GT(sut.get_outstanding_bytes(), 0u);
 
-    pdcp_segment_t first_seg(out_first, static_cast<size_t>(written_first));
-    first_seg.has_sn     = true;
-    first_seg.has_offset = true;
+    pdcp_segment_t first_seg(out_first, static_cast<size_t>(written_first), true, true);
     first_seg.rescan();
+    ASSERT_TRUE(first_seg.is_valid());
 
     auto first_payload_size = first_seg.get_payload_size();
     EXPECT_FALSE(first_seg.is_LAST());
@@ -154,7 +152,7 @@ TEST_F(Test_pdcp_ul, should_segment_frame_when_segmentation_enabled)
     // First call must report the full PDCP size of the first segment.
     EXPECT_EQ(static_cast<size_t>(written_first),
               static_cast<size_t>(first_seg.get_SIZE()));
-    EXPECT_EQ(0, std::memcmp(first_seg.payload,
+    EXPECT_EQ(0, std::memcmp(first_seg.get_payload(),
                              in_data,
                              static_cast<size_t>(first_payload_size)));
 
@@ -167,10 +165,9 @@ TEST_F(Test_pdcp_ul, should_segment_frame_when_segmentation_enabled)
     EXPECT_EQ(pdcp_ul::STATUS_CODE_SUCCESS, sut.get_status());
     EXPECT_EQ(0u, sut.get_outstanding_bytes());
 
-    pdcp_segment_t second_seg(out_second, static_cast<size_t>(written_second));
-    second_seg.has_sn     = true;
-    second_seg.has_offset = true;
+    pdcp_segment_t second_seg(out_second, static_cast<size_t>(written_second), true, true);
     second_seg.rescan();
+    ASSERT_TRUE(second_seg.is_valid());
 
     auto second_payload_size = second_seg.get_payload_size();
     EXPECT_TRUE(second_seg.is_LAST());
@@ -186,11 +183,11 @@ TEST_F(Test_pdcp_ul, should_segment_frame_when_segmentation_enabled)
     EXPECT_EQ(total_payload, total_from_segments);
 
     EXPECT_EQ(0,
-              std::memcmp(first_seg.payload,
+              std::memcmp(first_seg.get_payload(),
                           in_data,
                           static_cast<size_t>(first_payload_size)));
     EXPECT_EQ(0,
-              std::memcmp(second_seg.payload,
+              std::memcmp(second_seg.get_payload(),
                           in_data + first_payload_size,
                           static_cast<size_t>(second_payload_size)));
 }

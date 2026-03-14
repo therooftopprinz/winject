@@ -87,9 +87,7 @@ TEST_F(Test_PDCP, should_allocate_basic)
     pdcp.rescan();
 
     auto payload = pdcp.payload;
-    pdcp_segment_t segment(payload, pdcp.max_size);
-    segment.has_offset = false;
-    segment.has_sn = true;
+    pdcp_segment_t segment(payload, pdcp.max_size, true, false);
     segment.rescan();
 
     EXPECT_EQ(0, segment.get_SN());
@@ -115,9 +113,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
 
         auto payload = pdcp.payload;
         // Segment view must cover full segment: 6-byte header + 5-byte payload = 11
-        pdcp_segment_t segment(payload, 11);
-        segment.has_offset = true;
-        segment.has_sn = true;
+        pdcp_segment_t segment(payload, 11, true, true);
         segment.rescan();
 
         EXPECT_EQ(0, segment.get_SN());
@@ -127,7 +123,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
         ASSERT_EQ(5, segment.get_payload_size());
 
         to_buffer_direct(cmp, "ABCD112233");
-        EXPECT_EQ(0, std::memcmp(segment.payload, cmp, 5));
+        EXPECT_EQ(0, std::memcmp(segment.get_payload(), cmp, 5));
     }
     {
         auto tx_info = trigger_tx(2, buffer, 11);
@@ -141,11 +137,9 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
 
         auto payload = pdcp.payload;
         // Segment view must cover full segment: 6-byte header + 5-byte payload = 11
-        pdcp_segment_t segment(payload, 11);
-        segment.has_offset = true;
-        segment.has_sn = true;
+        pdcp_segment_t segment(payload, 11, true, true);
         segment.rescan();
-
+ 
         EXPECT_EQ(0, segment.get_SN());
         EXPECT_EQ(pdcp.get_header_size() + segment.get_SIZE(), tx_info.out_allocated);
         EXPECT_FALSE(tx_info.out_tx_available);
@@ -153,7 +147,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
         ASSERT_EQ(5, segment.get_payload_size());
 
         to_buffer_direct(cmp, "EFAA445566");
-        EXPECT_EQ(0, std::memcmp(segment.payload, cmp, 5));
+        EXPECT_EQ(0, std::memcmp(segment.get_payload(), cmp, 5));
     }
 }
 
@@ -176,9 +170,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
 
         auto payload = pdcp.payload;
         // Segment view must cover full segment: 6-byte header + 5-byte payload = 11
-        pdcp_segment_t segment(payload, 11);
-        segment.has_offset = true;
-        segment.has_sn = true;
+        pdcp_segment_t segment(payload, 11, true, true);
         segment.rescan();
 
         EXPECT_EQ(0, segment.get_SN());
@@ -188,7 +180,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
         ASSERT_EQ(5, segment.get_payload_size());
 
         to_buffer_direct(cmp, "ABCD112233");
-        EXPECT_EQ(0, std::memcmp(segment.payload, cmp, 5));
+        EXPECT_EQ(0, std::memcmp(segment.get_payload(), cmp, 5));
     }
     {
         auto tx_info = trigger_tx(2, buffer, 100);
@@ -202,9 +194,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
 
         // SEGMENT 1: 6-byte header + 5-byte payload = 11
         auto payload = pdcp.payload;
-        pdcp_segment_t segment(payload, 11);
-        segment.has_offset = true;
-        segment.has_sn = true;
+        pdcp_segment_t segment(payload, 11, true, true);
         segment.rescan();
         auto seg1_sz = segment.get_SIZE();
 
@@ -212,13 +202,10 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
         ASSERT_EQ(5, segment.get_payload_size());
 
         to_buffer_direct(cmp, "EFAA445566");
-        EXPECT_EQ(0, std::memcmp(segment.payload, cmp, 5));
+        EXPECT_EQ(0, std::memcmp(segment.get_payload(), cmp, 5));
 
         // SEGMENT 2: 6-byte header + 3-byte payload = 9
-        segment.base += segment.get_SIZE();
-        segment.max_size = 9;
-        segment.has_offset = true;
-        segment.has_sn = true;
+        segment = pdcp_segment_t(payload + segment.get_SIZE(), 9, true, true);
         segment.rescan();
         auto seg2_sz = segment.get_SIZE();
 
@@ -226,7 +213,7 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
         ASSERT_EQ(3, segment.get_payload_size());
 
         to_buffer_direct(cmp, "001122");
-        EXPECT_EQ(0, std::memcmp(segment.payload, cmp, 3));
+        EXPECT_EQ(0, std::memcmp(segment.get_payload(), cmp, 3));
 
         EXPECT_EQ(pdcp.get_header_size() + seg1_sz + seg2_sz, tx_info.out_allocated);
     }
