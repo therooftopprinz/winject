@@ -70,7 +70,7 @@ TEST_F(Test_pdcp_dl, should_reassemble_single_unsegmented_frame)
     EXPECT_EQ(1u, sut.get_outstanding_packet());
     EXPECT_EQ(payload_size, sut.get_outstanding_bytes());
 
-    bfc::buffer out = sut.pop();
+    bfc::sized_buffer out = sut.pop();
     ASSERT_EQ(payload_size, out.size());
     EXPECT_EQ(0,
               std::memcmp(out.data(),
@@ -125,7 +125,7 @@ TEST_F(Test_pdcp_dl, should_reassemble_segmented_frame)
     EXPECT_EQ(1u, sut.get_outstanding_packet());
     EXPECT_EQ(total_payload, sut.get_outstanding_bytes());
 
-    bfc::buffer out = sut.pop();
+    bfc::sized_buffer out = sut.pop();
     ASSERT_EQ(total_payload, out.size());
     EXPECT_EQ(0,
               std::memcmp(out.data(),
@@ -237,14 +237,14 @@ TEST_F(Test_pdcp_dl, should_flush_completed_frames_in_order)
     EXPECT_EQ(2u, sut.get_outstanding_packet());
     EXPECT_EQ(payload_size * 2, sut.get_outstanding_bytes());
 
-    bfc::buffer out0 = sut.pop();
+    bfc::sized_buffer out0 = sut.pop();
     ASSERT_EQ(payload_size, out0.size());
     EXPECT_EQ(0,
               std::memcmp(out0.data(),
                           frame0,
                           payload_size));
 
-    bfc::buffer out1 = sut.pop();
+    bfc::sized_buffer out1 = sut.pop();
     ASSERT_EQ(payload_size, out1.size());
     EXPECT_EQ(0,
               std::memcmp(out1.data(),

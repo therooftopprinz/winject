@@ -5,6 +5,7 @@
 #include "pdcp_dl.hpp"
 
 #include <cstring>
+#include <iostream>
 
 namespace winject
 {
@@ -53,14 +54,14 @@ size_t pdcp_dl::get_outstanding_packet()
     return completed_frames.size();
 }
 
-bfc::buffer pdcp_dl::pop()
+bfc::sized_buffer pdcp_dl::pop()
 {
     if (completed_frames.empty())
     {
         return {};
     }
 
-    bfc::buffer rv = std::move(completed_frames.front());
+    bfc::sized_buffer rv = std::move(completed_frames.front());
     completed_frames.pop_front();
     if (outstanding_bytes >= rv.size())
     {
@@ -74,39 +75,45 @@ bfc::buffer pdcp_dl::pop()
     return rv;
 }
 
-bool pdcp_dl::on_pdcp_data(bfc::buffer_view pdcp)
+bool pdcp_dl::on_pdcp_data(bfc::const_buffer_view pdcp)
 {
     if (pdcp.empty())
     {
+        std::cout << "pdcp_dl: empty buffer\n";
         status = STATUS_CODE_BUFFER_INVALID_DATA;
         return false;
     }
 
     size_t available_data = pdcp.size();
-    auto*  cursor = reinterpret_cast<uint8_t*>(pdcp.data());
+    auto*  cursor = reinterpret_cast<const uint8_t*>(pdcp.data());
 
     bool processed_any_segment = false;
 
     while (available_data)
     {
-        pdcp_segment_t segment(cursor, available_data);
+        pdcp_segment_const_t segment(cursor, available_data);
         segment.has_sn     = config.allow_reordering;
         segment.has_offset = config.allow_segmentation;
         segment.rescan();
 
         if (!segment.is_header_valid())
         {
+            std::cout << "pdcp_dl: invalid header\n";
             status = STATUS_CODE_BUFFER_INVALID_DATA;
             return false;
         }
 
         const size_t header_size = segment.get_header_size();
-        const auto   total_size  = static_cast<size_t>(segment.get_SIZE());
+        const size_t total_size = static_cast<size_t>(segment.get_SIZE());
 
         if (header_size >= available_data ||
             total_size > available_data ||
             total_size < header_size)
         {
+            std::cout << "pdcp_dl: size mismatch "
+                      << "header_size=" << header_size
+                      << " total_size=" << total_size
+                      << " available_data=" << available_data << "\n";
             status = STATUS_CODE_BUFFER_INVALID_DATA;
             return false;
         }
@@ -115,17 +122,17 @@ bool pdcp_dl::on_pdcp_data(bfc::buffer_view pdcp)
 
         if (!payload_size)
         {
+            std::cout << "pdcp_dl: zero payload size\n";
             status = STATUS_CODE_BUFFER_INVALID_DATA;
             return false;
         }
 
-        const pdcp_sn_t sn =
-            segment.get_SN().value_or(static_cast<pdcp_sn_t>(0u));
-        const auto offset =
-            static_cast<size_t>(segment.get_OFFSET().value_or(0u));
+        const pdcp_sn_t sn = segment.get_SN().value_or(static_cast<pdcp_sn_t>(0u));
+        const auto offset  = static_cast<size_t>(segment.get_OFFSET().value_or(0u));
 
         if (!config.allow_segmentation && offset != 0u)
         {
+            std::cout << "pdcp_dl: segmentation disabled but offset!=0\n";
             status = STATUS_CODE_BUFFER_INVALID_DATA;
             return false;
         }
@@ -133,24 +140,12 @@ bool pdcp_dl::on_pdcp_data(bfc::buffer_view pdcp)
         auto& state = reassembly_map[sn];
 
         const size_t required_size = offset + payload_size;
-        if (state.buffer.size() < required_size)
+        if (state.buffer.capacity() < required_size)
         {
-            auto* data = new std::byte[required_size];
-            std::memset(data, 0, required_size);
-
-            if (!state.buffer.empty())
-            {
-                std::memcpy(
-                    data,
-                    state.buffer.data(),
-                    state.buffer.size());
-            }
-
-            state.buffer = bfc::buffer(data, required_size);
+            state.buffer.resize(required_size);
         }
 
-        const bool is_duplicate_offset =
-            !state.recvd_offsets.emplace(offset).second;
+        const bool is_duplicate_offset = !state.recvd_offsets.emplace(offset).second;
 
         if (!is_duplicate_offset)
         {
@@ -196,6 +191,7 @@ bool pdcp_dl::on_pdcp_data(bfc::buffer_view pdcp)
     {
         if (status == STATUS_CODE_SUCCESS)
         {
+            std::cout << "pdcp_dl: no segment processed\n";
             status = STATUS_CODE_BUFFER_INVALID_DATA;
         }
         return false;

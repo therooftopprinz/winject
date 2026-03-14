@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <optional>
+#include <type_traits>
 #include "safeint.hpp"
 #include "info_defs.hpp"
 
@@ -402,9 +403,14 @@ struct pdcp_t
 //     | PAYLOAD                       | EOS
 //     +-------------------------------+
 
-struct pdcp_segment_t
+
+template <bool IsConst>
+struct basic_pdcp_segment_t
 {
-    pdcp_segment_t(uint8_t* base, size_t size)
+    using byte_ptr = std::conditional_t<IsConst, const uint8_t*, uint8_t*>;
+    using u16_ptr  = std::conditional_t<IsConst, const winject::BEU16UA*, winject::BEU16UA*>;
+
+    basic_pdcp_segment_t(byte_ptr base, size_t size)
         : base(base)
         , max_size(size)
     {}
@@ -419,7 +425,8 @@ struct pdcp_segment_t
 
     void rescan()
     {
-        safe_checker checker(base, base + max_size);
+        auto start = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(base));
+        safe_checker checker(start, start + max_size);
 
         size = checker.get<winject::BEU16UA>();
         if (!checker) return reset();
@@ -439,6 +446,7 @@ struct pdcp_segment_t
         payload = checker.get_n(checker.remaining());
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_SN(std::optional<pdcp_sn_t> value)
     {
         if (!value || sn==nullptr)
@@ -449,84 +457,103 @@ struct pdcp_segment_t
         *sn = *value;
     }
 
-    std::optional<pdcp_sn_t> get_SN()
+    std::optional<pdcp_sn_t> get_SN() const
     {
-        if (!has_sn)
+        if (!has_sn || sn == nullptr)
         {
             return {};
         }
         return *sn;
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_OFFSET(std::optional<pdcp_segment_offset_t> value)
     {
+        if (!value || offset == nullptr)
+        {
+            return;
+        }
         *offset = *value;
     }
 
-    std::optional<pdcp_segment_offset_t> get_OFFSET()
+    std::optional<pdcp_segment_offset_t> get_OFFSET() const
     {
-        if (!has_offset)
+        if (!has_offset || offset == nullptr)
         {
             return {};
         }
         return *offset;
     }
 
-    pdcp_segment_offset_t get_SIZE()
+    pdcp_segment_offset_t get_SIZE() const
     {
-        return *size & 0x7FFF;
+        return size ? (static_cast<pdcp_segment_offset_t>(*size) & 0x7FFF) : 0;
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_SIZE(pdcp_segment_offset_t size_)
     {
-        *size = (*size&0x8000) | size_;
+        if (!size)
+        {
+            return;
+        }
+        *size = (static_cast<pdcp_segment_offset_t>(*size) & 0x8000) | size_;
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_LAST(bool is_last)
     {
+        if (!size)
+        {
+            return;
+        }
         *size = (uint16_t(is_last) << 15) | get_SIZE();
     }
 
-    bool is_LAST()
+    bool is_LAST() const
     {
-        return *size & 0x8000;
+        return size ? (static_cast<pdcp_segment_offset_t>(*size) & 0x8000) != 0 : false;
     }
 
-    size_t get_header_size()
+    size_t get_header_size() const
     {
         return size_t(has_sn)*sizeof(*sn) +
             sizeof(*size) +
             size_t(has_offset)*sizeof(*offset);
     }
 
-    pdcp_segment_offset_t get_payload_size()
+    pdcp_segment_offset_t get_payload_size() const
     {
         return get_SIZE()-get_header_size();
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_payload_size(pdcp_segment_offset_t payload_size)
     {
         set_SIZE(get_header_size() + payload_size);
     }
 
-    bool is_header_valid()
+    bool is_header_valid() const
     {
         return max_size > get_header_size();
     }
 
-    bool is_valid()
+    bool is_valid() const
     {
         return is_header_valid() && max_size > get_payload_size();;
     }
 
-    uint8_t *base = nullptr;
+    byte_ptr base = nullptr;
     size_t max_size = 0;
-    winject::BEU16UA *size = nullptr;
+    u16_ptr size = nullptr;
     bool has_sn = false;
-    winject::BEU16UA *sn = nullptr;
+    u16_ptr sn = nullptr;
     bool has_offset = false;
-    winject::BEU16UA *offset = nullptr;
-    uint8_t *payload = nullptr;
+    u16_ptr offset = nullptr;
+    byte_ptr payload = nullptr;
 };
+
+using pdcp_segment_t       = basic_pdcp_segment_t<false>;
+using pdcp_segment_const_t = basic_pdcp_segment_t<true>;
 
 #endif // __WINJECTUM_FRAME_DEFS_HPP__

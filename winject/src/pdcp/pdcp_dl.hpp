@@ -2,6 +2,7 @@
 #define __PDCP_PDCP_DL_HPP__
 
 #include <bfc/buffer.hpp>
+#include <bfc/sized_buffer.hpp>
 #include "frame_defs.hpp"
 
 #include <deque>
@@ -36,20 +37,19 @@ public:
     pdcp_dl(const pdcp_dl_config_t& config);
     ~pdcp_dl();
 
-    void          reset();
-    void          reconfigure(const pdcp_dl_config_t& config);
-    pdcp_dl_config_t
-                  get_config();
-    bool          on_pdcp_data(bfc::buffer_view pdcp);
-    size_t        get_outstanding_bytes();
-    size_t        get_outstanding_packet();
-    bfc::buffer   pop();
-    status_code_e get_status();
+    void              reset();
+    void              reconfigure(const pdcp_dl_config_t& config);
+    pdcp_dl_config_t  get_config();
+    bool              on_pdcp_data(bfc::const_buffer_view pdcp);
+    size_t            get_outstanding_bytes();
+    size_t            get_outstanding_packet();
+    bfc::sized_buffer pop();
+    status_code_e     get_status();
 
 private:
     struct reassembly_state_t
     {
-        bfc::buffer buffer;
+        bfc::sized_buffer buffer;
         size_t accumulated_size = 0;
         size_t expected_size = 0;
         std::unordered_set<size_t> recvd_offsets;
@@ -67,7 +67,7 @@ private:
     // Next SN we are allowed to deliver (monotonically increasing, starts at 0)
     pdcp_sn_t next_expected_sn = 0;
 
-    std::deque<bfc::buffer> completed_frames;
+    std::deque<bfc::sized_buffer> completed_frames;
     size_t outstanding_bytes = 0;
 };
 
