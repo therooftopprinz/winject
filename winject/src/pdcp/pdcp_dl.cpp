@@ -79,7 +79,6 @@ bool pdcp_dl::on_pdcp_data(bfc::const_buffer_view pdcp)
 {
     if (pdcp.empty())
     {
-        std::cout << "pdcp_dl: empty buffer\n";
         status = STATUS_CODE_BUFFER_INVALID_DATA;
         return false;
     }
@@ -98,7 +97,6 @@ bool pdcp_dl::on_pdcp_data(bfc::const_buffer_view pdcp)
 
         if (!segment.is_header_valid())
         {
-            std::cout << "pdcp_dl: invalid header\n";
             status = STATUS_CODE_BUFFER_INVALID_DATA;
             return false;
         }
@@ -110,10 +108,6 @@ bool pdcp_dl::on_pdcp_data(bfc::const_buffer_view pdcp)
             total_size > available_data ||
             total_size < header_size)
         {
-            std::cout << "pdcp_dl: size mismatch "
-                      << "header_size=" << header_size
-                      << " total_size=" << total_size
-                      << " available_data=" << available_data << "\n";
             status = STATUS_CODE_BUFFER_INVALID_DATA;
             return false;
         }
@@ -122,7 +116,6 @@ bool pdcp_dl::on_pdcp_data(bfc::const_buffer_view pdcp)
 
         if (!payload_size)
         {
-            std::cout << "pdcp_dl: zero payload size\n";
             status = STATUS_CODE_BUFFER_INVALID_DATA;
             return false;
         }
@@ -132,7 +125,6 @@ bool pdcp_dl::on_pdcp_data(bfc::const_buffer_view pdcp)
 
         if (!config.allow_segmentation && offset != 0u)
         {
-            std::cout << "pdcp_dl: segmentation disabled but offset!=0\n";
             status = STATUS_CODE_BUFFER_INVALID_DATA;
             return false;
         }
@@ -191,7 +183,6 @@ bool pdcp_dl::on_pdcp_data(bfc::const_buffer_view pdcp)
     {
         if (status == STATUS_CODE_SUCCESS)
         {
-            std::cout << "pdcp_dl: no segment processed\n";
             status = STATUS_CODE_BUFFER_INVALID_DATA;
         }
         return false;
@@ -225,4 +216,3 @@ void pdcp_dl::flush_completed_in_order()
 }
 
 } // namespace winject
-

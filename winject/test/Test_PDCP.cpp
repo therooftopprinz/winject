@@ -114,7 +114,8 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
         pdcp.rescan();
 
         auto payload = pdcp.payload;
-        pdcp_segment_t segment(payload, 5);
+        // Segment view must cover full segment: 6-byte header + 5-byte payload = 11
+        pdcp_segment_t segment(payload, 11);
         segment.has_offset = true;
         segment.has_sn = true;
         segment.rescan();
@@ -139,7 +140,8 @@ TEST_F(Test_PDCP, should_allocate_segmented_halving)
         pdcp.rescan();
 
         auto payload = pdcp.payload;
-        pdcp_segment_t segment(payload, 5);
+        // Segment view must cover full segment: 6-byte header + 5-byte payload = 11
+        pdcp_segment_t segment(payload, 11);
         segment.has_offset = true;
         segment.has_sn = true;
         segment.rescan();
@@ -173,7 +175,8 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
         pdcp.rescan();
 
         auto payload = pdcp.payload;
-        pdcp_segment_t segment(payload, 5);
+        // Segment view must cover full segment: 6-byte header + 5-byte payload = 11
+        pdcp_segment_t segment(payload, 11);
         segment.has_offset = true;
         segment.has_sn = true;
         segment.rescan();
@@ -197,9 +200,9 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
         pdcp.hmac_size = 0;
         pdcp.rescan();
 
-        // SEGMENT 1
+        // SEGMENT 1: 6-byte header + 5-byte payload = 11
         auto payload = pdcp.payload;
-        pdcp_segment_t segment(payload, 5);
+        pdcp_segment_t segment(payload, 11);
         segment.has_offset = true;
         segment.has_sn = true;
         segment.rescan();
@@ -211,8 +214,9 @@ TEST_F(Test_PDCP, should_allocate_segmented_carry_over)
         to_buffer_direct(cmp, "EFAA445566");
         EXPECT_EQ(0, std::memcmp(segment.payload, cmp, 5));
 
-        // SEGMENT 2
+        // SEGMENT 2: 6-byte header + 3-byte payload = 9
         segment.base += segment.get_SIZE();
+        segment.max_size = 9;
         segment.has_offset = true;
         segment.has_sn = true;
         segment.rescan();

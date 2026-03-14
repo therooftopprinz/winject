@@ -99,31 +99,34 @@ private:
 //     +-------------------------------+
 
 
-struct fec_t
+template <bool IsConst>
+struct basic_fec_t
 {
-    fec_t(uint8_t* base, size_t size)
+    using byte_ptr = std::conditional_t<IsConst, const uint8_t*, uint8_t*>;
+
+    basic_fec_t(byte_ptr base, size_t size)
         : base(base)
         , max_size(size)
-    {
-    }
+    {}
 
     void reset()
     {
-        fec_type = nullptr;
-        n = nullptr;
+        fec_type   = nullptr;
+        n          = nullptr;
         data_blocks = nullptr;
         redu_blocks = nullptr;
-        fec_d_sz = 0;
-        fec_r_sz = 0;
-        header_sz = 0;
-        data_sz = 0;
+        fec_d_sz   = 0;
+        fec_r_sz   = 0;
+        header_sz  = 0;
+        data_sz    = 0;
     }
 
-    bool is_valid()
+    bool is_valid() const
     {
         return fec_type != nullptr;
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void init(uint8_t fec, uint8_t n_)
     {
         safe_checker checker(base, base + max_size);
@@ -137,7 +140,8 @@ struct fec_t
 
     void rescan()
     {
-        safe_checker checker(base, base + max_size);
+        auto start = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(base));
+        safe_checker checker(start, start + max_size);
         fec_type = checker.get<uint8_t>();
         if (!checker) return reset();
 
@@ -151,47 +155,50 @@ struct fec_t
         if (E_FEC_TYPE_RS_255_247 == ft)
         {
             fec_d_sz = 247;
-            fec_r_sz = 255-247;
+            fec_r_sz = 255 - 247;
         }
         else if (E_FEC_TYPE_RS_255_239 == ft)
         {
             fec_d_sz = 239;
-            fec_r_sz = 255-239;
+            fec_r_sz = 255 - 239;
         }
         else if (E_FEC_TYPE_RS_255_223 == ft)
         {
             fec_d_sz = 223;
-            fec_r_sz = 255-223;
+            fec_r_sz = 255 - 223;
         }
         else if (E_FEC_TYPE_RS_255_191 == ft)
         {
             fec_d_sz = 191;
-            fec_r_sz = 255-191;
+            fec_r_sz = 255 - 191;
         }
-        else if (E_FEC_TYPE_RS_255_127  == ft)
+        else if (E_FEC_TYPE_RS_255_127 == ft)
         {
             fec_d_sz = 127;
-            fec_r_sz = 255-127;
+            fec_r_sz = 255 - 127;
         }
 
-        redu_blocks = checker.get_n(*n*fec_r_sz);
+        redu_blocks = checker.get_n(*n * fec_r_sz);
         if (!checker) return reset();
-        data_blocks = checker.get_n(*n*fec_d_sz);
+        data_blocks = checker.get_n(*n * fec_d_sz);
         if (!checker) return reset();
     }
 
-    uint8_t* base = nullptr;
-    llc_sz_t max_size = 0;
-    size_t fec_d_sz = 0;
-    size_t fec_r_sz = 0;
-    size_t header_sz = 0;
-    size_t data_sz = 0;
+    byte_ptr base         = nullptr;
+    llc_sz_t max_size     = 0;
+    size_t   fec_d_sz     = 0;
+    size_t   fec_r_sz     = 0;
+    size_t   header_sz    = 0;
+    size_t   data_sz      = 0;
 
-    uint8_t* fec_type = nullptr;
-    uint8_t* n = nullptr;
-    uint8_t* data_blocks = nullptr;
-    uint8_t* redu_blocks = nullptr;
+    byte_ptr fec_type     = nullptr;
+    byte_ptr n            = nullptr;
+    byte_ptr data_blocks  = nullptr;
+    byte_ptr redu_blocks  = nullptr;
 };
+
+using fec_t       = basic_fec_t<false>;
+using fec_const_t = basic_fec_t<true>;
 
 constexpr llc_sn_t llc_sn_mask = 0b11111111;
 constexpr size_t llc_sn_size = llc_sn_mask+1;
@@ -208,9 +215,12 @@ constexpr size_t llc_sn_size = llc_sn_mask+1;
 // HDR_SZ | Payload                       |
 //        +-------------------------------+
 
-struct llc_t
+template <bool IsConst>
+struct basic_llc_t
 {
-    llc_t(uint8_t* base, size_t size)
+    using byte_ptr = std::conditional_t<IsConst, const uint8_t*, uint8_t*>;
+
+    basic_llc_t(byte_ptr base, size_t size)
         : base(base)
         , max_size(size)
     {}
@@ -227,99 +237,108 @@ struct llc_t
     static constexpr uint8_t shift_SIZEH = 0;
     static constexpr uint8_t shift_SIZEL = 0;
 
-    uint8_t get(int index, uint8_t mask, uint8_t shift)
+    uint8_t get(int index, uint8_t mask, uint8_t shift) const
     {
         return (base[index] & mask) >> shift;
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set(int index, uint8_t mask, uint8_t shift, uint8_t val)
     {
         uint8_t mv = base[index] & ~mask;
-        mv |= ((val<<shift) & mask);
+        mv |= ((val << shift) & mask);
         base[index] = mv;
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_SN(llc_sn_t sn)
     {
         set(0, mask_SN, shift_SN, sn);
     }
 
-    llc_sn_t get_SN()
+    llc_sn_t get_SN() const
     {
         return get(0, mask_SN, shift_SN);
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_LCID(lcid_t lcid)
     {
         set(1, mask_LCID, shift_LCID, lcid);
     }
 
-    lcid_t get_LCID()
+    lcid_t get_LCID() const
     {
         return get(1, mask_LCID, shift_LCID);
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_A(bool val)
     {
         set(1, mask_A, shift_A, val);
     }
 
-    bool get_A()
+    bool get_A() const
     {
         return get(1, mask_A, shift_A);
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_SIZE(llc_sz_t size)
     {
         set(1, mask_SIZEH, shift_SIZEH, size >> 8);
         set(2, mask_SIZEL, shift_SIZEL, size);
     }
 
-    llc_sz_t get_SIZE()
+    llc_sz_t get_SIZE() const
     {
         return (get(1, mask_SIZEH, shift_SIZEH) << 8) |
                (get(2, mask_SIZEL, shift_SIZEL));
     }
 
-    llc_sz_t get_header_size()
+    llc_sz_t get_header_size() const
     {
         return 3 + crc_size;
     }
 
-    uint8_t* payload()
+    byte_ptr payload() const
     {
-        return base+get_header_size();
+        return base + get_header_size();
     }
 
-    llc_sz_t get_max_payload_size()
+    llc_sz_t get_max_payload_size() const
     {
-        return max_size-get_header_size();
+        return max_size - get_header_size();
     }
 
-    llc_sz_t get_payload_size()
+    llc_sz_t get_payload_size() const
     {
-        return get_SIZE()-get_header_size();
+        return get_SIZE() - get_header_size();
     }
 
+    template <bool B = IsConst, typename = std::enable_if_t<!B>>
     void set_payload_size(llc_sz_t size)
     {
-        set_SIZE(size+get_header_size());
+        set_SIZE(size + get_header_size());
     }
 
-    uint8_t* CRC()
+    byte_ptr CRC() const
     {
-        return max_size ? base+3 : nullptr;
+        return max_size ? base + 3 : nullptr;
     }
 
-    bool is_valid()
+    bool is_valid() const
     {
         return get_SIZE() > max_size;
     }
 
-    uint8_t* base = nullptr;
+    byte_ptr base     = nullptr;
     llc_sz_t max_size = 0;
-    size_t crc_size = 0;
+    size_t   crc_size = 0;
 };
+
+using llc_t       = basic_llc_t<false>;
+using llc_const_t = basic_llc_t<true>;
 
 // LLC-CTL-ACK Payload:
 //    +-------------------------------+
@@ -543,14 +562,14 @@ struct basic_pdcp_segment_t
         return is_header_valid() && max_size > get_payload_size();;
     }
 
-    byte_ptr base = nullptr;
-    size_t max_size = 0;
-    u16_ptr size = nullptr;
-    bool has_sn = false;
-    u16_ptr sn = nullptr;
-    bool has_offset = false;
-    u16_ptr offset = nullptr;
-    byte_ptr payload = nullptr;
+    byte_ptr base       = nullptr;
+    size_t   max_size   = 0;
+    u16_ptr  size       = nullptr;
+    bool     has_sn     = false;
+    u16_ptr  sn         = nullptr;
+    bool     has_offset = false;
+    u16_ptr  offset     = nullptr;
+    byte_ptr payload    = nullptr;
 };
 
 using pdcp_segment_t       = basic_pdcp_segment_t<false>;

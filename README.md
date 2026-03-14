@@ -140,7 +140,7 @@ ppWIFI RRC:
       +-------------------------------+
 ```
 
-## ppWiFi PDCP
+## ppWiFi PDCP (Deprecated, encryption and mac moved to pdcp-frame layer)
 ```
       +-------------------------------+
    00 | IV (OPTIONAL)                 | IVSZ
