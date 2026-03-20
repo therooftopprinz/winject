@@ -15,23 +15,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __WINJECT_FRAME_DEFS_HPP__
-#define __WINJECT_FRAME_DEFS_HPP__
+#ifndef __WINJECT_FRAMES_FRAME_TYPES_HPP__
+#define __WINJECT_FRAMES_FRAME_TYPES_HPP__
 
-#include <cstdint>
 #include <cstddef>
-#include <optional>
-#include <type_traits>
-#include <cstring>
-#include "safeint.hpp"
-#include "info_defs.hpp"
+#include <cstdint>
 
-#include "frames/frame_types.hpp"
-#include "frames/safe_checker.hpp"
-#include "frames/basic_fec_t.hpp"
-#include "frames/basic_llc_t.hpp"
-#include "frames/llc_payload_ack.hpp"
-#include "frames/pdcp_t.hpp"
-#include "frames/basic_pdcp_segment_t.hpp"
+using llc_sn_t = uint8_t;
+using lcid_t = uint8_t;
+using llc_sz_t = uint16_t;
+using pdcp_sn_t = uint16_t;
+using pdcp_segment_offset_t = uint16_t;
 
-#endif // __WINJECT_FRAME_DEFS_HPP__
+constexpr llc_sn_t llc_sn_mask = 0b11111111;
+constexpr size_t llc_sn_size = llc_sn_mask + 1;
+
+#endif // __WINJECT_FRAMES_FRAME_TYPES_HPP__

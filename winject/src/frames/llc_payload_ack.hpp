@@ -15,23 +15,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __WINJECT_FRAME_DEFS_HPP__
-#define __WINJECT_FRAME_DEFS_HPP__
-
-#include <cstdint>
-#include <cstddef>
-#include <optional>
-#include <type_traits>
-#include <cstring>
-#include "safeint.hpp"
-#include "info_defs.hpp"
+#ifndef __WINJECT_FRAMES_LLC_PAYLOAD_ACK_HPP__
+#define __WINJECT_FRAMES_LLC_PAYLOAD_ACK_HPP__
 
 #include "frames/frame_types.hpp"
-#include "frames/safe_checker.hpp"
-#include "frames/basic_fec_t.hpp"
-#include "frames/basic_llc_t.hpp"
-#include "frames/llc_payload_ack.hpp"
-#include "frames/pdcp_t.hpp"
-#include "frames/basic_pdcp_segment_t.hpp"
 
-#endif // __WINJECT_FRAME_DEFS_HPP__
+// LLC-CTL-ACK Payload:
+//    +-------------------------------+
+// 00 | LLC SN                        |
+//    +-------------------------------+
+// 01 | COUNT                         |
+//    +-------------------------------+
+
+struct llc_payload_ack_t
+{
+    llc_sn_t sn;
+    llc_sn_t count;
+} __attribute((packed));
+
+#endif // __WINJECT_FRAMES_LLC_PAYLOAD_ACK_HPP__

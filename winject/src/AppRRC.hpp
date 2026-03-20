@@ -26,7 +26,7 @@
 #include <bfc/epoll_reactor.hpp>
 #include <bfc/timer.hpp>
 
-#include "802_11.hpp"
+#include "frames/802_11.hpp"
 #include "802_11_filters.hpp"
 #include "radiotap.hpp"
 

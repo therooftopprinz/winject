@@ -1,6 +1,6 @@
 #include <winject/wifi.hpp>
 #include <winject/radiotap.hpp>
-#include <winject/802_11.hpp>
+#include <winject/frames/802_11.hpp>
 
 #include <thread>
 

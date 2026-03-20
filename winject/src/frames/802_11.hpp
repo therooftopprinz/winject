@@ -18,8 +18,12 @@
 #ifndef __WINJECT_802_11_hpp__
 #define __WINJECT_802_11_hpp__
 
+#include <cstddef>
 #include <cstdint>
-#include "safeint.hpp"
+#include <cstdio>
+#include <string>
+
+#include "../safeint.hpp"
 
 namespace winject
 {
