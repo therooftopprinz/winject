@@ -42,8 +42,7 @@ class basic_llc_t
 public:
     using byte_ptr = std::conditional_t<IsConst, const uint8_t*, uint8_t*>;
 
-
-    basic_llc_t() = delete;
+    basic_llc_t(size_t crc_size = 0);
 
     basic_llc_t(byte_ptr base, size_t size, size_t crc_size = 0);
 
@@ -122,5 +121,18 @@ private:
 
 using llc_t       = basic_llc_t<false>;
 using llc_const_t = basic_llc_t<true>;
+
+// LLC-CTL-ACK Payload:
+//    +-------------------------------+
+// 00 | LLC SN                        |
+//    +-------------------------------+
+// 01 | COUNT                         |
+//    +-------------------------------+
+
+struct llc_payload_ack_t
+{
+    llc_sn_t sn;
+    llc_sn_t count;
+} __attribute((packed));
 
 #endif // __WINJECT_FRAMES_BASIC_LLC_T_HPP__

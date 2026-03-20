@@ -30,7 +30,6 @@
 #include "frames/safe_checker.hpp"
 #include "frames/basic_fec.hpp"
 #include "frames/basic_llc.hpp"
-#include "frames/llc_payload_ack.hpp"
 #include "frames/pdcp.hpp"
 #include "frames/basic_pdcp_segment.hpp"
 

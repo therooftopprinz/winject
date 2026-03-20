@@ -20,6 +20,11 @@
 #include <cstring>
 
 template <bool IsConst>
+basic_llc_t<IsConst>::basic_llc_t(size_t crc_size)
+    : crc_size(crc_size)
+{}
+
+template <bool IsConst>
 basic_llc_t<IsConst>::basic_llc_t(byte_ptr base, size_t size, size_t crc_size)
     : base(base)
     , max_size(size)

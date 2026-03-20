@@ -20,6 +20,7 @@
 
 #include <array>
 #include <cstdlib>
+#include <mutex>
 
 template<size_t POLYNOMIAL, size_t CRCWIDTH, typename crc_t, bool ref_in, bool ref_out, crc_t INITIAL=0, crc_t FINAL=0>
 struct crc{
