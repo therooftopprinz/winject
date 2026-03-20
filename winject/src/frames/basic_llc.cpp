@@ -166,7 +166,7 @@ void basic_llc_t<IsConst>::set_payload_size(llc_sz_t size)
 template <bool IsConst>
 bool basic_llc_t<IsConst>::is_valid() const
 {
-    return get_SIZE() > max_size;
+    return max_size >= get_SIZE();
 }
 
 template <bool IsConst>

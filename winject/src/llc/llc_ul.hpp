@@ -13,26 +13,51 @@
 namespace winject
 {
 
+/**
+ * @brief LLC header CRC selection.
+ */
 enum llc_crc_type_e
 {
+    /** @brief Disable CRC in LLC headers. */
     E_LLC_CRC_TYPE_NONE,
+    /** @brief Enable CRC-32 using polynomial 0x04C11DB7. */
     E_LLC_CRC_TYPE_CRC32_04C11DB7
 };
 
+/**
+ * @brief LLC UL transmission mode.
+ */
 enum llc_tx_mode_e
 {
+    /** @brief TM mode (transmission mode) - retransmission bookkeeping differs. */
     E_LLC_TX_MODE_TM,
+    /** @brief AM mode (acknowledged mode) - uses ACK-driven retransmissions. */
     E_LLC_TX_MODE_AM
 };
 
+/**
+ * @brief llc_ul configuration parameters.
+ */
 struct llc_ul_config_t
 {
+    /** @brief Logical Channel Identifier (LCID) to place into LLC headers. */
     lcid_t         lcid                    = 0;
+    /** @brief CRC configuration for LLC headers. */
     llc_crc_type_e crc_type                = E_LLC_CRC_TYPE_NONE;
+    /** @brief Transmission mode (TM/AM). */
     llc_tx_mode_e  mode                    = E_LLC_TX_MODE_TM;
+    /**
+     * @brief TX slot ring size.
+     *
+     * Must be non-zero and a power of two; otherwise `validate_config()` will
+     * set `STATUS_BIT_INVALID_CONFIG`.
+     */
     size_t         tx_size                 = 512;
+    /** @brief Minimum slot distance used for AM retransmission re-checking. */
     size_t         min_recheck_slot_number = 10;
+    /** @brief Maximum slot distance used for AM retransmission re-checking. */
     size_t         max_recheck_slot_number = 50;
+    /** @brief Maximum retransmission count used for AM scheduling. */
     size_t         max_retx_count          = 10;
 };
 
@@ -60,24 +85,26 @@ class llc_ul
      * - `STATUS_BIT_SN_LOST`: SN exceeded maximum retransmission count.
      * - `STATUS_BIT_SPURIOUS_ACK_SN`: ACK received for unknown/untracked SN.
      * - `STATUS_BIT_SPURIOUS_ACK_TX`: ACK received for already-acknowledged TX.
+     * - `STATUS_BIT_SHOULD_NOT_HAPPEN`: Internal invariant violation (typically accompanied by another error bit).
      */
-    static constexpr uint64_t STATUS_BIT_SLOT_SKIPPED           = 1 << 0; // reset required
-    static constexpr uint64_t STATUS_BIT_DATA_PDU_ALLOCATED     = 1 << 1;
-    static constexpr uint64_t STATUS_BIT_WRITE_BUFFER_TOO_SMALL = 1 << 2;
-    static constexpr uint64_t STATUS_BIT_INVALID_LLC_PDU        = 1 << 3;
-    static constexpr uint64_t STATUS_BIT_NO_TX_SLOT             = 1 << 4;
-    static constexpr uint64_t STATUS_BIT_NO_FREE_SN             = 1 << 5;
-    static constexpr uint64_t STATUS_BIT_INVALID_CONFIG         = 1 << 6; // reset required
-    static constexpr uint64_t STATUS_BIT_SN_LOST                = 1 << 7;
-    static constexpr uint64_t STATUS_BIT_SPURIOUS_ACK_SN        = 1 << 8;
-    static constexpr uint64_t STATUS_BIT_SPURIOUS_ACK_TX        = 1 << 9;
+    static constexpr uint64_t STATUS_BIT_SLOT_SKIPPED           = 1ull << 0; // reset required
+    static constexpr uint64_t STATUS_BIT_DATA_PDU_ALLOCATED     = 1ull << 1;
+    static constexpr uint64_t STATUS_BIT_WRITE_BUFFER_TOO_SMALL = 1ull << 2;
+    static constexpr uint64_t STATUS_BIT_INVALID_LLC_PDU        = 1ull << 3;
+    static constexpr uint64_t STATUS_BIT_NO_TX_SLOT             = 1ull << 4;
+    static constexpr uint64_t STATUS_BIT_NO_FREE_SN             = 1ull << 5;
+    static constexpr uint64_t STATUS_BIT_INVALID_CONFIG         = 1ull << 6; // reset required
+    static constexpr uint64_t STATUS_BIT_SN_LOST                = 1ull << 7;
+    static constexpr uint64_t STATUS_BIT_SPURIOUS_ACK_SN        = 1ull << 8;
+    static constexpr uint64_t STATUS_BIT_SPURIOUS_ACK_TX        = 1ull << 9;
+    static constexpr uint64_t STATUS_BIT_SHOULD_NOT_HAPPEN      = 1ull << 63;
 
     /**
      * @brief Construct an LLC UL transmitter from configuration.
      *
-     * The constructor calls `validate_config()` and then `reset()`.
-     * Since `reset()` clears `status`, configuration failures are not visible
-     * via `get_status()` unless the configuration is applied through `reconfigure()`.
+     * The constructor resets internal state and then calls `validate_config()`.
+     * Any invalid configuration flags set by `validate_config()` remain visible
+     * via `get_status()`.
      *
      * @param config LLC UL configuration.
      */
@@ -103,7 +130,7 @@ class llc_ul
     /**
      * @brief Get the currently active configuration.
      *
-     * @return Current configuration.
+     * @return Current configuration (by value).
      *
      * @par Status codes set
      * None.
@@ -128,12 +155,14 @@ class llc_ul
      * `STATUS_BIT_SLOT_SKIPPED` is set and the function returns `false`.
      *
      * @param slot_number New current slot number.
-     * @return `true` when the slot advance succeeded; `false` on unexpected conditions.
+     * @return `true` when no unexpected conditions occurred, false otherwise.
      *
      * @par Status codes set
      * - `STATUS_BIT_SLOT_SKIPPED`: AM mode when the slot number is not expected.
      * - `STATUS_BIT_SPURIOUS_ACK_SN`: AM mode when transitioning a TX slot requires an SN entry
      *   but that SN bookkeeping is missing.
+     * - `STATUS_BIT_SHOULD_NOT_HAPPEN`: typically set together with `STATUS_BIT_SPURIOUS_ACK_SN`
+     *   when an internal invariant is violated.
      */
     bool update_current_slot_number(size_t slot_number);
 
@@ -145,7 +174,18 @@ class llc_ul
      * @par Status codes set
      * None.
      */
-    size_t get_free_tx_slot();
+    ssize_t get_free_tx_slot() const;
+
+    /**
+     * @brief Get the number of outstanding (not yet ACKed) DATA LLC PDUs.
+     *
+     * This value is incremented when a DATA PDU is successfully enqueued in
+     * AM mode, and decremented when that PDU is ACKed or dropped due to
+     * retransmission-related conditions.
+     *
+     * @return Outstanding DATA PDU count.
+     */
+    ssize_t get_pending_llc_pdu_count() const;
 
     /**
      * @brief Process an incoming ACK for the given LLC sequence number (SN).
@@ -159,6 +199,8 @@ class llc_ul
      * @par Status codes set
      * - `STATUS_BIT_SPURIOUS_ACK_SN`: SN is unknown/untracked for this transmitter.
      * - `STATUS_BIT_SPURIOUS_ACK_TX`: ACK corresponds to a TX element that was already acknowledged.
+     * - `STATUS_BIT_SHOULD_NOT_HAPPEN`: set when an unexpected ACK is neither found in the
+     *   SN bookkeeping nor in the retransmission list.
      */
     bool acknowledge(llc_sn_t sn);
 
@@ -170,7 +212,7 @@ class llc_ul
      * @par Status codes set
      * None.
      */
-    size_t get_retransmission_size();
+    size_t get_retransmission_size() const;
 
     /**
      * @brief Write the next retransmission PDU into `buffer` and enqueue it for TX-slot allocation.
@@ -181,6 +223,7 @@ class llc_ul
      * @par Status codes set
      * - `STATUS_BIT_WRITE_BUFFER_TOO_SMALL`: when `buffer.size()` is smaller than the retransmission PDU size.
      * - `STATUS_BIT_SPURIOUS_ACK_SN`: when the retransmission SN bookkeeping entry is missing.
+     * - `STATUS_BIT_SHOULD_NOT_HAPPEN`: typically set together with `STATUS_BIT_SPURIOUS_ACK_SN`.
      * - `STATUS_BIT_SN_LOST`: when retry count reached `config.max_retx_count`.
      * - `STATUS_BIT_NO_TX_SLOT`: if retransmission enqueueing cannot find a free TX slot.
      * - `STATUS_BIT_DATA_PDU_ALLOCATED`: when data PDU was successfully allocated/enqueued.
@@ -354,8 +397,15 @@ private:
     std::vector<std::optional<sn_elem_t>> sn_ring;
     std::list<retx_elem_t>                retx_list;
 
-    size_t                                used_tx_slots = 0;
-    size_t                                pending_llc_pdu_count = 0;
+    ssize_t                                used_tx_slots = 0;
+
+    /**
+     * @brief Number of LLC PDUs waiting for ACK / retransmission.
+     *
+     * Tracks DATA PDUs from successful enqueue until they are ACKed, or until
+     * they are removed due to retransmission-related failures (e.g. SN lost).
+     */
+    ssize_t                                pending_llc_pdu_count = 0;
 };
 
 } // namespace winject

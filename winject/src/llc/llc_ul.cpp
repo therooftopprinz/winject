@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -13,8 +14,8 @@ namespace winject
 llc_ul::llc_ul(const llc_ul_config_t& config)
     : config(config)
 {
-    validate_config();
     reset();
+    validate_config();
 }
 
 llc_ul::~llc_ul()
@@ -25,6 +26,7 @@ void llc_ul::reconfigure(const llc_ul_config_t& c)
     config = c;
     reset();
     validate_config();
+    
 }
 
 llc_ul_config_t llc_ul::get_config()
@@ -60,7 +62,6 @@ bool llc_ul::update_current_slot_number(size_t slot)
     }
 
     clear_sbit(STATUS_BIT_DATA_PDU_ALLOCATED);
-    clear_sbit(STATUS_BIT_SN_LOST);
 
     current_slot_number = slot;
 
@@ -71,9 +72,11 @@ bool llc_ul::update_current_slot_number(size_t slot)
         used_tx_slots--;
 
         auto& sn_elem = sn_ring[sn_ring_index(old_slot.sn)];
+        clear_sbit(STATUS_BIT_SHOULD_NOT_HAPPEN);
+        clear_sbit(STATUS_BIT_SPURIOUS_ACK_SN);
         if (!sn_elem)
         {
-            set_sbit(STATUS_BIT_SPURIOUS_ACK_SN);
+            set_sbit(STATUS_BIT_SPURIOUS_ACK_SN | STATUS_BIT_SHOULD_NOT_HAPPEN);
             return false;
         }
 
@@ -89,15 +92,21 @@ bool llc_ul::update_current_slot_number(size_t slot)
     return true;
 }
 
-size_t llc_ul::get_free_tx_slot()
+ssize_t llc_ul::get_free_tx_slot() const
 {
     return tx_ring.size() - used_tx_slots;
 }
+
+ssize_t llc_ul::get_pending_llc_pdu_count() const
+{
+    return pending_llc_pdu_count;
+}   
 
 bool llc_ul::acknowledge(llc_sn_t sn)
 {
     clear_sbit(STATUS_BIT_SPURIOUS_ACK_SN);
     clear_sbit(STATUS_BIT_SPURIOUS_ACK_TX);
+    clear_sbit(STATUS_BIT_SHOULD_NOT_HAPPEN);
 
     auto& sn_elem = sn_ring[sn_ring_index(sn)];
     if (!sn_elem)
@@ -116,7 +125,8 @@ bool llc_ul::acknowledge(llc_sn_t sn)
             pending_llc_pdu_count--;
             return true;
         }
-        set_sbit(STATUS_BIT_SPURIOUS_ACK_SN);
+
+        set_sbit(STATUS_BIT_SPURIOUS_ACK_SN | STATUS_BIT_SHOULD_NOT_HAPPEN);
         return false;
     }
 
@@ -131,6 +141,7 @@ bool llc_ul::acknowledge(llc_sn_t sn)
         return true;
     }
 
+    // @note: can happen if ack got duplicated
     set_sbit(STATUS_BIT_SPURIOUS_ACK_TX);
     return false;
 }
@@ -171,7 +182,7 @@ std::optional<size_t> llc_ul::enqueue_tx_check(bfc::shared_buffer_view&& llc_pdu
     return std::nullopt;
 }
 
-size_t llc_ul::get_retransmission_size()
+size_t llc_ul::get_retransmission_size() const
 {
     if (retx_list.empty())
     {
@@ -210,9 +221,10 @@ size_t llc_ul::write_retransmission_pdu(bfc::buffer_view target)
     auto& sn_elem = sn_ring[sn_ring_index(retx_elem.sn)];
 
     clear_sbit(STATUS_BIT_SPURIOUS_ACK_SN);
+    clear_sbit(STATUS_BIT_SHOULD_NOT_HAPPEN);
     if (!sn_elem)
     {
-        set_sbit(STATUS_BIT_SPURIOUS_ACK_SN);
+        set_sbit(STATUS_BIT_SPURIOUS_ACK_SN | STATUS_BIT_SHOULD_NOT_HAPPEN);
         retx_list.pop_front();
         pending_llc_pdu_count--;
         return 0;
@@ -274,8 +286,10 @@ size_t llc_ul::write_llc_pdu(bfc::shared_buffer_view target)
         return 0;
     }
 
+    llc_t llc(reinterpret_cast<uint8_t*>(target.data()), target.size(), crc_size());
+
     std::optional<sn_elem_t>& sn_elem = sn_ring[sn_ring_index(sn_counter)];
-    if (llc_tx_mode_e::E_LLC_TX_MODE_AM ==config.mode)
+    if (llc_tx_mode_e::E_LLC_TX_MODE_AM ==config.mode && !llc.get_A())
     {
         clear_sbit(STATUS_BIT_NO_FREE_SN);
         if (sn_elem)
@@ -285,24 +299,29 @@ size_t llc_ul::write_llc_pdu(bfc::shared_buffer_view target)
         }
     }
 
-    llc_t llc(reinterpret_cast<uint8_t*>(target.data()), target.size(), crc_size());
-
     clear_sbit(STATUS_BIT_INVALID_LLC_PDU);
     if (!llc.is_valid())
     {
         set_sbit(STATUS_BIT_INVALID_LLC_PDU);
         return 0;
     }
-    
-    if (crc_size())
+
+    if (llc.get_A())
+    {
+        llc.set_SN(0);
+    }
+    else
+    {
+        llc.set_SN(sn_counter);
+    }
+
+    if(crc_size())
     {
         std::memset(llc.get_CRC(), 0, crc_size());
         winject::BEU32UA crc_actual = crc32_04C11DB7()(llc.get_base(), llc.get_SIZE());
         std::memcpy(llc.get_CRC(), &crc_actual,  std::min(crc_size(), sizeof(crc_actual)));
     }
     
-    llc.set_SN(sn_counter);
-
     if (llc_tx_mode_e::E_LLC_TX_MODE_AM == config.mode && !llc.get_A())
     {
         auto tx_check_slot_number = enqueue_tx_check(std::move(target), sn_counter, 0);
@@ -310,14 +329,17 @@ size_t llc_ul::write_llc_pdu(bfc::shared_buffer_view target)
         {
             return 0;
         }
-
+        
         sn_elem = sn_elem_t{*tx_check_slot_number};
+        sn_counter++;
+        pending_llc_pdu_count++;
+        set_sbit(STATUS_BIT_DATA_PDU_ALLOCATED);
+    }
+    else
+    {
+        sn_counter++;
     }
 
-    sn_counter++;
-    pending_llc_pdu_count++;
-
-    set_sbit(STATUS_BIT_DATA_PDU_ALLOCATED);
     return llc.get_SIZE();
 }
 

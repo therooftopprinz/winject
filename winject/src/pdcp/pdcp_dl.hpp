@@ -18,6 +18,11 @@
 #ifndef __PDCP_PDCP_DL_CB_HPP__
 #define __PDCP_PDCP_DL_CB_HPP__
 
+/**
+ * @file pdcp_dl.hpp
+ * @brief PDCP downlink reassembly/ordering logic.
+ */
+
 #include <bfc/buffer.hpp>
 #include <bfc/sized_buffer.hpp>
 #include "frame_defs.hpp"
@@ -29,43 +34,112 @@
 namespace winject
 {
 
+/**
+ * @brief PDCP downlink configuration.
+ */
 struct pdcp_dl_config_t
 {
-    // @brief Breakdown frame data into smaller packets.
+    /** @brief Allow segmentation input to be reassembled into larger packets. */
     bool allow_segmentation = false;
-    // @brief Allow reordering of the packets.
+    /** @brief Allow reordering by using PDCP SN and emitting in-order. */
     bool allow_reordering = false;
-    // @brief Length of reorder buffer (slots). When slot is occupied by another SN, frame goes to overflow deque.
+    /**
+     * @brief Length of the reordering ring (slots).
+     *
+     * When a ring slot is occupied by a different SN, segments are stored in
+     * an overflow deque instead.
+     */
     size_t reorder_size = 512;
 };
 
-/* @brief PDCP DL class with circular-buffer reordering
- * Same interface as pdcp_dl but uses a circular buffer for reordering instead of a map.
- * When the circular buffer slot is occupied (different SN), frames are stored in an overflow deque.
+/**
+ * @brief PDCP downlink logic with circular-buffer reordering.
+ *
+ * Collects PDCP segments from `on_pdcp_data()`, reassembles frames, and
+ * optionally reorders them before they become available via `pop()`.
  */
 class pdcp_dl
 {
 public:
+    /**
+     * @brief Status code for PDCP downlink processing.
+     *
+     * Returned through `get_status()` and set by `on_pdcp_data()` on error/success.
+     */
     enum status_code_e
     {
+        /** @brief Processing succeeded. */
         STATUS_CODE_SUCCESS,
+        /** @brief Input PDCP buffer was empty. */
         STATUS_CODE_INPUT_EMPTY,
+        /** @brief Segment header scan/validation failed. */
         STATUS_CODE_SEGMENT_SCAN_FAILED,
+        /** @brief Segment length exceeded the remaining input. */
         STATUS_CODE_SEGMENT_OUTSIDE_INPUT,
+        /** @brief Segment reserved/invalid payload size used. */
         STATUS_CODE_RESERVED_VALUE_USED
     };
 
+    /**
+     * @brief Construct PDCP downlink logic from configuration.
+     * @param config PDCP downlink configuration.
+     */
     pdcp_dl(const pdcp_dl_config_t& config);
+    
+    /**
+     * @brief Destroy PDCP downlink logic.
+     */
     ~pdcp_dl();
 
-    void                reset();
-    void                reconfigure(const pdcp_dl_config_t& config);
+    /** @brief Reset internal state and clear outstanding buffers/frames. */
+    void reset();
+    
+    /**
+     * @brief Apply a new configuration and re-initialize internal state.
+     * @param config New PDCP downlink configuration.
+     */
+    void reconfigure(const pdcp_dl_config_t& config);
+    
+    /**
+     * @brief Get the currently active configuration.
+     * @return Active configuration (by value).
+     */
     pdcp_dl_config_t get_config();
-    bool                on_pdcp_data(bfc::const_buffer_view pdcp);
-    size_t              get_outstanding_bytes();
-    size_t              get_outstanding_packet();
-    bfc::sized_buffer   pop();
-    status_code_e       get_status();
+    
+    /**
+     * @brief Consume a PDCP downlink byte stream and build reassembled frames.
+     *
+     * Segments are validated during parsing; on error `status` is updated and the
+     * function returns `false`.
+     *
+     * When `config.allow_reordering` is enabled, frames are emitted in-order and
+     * stored for later retrieval by `pop()`.
+     *
+     * @param pdcp Input PDCP bytes.
+     * @return `true` on success; `false` on parse/reassembly errors.
+     */
+    bool on_pdcp_data(bfc::const_buffer_view pdcp);
+    
+    /**
+     * @brief Get total number of outstanding bytes ready to be popped.
+     * @return Outstanding bytes (bytes in reassembled frames not yet popped).
+     */
+    size_t get_outstanding_bytes();
+    
+    /**
+     * @brief Get number of outstanding completed frames ready to be popped.
+     * @return Completed frame count.
+     */
+    size_t get_outstanding_packet();
+    
+    /**
+     * @brief Pop next completed frame (FIFO).
+     * @return Next completed frame; returns an empty buffer when none is available.
+     */
+    bfc::sized_buffer pop();
+    
+    /** @brief Get the last status set by `on_pdcp_data()`. */
+    status_code_e get_status();
 
 private:
     struct reassembly_state_t
