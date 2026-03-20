@@ -15,23 +15,38 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __WINJECT_FRAME_DEFS_HPP__
-#define __WINJECT_FRAME_DEFS_HPP__
-
-#include <cstdint>
-#include <cstddef>
-#include <optional>
-#include <type_traits>
-#include <cstring>
-#include "safeint.hpp"
-#include "info_defs.hpp"
-
-#include "frames/frame_types.hpp"
-#include "frames/safe_checker.hpp"
-#include "frames/basic_fec.hpp"
-#include "frames/basic_llc.hpp"
-#include "frames/llc_payload_ack.hpp"
 #include "frames/pdcp.hpp"
-#include "frames/basic_pdcp_segment.hpp"
 
-#endif // __WINJECT_FRAME_DEFS_HPP__
+pdcp_t::pdcp_t(uint8_t* base_, size_t size)
+    : base(base_)
+    , max_size(size)
+{}
+
+void pdcp_t::rescan()
+{
+    uint8_t* ptr = base;
+
+    if (iv_size)
+    {
+        iv = ptr;
+        ptr += iv_size;
+    }
+
+    if (hmac_size)
+    {
+        hmac = ptr;
+        ptr += hmac_size;
+    }
+
+    payload = ptr;
+}
+
+size_t pdcp_t::get_header_size()
+{
+    return (hmac_size + iv_size);
+}
+
+bool pdcp_t::is_header_valid()
+{
+    return max_size > get_header_size();
+}

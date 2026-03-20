@@ -32,50 +32,20 @@
 // @note: Deprecated, pdcp is now composed of pdcp_segment_t only, encryption moved to upper layer.
 struct pdcp_t
 {
-    pdcp_t(uint8_t* base, size_t size)
-        : base(base)
-        , max_size(size)
-    {
-    }
+    pdcp_t(uint8_t* base, size_t size);
 
-    void rescan()
-    {
-        uint8_t *ptr = base;
+    void   rescan();
+    size_t get_header_size();
+    bool   is_header_valid();
 
-        if (iv_size)
-        {
-            iv = ptr;
-            ptr += iv_size;
-        }
-
-        if (hmac_size)
-        {
-            hmac = ptr;
-            ptr += hmac_size;
-        }
-
-        payload = ptr;
-    }
-
-    size_t get_header_size()
-    {
-        return (hmac_size + iv_size);
-    }
-
-    bool is_header_valid()
-    {
-        return max_size > get_header_size();
-    }
-
-    size_t iv_size = 0;
+    size_t iv_size   = 0;
     size_t hmac_size = 0;
 
-    uint8_t* iv = nullptr;
-    uint8_t* hmac = nullptr;
-
+    uint8_t* iv      = nullptr;
+    uint8_t* hmac    = nullptr;
     uint8_t* payload = nullptr;
 
-    uint8_t* base = nullptr;
+    uint8_t* base    = nullptr;
     size_t   max_size = 0;
 };
 

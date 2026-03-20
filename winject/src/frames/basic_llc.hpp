@@ -20,7 +20,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <type_traits>
 
 #include "frames/frame_types.hpp"
@@ -46,134 +45,57 @@ public:
 
     basic_llc_t() = delete;
 
-    basic_llc_t(byte_ptr base, size_t size, size_t crc_size = 0)
-        : base(base)
-        , max_size(size)
-        , crc_size(crc_size)
-    {}
+    basic_llc_t(byte_ptr base, size_t size, size_t crc_size = 0);
 
-    basic_llc_t(const basic_llc_t& other)
-        : base(other.base)
-        , max_size(other.max_size)
-        , crc_size(other.crc_size)
-    {}
+    basic_llc_t(const basic_llc_t& other);
 
-    basic_llc_t& operator=(const basic_llc_t& other)
-    {
-        base = other.base;
-        max_size = other.max_size;
-        crc_size = other.crc_size;
-        return *this;
-    }
+    basic_llc_t& operator=(const basic_llc_t& other);
 
-    void rebase(byte_ptr new_base, size_t new_max_size)
-    {
-        base = new_base;
-        max_size = new_max_size;
-    }
+    void rebase(byte_ptr new_base, size_t new_max_size);
 
-    byte_ptr get_base() const
-    {
-        return base;
-    }
+    byte_ptr get_base() const;
 
-    size_t get_max_size() const
-    {
-        return max_size;
-    }
+    size_t get_max_size() const;
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set_SN(llc_sn_t sn)
-    {
-        set(0, mask_SN, shift_SN, sn);
-    }
+    void set_SN(llc_sn_t sn);
 
-    llc_sn_t get_SN() const
-    {
-        return get(0, mask_SN, shift_SN);
-    }
+    llc_sn_t get_SN() const;
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set_LCID(lcid_t lcid)
-    {
-        set(1, mask_LCID, shift_LCID, lcid);
-    }
+    void set_LCID(lcid_t lcid);
 
-    lcid_t get_LCID() const
-    {
-        return get(1, mask_LCID, shift_LCID);
-    }
+    lcid_t get_LCID() const;
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set_A(bool val)
-    {
-        set(1, mask_A, shift_A, val);
-    }
+    void set_A(bool val);
 
-    bool get_A() const
-    {
-        return get(1, mask_A, shift_A);
-    }
+    bool get_A() const;
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set_SIZE(llc_sz_t size)
-    {
-        set(1, mask_SIZEH, shift_SIZEH, size >> 8);
-        set(2, mask_SIZEL, shift_SIZEL, size);
-    }
+    void set_SIZE(llc_sz_t size);
 
-    llc_sz_t get_SIZE() const
-    {
-        return (get(1, mask_SIZEH, shift_SIZEH) << 8) |
-               (get(2, mask_SIZEL, shift_SIZEL));
-    }
+    llc_sz_t get_SIZE() const;
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set_CRC(byte_ptr crc)
-    {
-        std::memcpy(base + 3, crc, crc_size);
-    }
+    void set_CRC(byte_ptr crc);
 
-    byte_ptr get_CRC() const
-    {
-        return base + 3;
-    }
+    byte_ptr get_CRC() const;
 
-    llc_sz_t get_header_size() const
-    {
-        return 3 + crc_size;
-    }
+    llc_sz_t get_header_size() const;
 
-    byte_ptr get_payload() const
-    {
-        return base + get_header_size();
-    }
+    byte_ptr get_payload() const;
 
-    llc_sz_t get_max_payload_size() const
-    {
-        return max_size - get_header_size();
-    }
+    llc_sz_t get_max_payload_size() const;
 
-    llc_sz_t get_payload_size() const
-    {
-        return get_SIZE() - get_header_size();
-    }
+    llc_sz_t get_payload_size() const;
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set_payload_size(llc_sz_t size)
-    {
-        set_SIZE(size + get_header_size());
-    }
+    void set_payload_size(llc_sz_t size);
 
-    bool is_valid() const
-    {
-        return get_SIZE() > max_size;
-    }
+    bool is_valid() const;
 
-    bool is_header_valid() const
-    {
-        return max_size >= get_header_size();
-    }
+    bool is_header_valid() const;
 
 private:
     static constexpr uint8_t mask_SN    = 0b11111111;
@@ -188,18 +110,10 @@ private:
     static constexpr uint8_t shift_SIZEH = 0;
     static constexpr uint8_t shift_SIZEL = 0;
 
-    uint8_t get(int index, uint8_t mask, uint8_t shift) const
-    {
-        return (base[index] & mask) >> shift;
-    }
+    uint8_t get(int index, uint8_t mask, uint8_t shift) const;
 
     template <bool B = IsConst, typename = std::enable_if_t<!B>>
-    void set(int index, uint8_t mask, uint8_t shift, uint8_t val)
-    {
-        uint8_t mv = base[index] & ~mask;
-        mv |= ((val << shift) & mask);
-        base[index] = mv;
-    }
+    void set(int index, uint8_t mask, uint8_t shift, uint8_t val);
 
     byte_ptr     base     = nullptr;
     llc_sz_t     max_size = 0;

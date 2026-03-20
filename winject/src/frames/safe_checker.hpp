@@ -25,12 +25,7 @@ class safe_checker
 {
 public:
     safe_checker() = delete;
-    safe_checker(uint8_t* start, uint8_t* end, bool& validity)
-        : start(start)
-        , current(start)
-        , end(end)
-        , validity(validity)
-    {}
+    safe_checker(uint8_t* start, uint8_t* end, bool& validity);
 
     template <typename T>
     T* get()
@@ -45,38 +40,16 @@ public:
         return rv;
     }
 
-    uint8_t* get_n(size_t n)
-    {
-        if (current + n > end)
-        {
-            validity = false;
-            return nullptr;
-        }
-        auto rv = reinterpret_cast<uint8_t*>(current);
-        current += n;
-        return rv;
-    }
-
-    bool is_valid() const
-    {
-        return validity;
-    }
-
-    operator bool() const
-    {
-        return is_valid();
-    }
-
-    size_t remaining() const
-    {
-        return size_t(end - current);
-    }
+    uint8_t* get_n(size_t n);
+    bool     is_valid() const;
+    operator bool() const;
+    size_t   remaining() const;
 
 private:
-    uint8_t* start = nullptr;
+    uint8_t* start   = nullptr;
     uint8_t* current = nullptr;
-    uint8_t* end = nullptr;
-    bool& validity;
+    uint8_t* end     = nullptr;
+    bool&    validity;
 };
 
 #endif // __WINJECT_FRAMES_SAFE_CHECKER_HPP__

@@ -21,13 +21,13 @@
 #include <cstddef>
 #include <cstdint>
 
-using llc_sn_t = uint8_t;
-using lcid_t = uint8_t;
-using llc_sz_t = uint16_t;
-using pdcp_sn_t = uint16_t;
+using llc_sn_t              = uint8_t;
+using lcid_t                = uint8_t;
+using llc_sz_t              = uint16_t;
+using pdcp_sn_t             = uint16_t;
 using pdcp_segment_offset_t = uint16_t;
 
 constexpr llc_sn_t llc_sn_mask = 0b11111111;
-constexpr size_t llc_sn_size = llc_sn_mask + 1;
+constexpr size_t   llc_sn_size = llc_sn_mask + 1;
 
 #endif // __WINJECT_FRAMES_FRAME_TYPES_HPP__

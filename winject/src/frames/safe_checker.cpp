@@ -15,23 +15,38 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __WINJECT_FRAME_DEFS_HPP__
-#define __WINJECT_FRAME_DEFS_HPP__
-
-#include <cstdint>
-#include <cstddef>
-#include <optional>
-#include <type_traits>
-#include <cstring>
-#include "safeint.hpp"
-#include "info_defs.hpp"
-
-#include "frames/frame_types.hpp"
 #include "frames/safe_checker.hpp"
-#include "frames/basic_fec.hpp"
-#include "frames/basic_llc.hpp"
-#include "frames/llc_payload_ack.hpp"
-#include "frames/pdcp.hpp"
-#include "frames/basic_pdcp_segment.hpp"
 
-#endif // __WINJECT_FRAME_DEFS_HPP__
+safe_checker::safe_checker(uint8_t* start_, uint8_t* end_, bool& validity_)
+    : start(start_)
+    , current(start_)
+    , end(end_)
+    , validity(validity_)
+{}
+
+uint8_t* safe_checker::get_n(size_t n)
+{
+    if (current + n > end)
+    {
+        validity = false;
+        return nullptr;
+    }
+    auto rv = reinterpret_cast<uint8_t*>(current);
+    current += n;
+    return rv;
+}
+
+bool safe_checker::is_valid() const
+{
+    return validity;
+}
+
+safe_checker::operator bool() const
+{
+    return is_valid();
+}
+
+size_t safe_checker::remaining() const
+{
+    return size_t(end - current);
+}

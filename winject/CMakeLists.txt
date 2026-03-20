@@ -51,6 +51,12 @@ add_executable(test
     src/PDCP.cpp
     src/pdcp/pdcp_dl.cpp
     src/pdcp/pdcp_ul.cpp
+    src/frames/basic_llc.cpp
+    src/frames/basic_fec.cpp
+    src/frames/basic_pdcp_segment.cpp
+    src/frames/pdcp.cpp
+    src/frames/safe_checker.cpp
+    src/frames/802_11.cpp
     )
 target_include_directories(test PRIVATE
     src
@@ -74,6 +80,15 @@ if(BUILD_COVERAGE)
 endif()
 
 file(GLOB_RECURSE winject_src src/*.cpp)
+list(APPEND winject_src
+    src/frames/basic_llc.cpp
+    src/frames/basic_fec.cpp
+    src/frames/basic_pdcp_segment.cpp
+    src/frames/pdcp.cpp
+    src/frames/safe_checker.cpp
+    src/frames/802_11.cpp
+    )
+list(REMOVE_DUPLICATES winject_src)
 add_executable(winject ${winject_src})
 target_include_directories(winject PRIVATE
     src
